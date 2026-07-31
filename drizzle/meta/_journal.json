@@ -36,6 +36,13 @@
       "when": 1785490966622,
       "tag": "0004_glamorous_marten_broadcloak",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1785504487988,
+      "tag": "0005_add_song_keys",
+      "breakpoints": true
     }
   ]
 }

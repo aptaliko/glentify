@@ -8,6 +8,8 @@ interface CurrentSong {
   id: number;
   title: string;
   lyrics: string | null;
+  maleKey: string | null;
+  femaleKey: string | null;
 }
 
 interface AvailableAxis {
@@ -52,9 +54,20 @@ function SongButton({ song, onPick }: { song: SuggestedSong; onPick: (songId: nu
   );
 }
 
-function LyricsCard({ lyrics }: { lyrics: string | null }) {
+function KeyBadges({ maleKey, femaleKey }: { maleKey: string | null; femaleKey: string | null }) {
+  if (!maleKey && !femaleKey) return null;
   return (
-    <div className="card bg-base-100 p-6 shadow sm:p-8">
+    <div className="flex justify-center gap-2">
+      {maleKey && <span className="badge badge-outline">♂ {maleKey}</span>}
+      {femaleKey && <span className="badge badge-outline">♀ {femaleKey}</span>}
+    </div>
+  );
+}
+
+function LyricsCard({ lyrics, maleKey, femaleKey }: { lyrics: string | null; maleKey: string | null; femaleKey: string | null }) {
+  return (
+    <div className="card flex flex-col gap-3 bg-base-100 p-6 shadow sm:p-8">
+      <KeyBadges maleKey={maleKey} femaleKey={femaleKey} />
       {lyrics ? (
         <pre className="whitespace-pre-wrap text-center font-sans text-xl sm:text-2xl leading-relaxed text-base-content">{lyrics}</pre>
       ) : (
@@ -168,7 +181,7 @@ export default function LiveSessionPage() {
 
       <div className="flex-1 p-4 sm:p-6">
         <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,320px)]">
-          <LyricsCard lyrics={currentSong.lyrics} />
+          <LyricsCard lyrics={currentSong.lyrics} maleKey={currentSong.maleKey} femaleKey={currentSong.femaleKey} />
           <div className="card overflow-hidden bg-base-100 shadow">
             <h2 className="border-b border-base-300 bg-base-200 px-4 py-2 text-sm font-semibold tracking-wide text-base-content/70 uppercase">
               {data.mode === 'filtered' ? data.listTitle : 'Όλα τα τραγούδια'}

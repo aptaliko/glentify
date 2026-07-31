@@ -56,13 +56,15 @@ export interface SongInput {
   lyrics: string | null;
   genreId: number;
   notes: string | null;
+  maleKey: string | null;
+  femaleKey: string | null;
   axisValues: AxisValueInput[];
 }
 
 export async function createSong(data: SongInput): Promise<SongRow> {
   const rows = await db
     .insert(songs)
-    .values({ title: data.title, lyrics: data.lyrics, genreId: data.genreId, notes: data.notes })
+    .values({ title: data.title, lyrics: data.lyrics, genreId: data.genreId, notes: data.notes, maleKey: data.maleKey, femaleKey: data.femaleKey })
     .returning();
   const song = rows[0];
   await replaceSongAxisValues(song.id, data.axisValues);
@@ -72,7 +74,7 @@ export async function createSong(data: SongInput): Promise<SongRow> {
 export async function updateSong(id: number, data: SongInput): Promise<SongRow> {
   const rows = await db
     .update(songs)
-    .set({ title: data.title, lyrics: data.lyrics, genreId: data.genreId, notes: data.notes, updatedAt: new Date() })
+    .set({ title: data.title, lyrics: data.lyrics, genreId: data.genreId, notes: data.notes, maleKey: data.maleKey, femaleKey: data.femaleKey, updatedAt: new Date() })
     .where(eq(songs.id, id))
     .returning();
   await replaceSongAxisValues(id, data.axisValues);

@@ -20,6 +20,8 @@ interface Song {
   title: string;
 }
 
+const PREVIEW_COUNT = 7;
+
 export default function ProgramSequencesPage() {
   const params = useParams<{ id: string }>();
   const [program, setProgram] = useState<ProgramWithSequences | null>(null);
@@ -52,26 +54,33 @@ export default function ProgramSequencesPage() {
   return (
     <main className="flex min-h-screen flex-col items-center gap-6 bg-base-200 p-4">
       <h1 className="text-2xl font-bold">{program.title}</h1>
-      <div className="card w-full max-w-md bg-base-100 shadow">
-        <div className="card-body gap-2">
-          <ul className="flex flex-col gap-3">
-            {program.sequences.map((seq) => (
-              <li key={seq.id} className="flex flex-col gap-1">
-                <Link href={`/programs/${program.id}/sequences/${seq.id}`} className="btn btn-outline btn-lg w-full">
+      <div className="grid w-full max-w-3xl grid-cols-1 gap-4 md:grid-cols-2">
+        {program.sequences.map((seq) => {
+          const songs = songsBySequence[seq.id] ?? [];
+          const remaining = songs.length - PREVIEW_COUNT;
+          return (
+            <div key={seq.id} className="card flex h-72 flex-col bg-base-100 shadow">
+              <div className="card-body flex flex-1 flex-col gap-2 overflow-hidden p-4">
+                <Link href={`/programs/${program.id}/sequences/${seq.id}`} className="btn btn-outline btn-sm w-full shrink-0">
                   {seq.title}
                 </Link>
-                {songsBySequence[seq.id] && songsBySequence[seq.id].length > 0 && (
-                  <ul className="flex flex-wrap gap-x-3 gap-y-1 px-2 text-sm text-base-content/60">
-                    {songsBySequence[seq.id].map((s, i) => (
+                <div className="flex-1 overflow-y-auto">
+                  <ul className="flex flex-col gap-1 text-sm text-base-content/60">
+                    {songs.slice(0, PREVIEW_COUNT).map((s, i) => (
                       <li key={s.id}>{i + 1}. {s.title}</li>
                     ))}
                   </ul>
-                )}
-              </li>
-            ))}
-            {program.sequences.length === 0 && <li className="p-3 text-center text-sm text-base-content/50">Καμία σειρά ακόμη</li>}
-          </ul>
-        </div>
+                  {remaining > 0 && (
+                    <p className="pt-1 text-xs italic text-base-content/40">+{remaining} ακόμα…</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+        {program.sequences.length === 0 && (
+          <p className="col-span-full p-3 text-center text-sm text-base-content/50">Καμία σειρά ακόμη</p>
+        )}
       </div>
       <Link href="/programs" className="link">← Όλα τα προγράμματα</Link>
     </main>

@@ -13,6 +13,8 @@ const updateSchema = z.object({
   lyrics: z.string().nullable(),
   genreId: z.number().int(),
   notes: z.string().nullable(),
+  maleKey: z.string().nullable(),
+  femaleKey: z.string().nullable(),
   axisValues: z.array(axisValueSchema),
 });
 

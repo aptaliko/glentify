@@ -32,6 +32,8 @@ export const songs = pgTable('songs', {
   lyrics: text('lyrics'),
   genreId: integer('genre_id').notNull().references(() => genres.id),
   notes: text('notes'),
+  maleKey: text('male_key'),
+  femaleKey: text('female_key'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });

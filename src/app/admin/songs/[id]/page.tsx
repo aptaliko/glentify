@@ -18,6 +18,8 @@ export default function EditSongPage() {
   const [lyrics, setLyrics] = useState('');
   const [genreId, setGenreId] = useState('');
   const [notes, setNotes] = useState('');
+  const [maleKey, setMaleKey] = useState('');
+  const [femaleKey, setFemaleKey] = useState('');
   const [axisValues, setAxisValues] = useState<AxisValueEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -28,6 +30,8 @@ export default function EditSongPage() {
       setLyrics(song.lyrics ?? '');
       setGenreId(String(song.genreId));
       setNotes(song.notes ?? '');
+      setMaleKey(song.maleKey ?? '');
+      setFemaleKey(song.femaleKey ?? '');
       setAxisValues(
         song.axisValues.map((v: { axisType: string; refId: number | null; yearValue: number | null }) => ({
           axisType: v.axisType,
@@ -49,6 +53,8 @@ export default function EditSongPage() {
         lyrics: lyrics || null,
         genreId: Number(genreId),
         notes: notes || null,
+        maleKey: maleKey || null,
+        femaleKey: femaleKey || null,
         axisValues,
       }),
     });
@@ -91,6 +97,10 @@ export default function EditSongPage() {
           {genres.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
         </select>
         <SongAxisEditor value={axisValues} onChange={setAxisValues} />
+        <div className="flex gap-3">
+          <input value={maleKey} onChange={(e) => setMaleKey(e.target.value)} placeholder="Τόνος (άντρας)" className="input input-bordered flex-1" />
+          <input value={femaleKey} onChange={(e) => setFemaleKey(e.target.value)} placeholder="Τόνος (γυναίκα)" className="input input-bordered flex-1" />
+        </div>
         <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Σημειώσεις (προαιρετικό)" className="input input-bordered" />
         <div className="flex gap-2">
           <button type="submit" className="btn btn-primary">Αποθήκευση</button>

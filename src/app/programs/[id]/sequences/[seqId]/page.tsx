@@ -8,6 +8,8 @@ interface Song {
   id: number;
   title: string;
   lyrics: string | null;
+  maleKey: string | null;
+  femaleKey: string | null;
 }
 
 interface SequenceSongEntry {
@@ -71,7 +73,13 @@ export default function SequencePlaybackPage() {
 
       <div className="flex flex-1 flex-col gap-4 p-4 sm:p-6 lg:flex-row lg:items-start lg:justify-center">
         <div className="flex flex-1 flex-col items-center gap-4 lg:max-w-3xl">
-          <div className="card w-full bg-base-100 p-6 shadow sm:p-8">
+          <div className="card flex w-full flex-col gap-3 bg-base-100 p-6 shadow sm:p-8">
+            {(current.song.maleKey || current.song.femaleKey) && (
+              <div className="flex justify-center gap-2">
+                {current.song.maleKey && <span className="badge badge-outline">♂ {current.song.maleKey}</span>}
+                {current.song.femaleKey && <span className="badge badge-outline">♀ {current.song.femaleKey}</span>}
+              </div>
+            )}
             {current.song.lyrics ? (
               <pre className="whitespace-pre-wrap text-center font-sans text-xl sm:text-2xl leading-relaxed text-base-content">
                 {current.song.lyrics}

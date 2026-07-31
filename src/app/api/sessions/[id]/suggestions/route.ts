@@ -105,7 +105,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   if (result.mode === 'grouped') {
     return NextResponse.json({
-      currentSong: { id: currentSongWithAxes.id, title: currentSongWithAxes.title, lyrics: currentSongWithAxes.lyrics },
+      currentSong: { id: currentSongWithAxes.id, title: currentSongWithAxes.title, lyrics: currentSongWithAxes.lyrics, maleKey: currentSongWithAxes.maleKey, femaleKey: currentSongWithAxes.femaleKey },
       availableAxisTypes,
       activeAxisTypes: [...effectiveActive],
       mode: 'grouped',
@@ -123,7 +123,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   const activeLabels = [...effectiveActive].map((key) => axisLabelByKey.get(key) ?? key);
   return NextResponse.json({
-    currentSong: { id: currentSongWithAxes.id, title: currentSongWithAxes.title, lyrics: currentSongWithAxes.lyrics },
+    currentSong: { id: currentSongWithAxes.id, title: currentSongWithAxes.title, lyrics: currentSongWithAxes.lyrics, maleKey: currentSongWithAxes.maleKey, femaleKey: currentSongWithAxes.femaleKey },
     availableAxisTypes,
     activeAxisTypes: [...effectiveActive],
     mode: 'filtered',
