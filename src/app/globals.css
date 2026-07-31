@@ -1,0 +1,19 @@
+@import "tailwindcss";
+@plugin "daisyui" {
+  themes: corporate --default;
+}
+
+:root {
+  color-scheme: light;
+}
+
+@theme inline {
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+/* Locked to a single (light) daisyUI theme regardless of the OS/browser color
+   scheme -- this is a tablet UI meant to be glanceable on stage, not a themed app. */
+body {
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
