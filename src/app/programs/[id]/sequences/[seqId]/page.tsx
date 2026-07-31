@@ -69,28 +69,49 @@ export default function SequencePlaybackPage() {
         <h1 className="text-center text-xl font-bold sm:text-2xl">{current.song.title}</h1>
       </header>
 
-      <div className="flex flex-1 flex-col items-center gap-4 p-4 sm:p-6">
-        <div className="card w-full max-w-3xl bg-base-100 p-6 shadow sm:p-8">
-          {current.song.lyrics ? (
-            <pre className="whitespace-pre-wrap text-center font-sans text-xl sm:text-2xl leading-relaxed text-base-content">
-              {current.song.lyrics}
-            </pre>
-          ) : (
-            <p className="text-lg italic text-base-content/50">Δεν έχουν προστεθεί ακόμη στίχοι για αυτό το τραγούδι.</p>
-          )}
+      <div className="flex flex-1 flex-col gap-4 p-4 sm:p-6 lg:flex-row lg:items-start lg:justify-center">
+        <div className="flex flex-1 flex-col items-center gap-4 lg:max-w-3xl">
+          <div className="card w-full bg-base-100 p-6 shadow sm:p-8">
+            {current.song.lyrics ? (
+              <pre className="whitespace-pre-wrap text-center font-sans text-xl sm:text-2xl leading-relaxed text-base-content">
+                {current.song.lyrics}
+              </pre>
+            ) : (
+              <p className="text-lg italic text-base-content/50">Δεν έχουν προστεθεί ακόμη στίχοι για αυτό το τραγούδι.</p>
+            )}
+          </div>
+
+          <div className="flex w-full gap-3">
+            {hasPrevious && (
+              <button onClick={() => setIndex((i) => i - 1)} className="btn btn-lg flex-1">
+                ← Προηγούμενο
+              </button>
+            )}
+            {hasNext && (
+              <button onClick={() => setIndex((i) => i + 1)} className="btn btn-primary btn-lg flex-1">
+                Επόμενο →
+              </button>
+            )}
+          </div>
         </div>
 
-        <div className="flex w-full max-w-3xl gap-3">
-          {hasPrevious && (
-            <button onClick={() => setIndex((i) => i - 1)} className="btn btn-lg flex-1">
-              ← Προηγούμενο
-            </button>
-          )}
-          {hasNext && (
-            <button onClick={() => setIndex((i) => i + 1)} className="btn btn-primary btn-lg flex-1">
-              Επόμενο →
-            </button>
-          )}
+        <div className="card w-full bg-base-100 shadow lg:w-72 lg:shrink-0">
+          <div className="card-body gap-1 p-4">
+            <h2 className="text-sm font-semibold text-base-content/60">Λίστα σειράς</h2>
+            <ul className="flex flex-col gap-1">
+              {sequence.songs.map((entry, i) => (
+                <li key={entry.sequenceSongId}>
+                  <button
+                    onClick={() => setIndex(i)}
+                    className={`btn btn-ghost btn-sm w-full justify-start text-left ${i === index ? 'btn-active' : ''}`}
+                  >
+                    <span className="badge badge-neutral badge-sm">{i + 1}</span>
+                    {entry.song.title}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
       </div>
     </main>

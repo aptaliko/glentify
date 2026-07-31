@@ -12,6 +12,8 @@ export default function ProgramsAdminPage() {
   const [programs, setPrograms] = useState<Program[]>([]);
   const [title, setTitle] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingTitle, setEditingTitle] = useState('');
 
   async function load() {
     const res = await fetch('/api/programs');
@@ -44,6 +46,22 @@ export default function ProgramsAdminPage() {
     await load();
   }
 
+  function startEditing(p: Program) {
+    setEditingId(p.id);
+    setEditingTitle(p.title);
+  }
+
+  async function handleRename(e: React.FormEvent, id: number) {
+    e.preventDefault();
+    await fetch(`/api/programs/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: editingTitle }),
+    });
+    setEditingId(null);
+    await load();
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <h1 className="text-xl font-bold">Προγράμματα</h1>
@@ -64,9 +82,26 @@ export default function ProgramsAdminPage() {
       </form>
       <ul className="list rounded-box bg-base-100 shadow">
         {programs.map((p) => (
-          <li key={p.id} className="list-row items-center">
-            <Link href={`/admin/programs/${p.id}`} className="link link-hover">{p.title}</Link>
-            <button onClick={() => handleDelete(p.id)} className="btn btn-ghost btn-sm text-error">Διαγραφή</button>
+          <li key={p.id} className="list-row items-center gap-2">
+            {editingId === p.id ? (
+              <form onSubmit={(e) => handleRename(e, p.id)} className="flex flex-1 gap-2">
+                <input
+                  value={editingTitle}
+                  onChange={(e) => setEditingTitle(e.target.value)}
+                  className="input input-bordered input-sm flex-1"
+                  autoFocus
+                  required
+                />
+                <button type="submit" className="btn btn-primary btn-sm">Αποθήκευση</button>
+                <button type="button" onClick={() => setEditingId(null)} className="btn btn-ghost btn-sm">Άκυρο</button>
+              </form>
+            ) : (
+              <>
+                <Link href={`/admin/programs/${p.id}`} className="link link-hover flex-1">{p.title}</Link>
+                <button onClick={() => startEditing(p)} className="btn btn-ghost btn-sm">Μετονομασία</button>
+                <button onClick={() => handleDelete(p.id)} className="btn btn-ghost btn-sm text-error">Διαγραφή</button>
+              </>
+            )}
           </li>
         ))}
         {programs.length === 0 && <li className="list-row text-base-content/50">Κανένα πρόγραμμα ακόμη</li>}

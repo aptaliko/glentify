@@ -28,6 +28,8 @@ export default function ProgramAdminPage() {
   const [seqSongs, setSeqSongs] = useState<SequenceSongEntry[]>([]);
   const [search, setSearch] = useState('');
   const [searchResults, setSearchResults] = useState<Song[]>([]);
+  const [editingSeqId, setEditingSeqId] = useState<number | null>(null);
+  const [editingSeqTitle, setEditingSeqTitle] = useState('');
 
   async function loadProgram() {
     const res = await fetch(`/api/programs/${params.id}`);
@@ -63,6 +65,36 @@ export default function ProgramAdminPage() {
     await fetch(`/api/programs/${params.id}/sequences/${seqId}`, { method: 'DELETE' });
     if (expandedSeqId === seqId) setExpandedSeqId(null);
     await loadProgram();
+  }
+
+  function startEditingSequence(seq: Sequence) {
+    setEditingSeqId(seq.id);
+    setEditingSeqTitle(seq.title);
+  }
+
+  async function handleRenameSequence(e: React.FormEvent, seqId: number) {
+    e.preventDefault();
+    await fetch(`/api/programs/${params.id}/sequences/${seqId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: editingSeqTitle }),
+    });
+    setEditingSeqId(null);
+    await loadProgram();
+  }
+
+  async function handleMoveSong(fromIndex: number, direction: -1 | 1) {
+    if (expandedSeqId === null) return;
+    const toIndex = fromIndex + direction;
+    if (toIndex < 0 || toIndex >= seqSongs.length) return;
+    const reordered = [...seqSongs];
+    [reordered[fromIndex], reordered[toIndex]] = [reordered[toIndex], reordered[fromIndex]];
+    setSeqSongs(reordered);
+    await fetch(`/api/programs/${params.id}/sequences/${expandedSeqId}/songs`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orderedIds: reordered.map((entry) => entry.sequenceSongId) }),
+    });
   }
 
   async function handleToggleExpand(seqId: number) {
@@ -117,12 +149,27 @@ export default function ProgramAdminPage() {
         {sequences.map((seq) => (
           <li key={seq.id} className="card border border-base-300 bg-base-100">
             <div className="card-body gap-3 p-4">
-              <div className="flex items-center gap-2">
-                <button onClick={() => handleToggleExpand(seq.id)} className="btn btn-ghost btn-sm flex-1 justify-start">
-                  {expandedSeqId === seq.id ? '▾' : '▸'} {seq.title}
-                </button>
-                <button onClick={() => handleDeleteSequence(seq.id)} className="btn btn-ghost btn-sm text-error">Διαγραφή σειράς</button>
-              </div>
+              {editingSeqId === seq.id ? (
+                <form onSubmit={(e) => handleRenameSequence(e, seq.id)} className="flex items-center gap-2">
+                  <input
+                    value={editingSeqTitle}
+                    onChange={(e) => setEditingSeqTitle(e.target.value)}
+                    className="input input-bordered input-sm flex-1"
+                    autoFocus
+                    required
+                  />
+                  <button type="submit" className="btn btn-primary btn-sm">Αποθήκευση</button>
+                  <button type="button" onClick={() => setEditingSeqId(null)} className="btn btn-ghost btn-sm">Άκυρο</button>
+                </form>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <button onClick={() => handleToggleExpand(seq.id)} className="btn btn-ghost btn-sm flex-1 justify-start">
+                    {expandedSeqId === seq.id ? '▾' : '▸'} {seq.title}
+                  </button>
+                  <button onClick={() => startEditingSequence(seq)} className="btn btn-ghost btn-sm">Μετονομασία</button>
+                  <button onClick={() => handleDeleteSequence(seq.id)} className="btn btn-ghost btn-sm text-error">Διαγραφή σειράς</button>
+                </div>
+              )}
 
               {expandedSeqId === seq.id && (
                 <div className="flex flex-col gap-3 border-t border-base-300 pt-3">
@@ -131,6 +178,8 @@ export default function ProgramAdminPage() {
                       <li key={entry.sequenceSongId} className="flex items-center gap-2">
                         <span className="badge badge-neutral badge-sm">{i + 1}</span>
                         <span className="flex-1">{entry.song.title}</span>
+                        <button onClick={() => handleMoveSong(i, -1)} disabled={i === 0} className="btn btn-ghost btn-xs">↑</button>
+                        <button onClick={() => handleMoveSong(i, 1)} disabled={i === seqSongs.length - 1} className="btn btn-ghost btn-xs">↓</button>
                         <button onClick={() => handleRemoveSong(entry.sequenceSongId)} className="btn btn-ghost btn-xs text-error">Αφαίρεση</button>
                       </li>
                     ))}

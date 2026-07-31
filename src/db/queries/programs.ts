@@ -1,6 +1,6 @@
 import { db } from '../client';
 import { programs, programSequences, sequenceSongs, songs } from '../schema';
-import { eq, asc, max } from 'drizzle-orm';
+import { eq, and, asc, max } from 'drizzle-orm';
 import type { ProgramRow, ProgramSequenceRow, SongRow } from '../schema';
 
 export async function listPrograms(): Promise<ProgramRow[]> {
@@ -50,6 +50,11 @@ export async function createSequence(programId: number, title: string): Promise<
   return rows[0];
 }
 
+export async function updateSequence(id: number, title: string): Promise<ProgramSequenceRow> {
+  const rows = await db.update(programSequences).set({ title }).where(eq(programSequences.id, id)).returning();
+  return rows[0];
+}
+
 export async function deleteSequence(id: number): Promise<void> {
   await db.delete(sequenceSongs).where(eq(sequenceSongs.sequenceId, id));
   await db.delete(programSequences).where(eq(programSequences.id, id));
@@ -81,4 +86,13 @@ export async function addSongToSequence(sequenceId: number, songId: number): Pro
 
 export async function removeSongFromSequence(sequenceSongId: number): Promise<void> {
   await db.delete(sequenceSongs).where(eq(sequenceSongs.id, sequenceSongId));
+}
+
+export async function reorderSequenceSongs(sequenceId: number, orderedSequenceSongIds: number[]): Promise<void> {
+  for (const [position, sequenceSongId] of orderedSequenceSongIds.entries()) {
+    await db
+      .update(sequenceSongs)
+      .set({ position })
+      .where(and(eq(sequenceSongs.id, sequenceSongId), eq(sequenceSongs.sequenceId, sequenceId)));
+  }
 }
