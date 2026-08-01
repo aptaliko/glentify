@@ -22,24 +22,27 @@ The simplest possible Capacitor setup points the native WebView at the live Verc
 Two build outputs from one codebase:
 
 - **Web** (unchanged): `next build`, deployed to Vercel exactly as today — dynamic API routes, cookie auth, DB access via Drizzle/Neon.
-- **Mobile**: a second, separately-invoked build using `output: 'export'` with `src/app/api` excluded from the build tree, producing a static HTML/JS/CSS bundle. Capacitor packages that bundle as the native app's local assets for iOS/Android, so the app shell loads instantly with zero network, from a cold start. At runtime, the app still calls the same deployed Vercel API over HTTPS for data — it just doesn't need a server to render pages.
+- **Mobile**: a second, separately-invoked build using `output: 'export'`, run against a **staged copy** of `src/app` with `api/`, `admin/`, and `programs/` removed, producing a static HTML/JS/CSS bundle. Capacitor packages that bundle as the native app's local assets for iOS/Android, so the app shell loads instantly with zero network, from a cold start. At runtime, the app still calls the same deployed Vercel API over HTTPS for data — it just doesn't need a server to render pages.
 
-Because every page already fetches client-side, the export build requires no page rewrites. It does require the API route tree to be absent from that specific build (Route Handlers using `Request` are unsupported under `output: 'export'`), handled by a build script, not by changing the routes themselves.
+Confirmed by actually running `next build` with `output: 'export'`: Next.js requires every `[param]`-style dynamic route to have `generateStaticParams()`, which is impossible for `/session/[id]` (IDs are runtime/local) and `/programs/[id]`. Since neither admin screens nor program browsing are part of the offline scope, the mobile build's staged copy excludes `admin/` and `programs/` entirely (sidesteps the requirement without touching those files), and mobile gets a **new, separate, non-dynamic route** — `src/app/session/local/page.tsx` — as its live-session entry point instead of reusing `/session/[id]`. The existing `/session/[id]/page.tsx` is untouched and keeps working exactly as today for web; mobile simply never includes it in its build. One visible consequence: mobile's live session lives at `/session/local`, not `/session/<id>` — a different URL shape than web, which is an unavoidable result of the static-export constraint, not a chosen behavior change.
 
-No schema or data changes. The only new server-side surface is one additional read-only API route and an auth extension (below).
+No schema or data changes. The new server-side surface is one additional read-only API route (below) and an auth extension (below) — both purely additive to the existing API.
 
 ## New/changed components
 
-- **`src/app/api/reference-data/route.ts`** (new) — bulk `GET` returning all songs (lyrics, keys), their axis values, regions, and genres in one payload. This is what a device caches to run suggestions fully offline.
-- **`src/lib/sessionStore.ts`** (new) — a small interface (`getCurrentState()`, `pickSong(id)`, `endSession()`, etc.) with two implementations:
+- **`src/app/api/reference-data/route.ts`** (new) — bulk `GET` returning everything `buildSuggestionsResponse` (below) needs: all songs (lyrics, keys), their axis values, regions, rhythms, dromoi, composers, axis types, and genres, in one payload. This is what a device caches to run suggestions fully offline.
+- **`src/lib/suggestions.ts`** — extract the label/formatting logic currently inline in `GET /api/sessions/[id]/suggestions` (axis labels, genre names, `listTitle`, grouped-vs-filtered shaping) into a new pure `buildSuggestionsResponse()` function. The existing route is refactored to call it (behavior-preserving, covered by tests); this is the one existing route that changes, because mobile must reproduce its output exactly. `listSongs`-style filtering and `getUsedTopLevelRegionsForGenre`-style lookups are **not** extracted from `src/db/queries/` — small equivalent pure versions are written fresh in `src/lib/` for the local data sources below, so the existing, untested `/api/songs` and `/api/genres/[id]/regions` routes are left alone.
+- **`src/lib/sessionStore.ts`** (new) — a small interface (`getCurrentState()`, `pickSong(id)`, `endSequence()`, `endSession()`) with two implementations:
   - `RemoteSessionStore` — today's behavior, extracted as-is from `session/[id]/page.tsx` (hits `/api/sessions/...`). Used by web.
-  - `LocalSessionStore` — holds current song + played-song set in `localStorage`, calls `getSuggestions()` from `src/lib/suggestions.ts` (already pure, DB-agnostic logic) directly against the cached reference-data payload. Never touches the network. Used by mobile — mobile sessions are local-only by design (see below), never written to the `sessions` / `session_played_songs` tables.
-- **`src/lib/offlineCache.ts`** (new) — thin IndexedDB wrapper: store/retrieve the reference-data payload and the auth token.
-- **`src/lib/auth.ts`** — add a helper to validate a bearer token the same way the cookie is validated today (reuses the existing HMAC check).
-- **`src/proxy.ts`** — extend to also accept `Authorization: Bearer <token>` on `/api/*` (web's cookie path is untouched), and emit CORS headers for the Capacitor app's origin.
+  - `LocalSessionStore` — holds current song + played-song set in local storage, calls `buildSuggestionsResponse()` directly against the cached reference-data payload for every state transition (`pickSong`, `endSequence`, `endSession` mirror `advanceToSong`/`endSequence`/`endSession` in `src/db/queries/sessions.ts`). Never touches the network. Used by mobile — mobile sessions are local-only by design (see below), never written to the `sessions` / `session_played_songs` tables.
+- **`src/components/SongPicker.tsx`** — the offline "start a new session" flow needs to pick a song from cached data too, so `SongPicker` takes an injectable data-source prop (`listGenres`, `listRegionsForGenre`, `listSongs`), defaulting to today's `fetch`-based behavior (web, unchanged) with a new local implementation (small pure equivalents of the filtering logic, reading the cached reference-data payload) used on mobile.
+- **`src/components/LiveSessionView.tsx`** (new) — the presentational JSX currently inline in `session/[id]/page.tsx` (header, lyrics card, suggestion list), extracted so both the untouched `/session/[id]` route (web) and the new `/session/local` route (mobile) render identically from whichever `SessionStore` they're given.
+- **`src/app/session/local/page.tsx`** (new, mobile-only) — live-session entry point with no dynamic segment, wired to `LocalSessionStore`, rendering `<LiveSessionView>`. Required because `output: 'export'` cannot support `/session/[id]` (see Architecture).
+- **`src/lib/offlineCache.ts`** (new) — thin IndexedDB wrapper: store/retrieve the reference-data payload and the auth token. Kept deliberately dumb (no business logic) so it can be verified on-device rather than unit tested; the logic that matters (`LocalSessionStore`, `buildSuggestionsResponse`) is tested behind an injectable storage interface instead.
+- **`src/proxy.ts`** — extend to also accept `Authorization: Bearer <token>` on `/api/*` (web's cookie path is untouched, reuses the existing `isAuthCookieValid` check), and emit CORS headers for the Capacitor app's origin.
 - **`src/app/api/login/route.ts`** — also return the token in the JSON response body (already computed server-side for the cookie; just needs exposing) so mobile can capture and store it.
 - **`capacitor.config.ts`, `ios/`, `android/`** (new) — standard Capacitor project scaffolding.
-- **`scripts/build-mobile.sh`** (new) — stages `src/app` without `api/`, runs `next build` with `output: 'export'` via an env flag, hands the resulting `out/` folder to `npx cap sync`.
+- **`scripts/build-mobile.sh`** (new) — stages a copy of `src/app` with `api/`, `admin/`, and `programs/` removed, runs `next build` with `output: 'export'` against that copy, hands the resulting `out/` folder to `npx cap sync`.
 
 ## Why mobile sessions are local-only
 
@@ -60,8 +63,9 @@ Web behavior is unchanged throughout.
 
 - **Sync**: on app launch (or a manual "Sync" action), if online, mobile calls `GET /api/reference-data` with its bearer token and writes the result to IndexedDB, replacing the previous cache.
 - **Login**: mobile POSTs to `/api/login` as today; the response now also includes the token, which mobile persists locally instead of relying on a cookie.
-- **Live session (mobile)**: `session/[id]/page.tsx` selects `LocalSessionStore` when running under Capacitor. All suggestion computation happens on-device against the cached payload; "mark played" and "current song" updates only touch `localStorage`.
-- **Live session (web)**: unchanged — `RemoteSessionStore` hits the API per action, exactly as today.
+- **Live session (mobile)**: `/session/local` (new route) always uses `LocalSessionStore`. All suggestion computation happens on-device against the cached payload; "mark played" and "current song" updates only touch local storage.
+- **Live session (web)**: unchanged — `/session/[id]` always uses `RemoteSessionStore`, hitting the API per action exactly as today.
+- **Starting a session (mobile)**: `session/new/page.tsx` detects the native platform and, instead of `POST /api/sessions`, calls `LocalSessionStore`'s local-create path (generates a local ID, picks the starting song via the offline `SongPicker`), then navigates to `/session/local`.
 
 ## Error handling
 
