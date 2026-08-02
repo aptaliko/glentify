@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { remoteSongPickerDataSource, type SongPickerDataSource } from '@/lib/songPickerData';
 
 interface Genre {
   id: number;
@@ -19,7 +20,13 @@ interface Song {
 
 type Step = 'genre' | 'region' | 'songs';
 
-export default function SongPicker({ onSelect }: { onSelect: (songId: number) => void }) {
+export default function SongPicker({
+  onSelect,
+  dataSource = remoteSongPickerDataSource,
+}: {
+  onSelect: (songId: number) => void;
+  dataSource?: SongPickerDataSource;
+}) {
   const [step, setStep] = useState<Step>('genre');
   const [genres, setGenres] = useState<Genre[]>([]);
   const [selectedGenre, setSelectedGenre] = useState<Genre | null>(null);
@@ -29,23 +36,19 @@ export default function SongPicker({ onSelect }: { onSelect: (songId: number) =>
   const [songs, setSongs] = useState<Song[]>([]);
 
   useEffect(() => {
-    fetch('/api/genres').then((r) => r.json()).then(setGenres);
-  }, []);
+    dataSource.listGenres().then(setGenres);
+  }, [dataSource]);
 
   async function loadSongs(genreId: number, regionId: number | null, q: string) {
-    const params = new URLSearchParams({ genreId: String(genreId) });
-    if (regionId) params.set('regionId', String(regionId));
-    if (q) params.set('search', q);
-    const res = await fetch(`/api/songs?${params.toString()}`);
-    setSongs(await res.json());
+    const results = await dataSource.listSongs({ genreId, regionId: regionId ?? undefined, search: q || undefined });
+    setSongs(results);
   }
 
   async function handlePickGenre(genre: Genre) {
     setSelectedGenre(genre);
     setSelectedRegion(null);
     setSearch('');
-    const res = await fetch(`/api/genres/${genre.id}/regions`);
-    const regionsForGenre: Region[] = await res.json();
+    const regionsForGenre = await dataSource.listRegionsForGenre(genre.id);
     if (regionsForGenre.length > 0) {
       setRegionOptions(regionsForGenre);
       setStep('region');
