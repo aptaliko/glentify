@@ -92,8 +92,8 @@ describe('LocalSessionStore', () => {
     const storage = inMemoryStore();
     const ref = referenceDataWithThreeSongs();
 
-    // Build up some played history
-    let store = await LocalSessionStore.start(1, ref, storage);
+    // Build up some played history on the same store instance
+    const store = await LocalSessionStore.start(1, ref, storage);
     await store.pickSong(2); // marks song 1 as played, current = 2
     await store.pickSong(3); // marks song 2 as played, current = 3
 
@@ -104,22 +104,20 @@ describe('LocalSessionStore', () => {
     expect(song1Before?.played).toBe(true);
     expect(song2Before?.played).toBe(true);
 
-    // Clear everything via endSession
+    // Clear everything via endSession on the same store instance
     await store.endSession();
 
-    // Start a new session on the SAME storage to verify played history was cleared
-    store = await LocalSessionStore.start(1, ref, storage);
-    await store.pickSong(2); // marks song 1 as played (new session), current = 2
+    // Call pickSong directly on the SAME store instance (no new start() call)
+    // This exposes what endSession actually left in storage without masking it
+    await store.pickSong(1);
     data = await store.load(true, null);
 
-    // Song 3 (previously played in old session) should NOT be marked as played
-    // This proves endSession cleared the old playedSongIds
+    // Song 2 and 3 should NOT be marked as played if endSession correctly cleared playedSongIds
+    // If endSession was buggy (e.g. just called endSequence), they would still be marked as played
+    const song2After = data.genreGroups.flatMap((g) => g.songs).find((s) => s.id === 2);
     const song3After = data.genreGroups.flatMap((g) => g.songs).find((s) => s.id === 3);
+    expect(song2After?.played).toBe(false);
     expect(song3After?.played).toBe(false);
-
-    // Song 1 should be marked as played (from this new session, confirming state works)
-    const song1After = data.genreGroups.flatMap((g) => g.songs).find((s) => s.id === 1);
-    expect(song1After?.played).toBe(true);
   });
 });
 
