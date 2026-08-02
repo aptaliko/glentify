@@ -7,10 +7,11 @@ import {
   rankBySharedAxes,
   groupByGenre,
   getSuggestions,
+  buildSuggestionsResponse,
   type AxisValue,
   type SongWithAxes,
 } from './suggestions';
-import type { SongRow, RegionRow } from '@/db/schema';
+import type { SongRow, RegionRow, RhythmRow, DromosRow, ComposerRow, AxisTypeRow, GenreRow } from '@/db/schema';
 
 function makeSong(id: number, title: string, genreId = 1): SongRow {
   return {
@@ -182,5 +183,61 @@ describe('getSuggestions', () => {
     if (result.mode === 'grouped') {
       expect(result.genreGroups.map((g) => g.genreId).sort()).toEqual([3, 7]);
     }
+  });
+});
+
+describe('buildSuggestionsResponse', () => {
+  const rhythms: RhythmRow[] = [{ id: 1, name: 'Καλαματιανός' }];
+  const dromoi: DromosRow[] = [{ id: 1, name: 'Ραστ' }];
+  const composers: ComposerRow[] = [];
+  const axisTypes: AxisTypeRow[] = [
+    { id: 1, key: 'region', label: 'Περιοχή', lookupTable: 'regions', hierarchical: true },
+    { id: 2, key: 'rhythm', label: 'Ρυθμός', lookupTable: 'rhythms', hierarchical: false },
+  ];
+  const genres: GenreRow[] = [{ id: 1, name: 'Παραδοσιακό' }];
+  const lookups = { regions, rhythms, dromoi, composers, axisTypes, genres };
+
+  it('returns an empty grouped response when there is no current song', () => {
+    const result = buildSuggestionsResponse({
+      currentSongWithAxes: null,
+      allSongs: [],
+      playedSongIds: new Set(),
+      showPlayed: false,
+      requestedActive: null,
+      lookups,
+    });
+    expect(result).toEqual({
+      currentSong: null,
+      availableAxisTypes: [],
+      activeAxisTypes: [],
+      mode: 'grouped',
+      candidates: [],
+      genreGroups: [],
+      listTitle: '',
+    });
+  });
+
+  it('builds a filtered response with human-readable axis labels and a listTitle', () => {
+    const current = makeSong(1, 'Τραγούδι Α');
+    const candidate = makeSong(2, 'Τραγούδι Β');
+    const allSongs = [
+      { song: current, axisValues: [av('region', 3), av('rhythm', 1)] },
+      { song: candidate, axisValues: [av('region', 3), av('rhythm', 1)] },
+    ];
+    const result = buildSuggestionsResponse({
+      currentSongWithAxes: { id: 1, title: 'Τραγούδι Α', lyrics: null, maleKey: null, femaleKey: null, axisValues: [av('region', 3), av('rhythm', 1)] },
+      allSongs,
+      playedSongIds: new Set(),
+      showPlayed: false,
+      requestedActive: null,
+      lookups,
+    });
+    expect(result.mode).toBe('filtered');
+    expect(result.availableAxisTypes).toEqual([
+      { key: 'region', label: 'Περιοχή', value: 'Κυκλάδες' },
+      { key: 'rhythm', label: 'Ρυθμός', value: 'Καλαματιανός' },
+    ]);
+    expect(result.candidates).toEqual([{ id: 2, title: 'Τραγούδι Β', played: false }]);
+    expect(result.listTitle).toBe('Άλλα τραγούδια με τα ίδια: Περιοχή, Ρυθμός');
   });
 });

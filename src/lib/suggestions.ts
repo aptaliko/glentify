@@ -1,4 +1,4 @@
-import type { SongRow, RegionRow } from '@/db/schema';
+import type { SongRow, RegionRow, RhythmRow, DromosRow, ComposerRow, AxisTypeRow, GenreRow } from '@/db/schema';
 
 export interface AxisValue {
   axisType: string;
@@ -170,4 +170,142 @@ export function getSuggestions(params: SuggestionParams): SuggestionResult {
     showPlayed,
   });
   return { mode: 'filtered', candidates: rankBySharedAxes(filtered, currentAxisValues, activeAxisTypes) };
+}
+
+export interface ReferenceLookups {
+  regions: RegionRow[];
+  rhythms: RhythmRow[];
+  dromoi: DromosRow[];
+  composers: ComposerRow[];
+  axisTypes: AxisTypeRow[];
+  genres: GenreRow[];
+}
+
+export interface CurrentSongPayload {
+  id: number;
+  title: string;
+  lyrics: string | null;
+  maleKey: string | null;
+  femaleKey: string | null;
+}
+
+export interface AvailableAxis {
+  key: string;
+  label: string;
+  value: string;
+}
+
+export interface SuggestedSong {
+  id: number;
+  title: string;
+  played: boolean;
+}
+
+export interface GenreGroupPayload {
+  genreId: number;
+  genreName: string;
+  songs: SuggestedSong[];
+}
+
+export interface SuggestionsResponsePayload {
+  currentSong: CurrentSongPayload | null;
+  availableAxisTypes: AvailableAxis[];
+  activeAxisTypes: string[];
+  mode: 'filtered' | 'grouped';
+  candidates: SuggestedSong[];
+  genreGroups: GenreGroupPayload[];
+  listTitle: string;
+}
+
+export interface BuildSuggestionsInput {
+  currentSongWithAxes: (CurrentSongPayload & { axisValues: AxisValue[] }) | null;
+  allSongs: SongWithAxes[];
+  playedSongIds: Set<number>;
+  showPlayed: boolean;
+  requestedActive: Set<string> | null;
+  lookups: ReferenceLookups;
+}
+
+export function buildSuggestionsResponse(input: BuildSuggestionsInput): SuggestionsResponsePayload {
+  const { currentSongWithAxes, allSongs, playedSongIds, showPlayed, requestedActive, lookups } = input;
+
+  if (!currentSongWithAxes) {
+    return { currentSong: null, availableAxisTypes: [], activeAxisTypes: [], mode: 'grouped', candidates: [], genreGroups: [], listTitle: '' };
+  }
+
+  const currentAxisValues = currentSongWithAxes.axisValues;
+  const availableAxisTypeKeys = currentAxisValues.map((v) => v.axisType);
+  const effectiveActive = requestedActive
+    ? new Set([...requestedActive].filter((t) => availableAxisTypeKeys.includes(t)))
+    : new Set(availableAxisTypeKeys);
+
+  const lookupNameById: Record<string, Map<number, string>> = {
+    region: new Map(lookups.regions.map((r) => [r.id, r.name])),
+    rhythm: new Map(lookups.rhythms.map((r) => [r.id, r.name])),
+    dromos: new Map(lookups.dromoi.map((d) => [d.id, d.name])),
+    composer: new Map(lookups.composers.map((c) => [c.id, c.name])),
+  };
+  const axisLabelByKey = new Map(lookups.axisTypes.map((t) => [t.key, t.label]));
+  const genreNameById = new Map(lookups.genres.map((g) => [g.id, g.name]));
+
+  function labelForAxisValue(v: AxisValue): string {
+    if (v.axisType === 'year') return String(v.yearValue);
+    const name = v.refId !== null ? lookupNameById[v.axisType]?.get(v.refId) : undefined;
+    return name ?? '?';
+  }
+
+  const toSuggestion = (id: number, title: string): SuggestedSong => ({ id, title, played: playedSongIds.has(id) });
+
+  const result = getSuggestions({
+    currentSongId: currentSongWithAxes.id,
+    currentAxisValues,
+    activeAxisTypes: effectiveActive,
+    allSongs,
+    regions: lookups.regions,
+    playedSongIds,
+    showPlayed,
+  });
+
+  const availableAxisTypes: AvailableAxis[] = currentAxisValues.map((v) => ({
+    key: v.axisType,
+    label: axisLabelByKey.get(v.axisType) ?? v.axisType,
+    value: labelForAxisValue(v),
+  }));
+
+  const currentSong: CurrentSongPayload = {
+    id: currentSongWithAxes.id,
+    title: currentSongWithAxes.title,
+    lyrics: currentSongWithAxes.lyrics,
+    maleKey: currentSongWithAxes.maleKey,
+    femaleKey: currentSongWithAxes.femaleKey,
+  };
+
+  if (result.mode === 'grouped') {
+    return {
+      currentSong,
+      availableAxisTypes,
+      activeAxisTypes: [...effectiveActive],
+      mode: 'grouped',
+      candidates: [],
+      genreGroups: result.genreGroups
+        .map((g) => ({
+          genreId: g.genreId,
+          genreName: genreNameById.get(g.genreId) ?? '?',
+          songs: g.songs.map((s) => toSuggestion(s.id, s.title)),
+        }))
+        .sort((a, b) => a.genreName.localeCompare(b.genreName, 'el')),
+      listTitle: '',
+    };
+  }
+
+  const activeLabels = [...effectiveActive].map((key) => axisLabelByKey.get(key) ?? key);
+  return {
+    currentSong,
+    availableAxisTypes,
+    activeAxisTypes: [...effectiveActive],
+    mode: 'filtered',
+    candidates: result.candidates.map((s) => toSuggestion(s.id, s.title)),
+    genreGroups: [],
+    listTitle: `Άλλα τραγούδια με τα ίδια: ${activeLabels.join(', ')}`,
+  };
 }
