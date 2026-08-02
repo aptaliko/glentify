@@ -6,7 +6,7 @@ export async function POST(request: NextRequest) {
   if (typeof body.password !== 'string' || !isValidPassword(body.password)) {
     return NextResponse.json({ error: 'Λάθος κωδικός' }, { status: 401 });
   }
-  const response = NextResponse.json({ ok: true });
+  const response = NextResponse.json({ ok: true, token: getAuthCookieValue() });
   response.cookies.set(getAuthCookieName(), getAuthCookieValue(), {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
