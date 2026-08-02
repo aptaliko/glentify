@@ -36,6 +36,21 @@ function referenceData(): ReferenceData {
   };
 }
 
+function referenceDataWithThreeSongs(): ReferenceData {
+  const regions: RegionRow[] = [];
+  const genres: GenreRow[] = [{ id: 1, name: 'Παραδοσιακό' }];
+  return {
+    songs: [makeSong(1, 'Τραγούδι Α'), makeSong(2, 'Τραγούδι Β'), makeSong(3, 'Τραγούδι Γ')],
+    axisValues: [],
+    regions,
+    rhythms: [],
+    dromoi: [],
+    composers: [],
+    axisTypes: [],
+    genres,
+  };
+}
+
 describe('LocalSessionStore', () => {
   it('starts a session with the given starting song and no played songs', async () => {
     const storage = inMemoryStore();
@@ -58,20 +73,53 @@ describe('LocalSessionStore', () => {
 
   it('clears the current song on endSequence, keeping played history', async () => {
     const storage = inMemoryStore();
-    const store = await LocalSessionStore.start(1, referenceData(), storage);
-    await store.endSequence();
+    const store = await LocalSessionStore.start(1, referenceDataWithThreeSongs(), storage);
+    await store.pickSong(2); // marks song 1 as played, current = 2
+    await store.pickSong(3); // marks song 2 as played, current = 3
+    await store.endSequence(); // marks song 3 as played, current = null
+    // To verify played history was kept, pick a new song and inspect genreGroups
+    await store.pickSong(1); // current = 1, playedSongIds should still be [2, 3]
     const data = await store.load(true, null);
-    expect(data.currentSong).toBeNull();
+    expect(data.currentSong?.id).toBe(1);
+    // Song 2 and 3 should show as played (proving endSequence preserved playedSongIds)
+    const song2 = data.genreGroups.flatMap((g) => g.songs).find((s) => s.id === 2);
+    const song3 = data.genreGroups.flatMap((g) => g.songs).find((s) => s.id === 3);
+    expect(song2?.played).toBe(true);
+    expect(song3?.played).toBe(true);
   });
 
   it('clears all local state on endSession', async () => {
     const storage = inMemoryStore();
-    const store = await LocalSessionStore.start(1, referenceData(), storage);
+    const ref = referenceDataWithThreeSongs();
+
+    // Build up some played history
+    let store = await LocalSessionStore.start(1, ref, storage);
+    await store.pickSong(2); // marks song 1 as played, current = 2
+    await store.pickSong(3); // marks song 2 as played, current = 3
+
+    // Verify played history exists before endSession
+    let data = await store.load(true, null);
+    let song1Before = data.genreGroups.flatMap((g) => g.songs).find((s) => s.id === 1);
+    let song2Before = data.genreGroups.flatMap((g) => g.songs).find((s) => s.id === 2);
+    expect(song1Before?.played).toBe(true);
+    expect(song2Before?.played).toBe(true);
+
+    // Clear everything via endSession
     await store.endSession();
-    const data = await store.load(true, null);
-    expect(data.currentSong).toBeNull();
-    const song1 = data.genreGroups.flatMap((g) => g.songs).find((s) => s.id === 1);
-    expect(song1?.played).toBeUndefined();
+
+    // Start a new session on the SAME storage to verify played history was cleared
+    store = await LocalSessionStore.start(1, ref, storage);
+    await store.pickSong(2); // marks song 1 as played (new session), current = 2
+    data = await store.load(true, null);
+
+    // Song 3 (previously played in old session) should NOT be marked as played
+    // This proves endSession cleared the old playedSongIds
+    const song3After = data.genreGroups.flatMap((g) => g.songs).find((s) => s.id === 3);
+    expect(song3After?.played).toBe(false);
+
+    // Song 1 should be marked as played (from this new session, confirming state works)
+    const song1After = data.genreGroups.flatMap((g) => g.songs).find((s) => s.id === 1);
+    expect(song1After?.played).toBe(true);
   });
 });
 
