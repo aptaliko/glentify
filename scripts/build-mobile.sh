@@ -45,7 +45,14 @@ CONFIG
 
 # NEXT_PUBLIC_MOBILE_BUILD marks this bundle as the native/Capacitor one, so pages can
 # resolve the platform during render (prerender included) instead of after hydration.
-(cd .mobile-build && NEXT_PUBLIC_MOBILE_BUILD=1 npx dotenv -e .env.local -- npx next build)
+# NEXT_PUBLIC_API_BASE_URL points fetch calls at the deployed API, since the on-device
+# origin (capacitor://localhost) serves only the static bundle, not the API routes.
+# No dotenv wrapper: nothing left in this bundle after staging (api/, admin/, programs/
+# removed above) reads AUTH_SECRET/APP_PASSWORD/DATABASE_URL, so .env.local's contents
+# aren't needed here. Next's own build still auto-loads .mobile-build/.env.local if
+# present (see environment-variables docs' load order) - this line never controlled
+# that, it only wrapped the invocation redundantly.
+(cd .mobile-build && NEXT_PUBLIC_MOBILE_BUILD=1 NEXT_PUBLIC_API_BASE_URL=https://glentify-kohl.vercel.app npx next build)
 
 cp -R .mobile-build/out out
 echo "Mobile static export written to ./out"

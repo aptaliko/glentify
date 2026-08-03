@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { isNativeApp } from '@/lib/platform';
 import { getAuthToken, clearAuthToken } from '@/lib/authToken';
+import { apiUrl } from '@/lib/apiClient';
 import { saveReferenceData } from '@/lib/offlineCache';
 import { preferencesStore } from '@/lib/preferencesStore';
 import { hasLocalSession as checkHasLocalSession } from '@/lib/sessionStore';
@@ -40,7 +41,7 @@ export default function HomePage() {
     setSyncStatus('syncing');
     try {
       const token = await getAuthToken();
-      const res = await fetch('/api/reference-data', {
+      const res = await fetch(apiUrl('/api/reference-data'), {
         headers: token ? { Authorization: `Bearer ${token}` } : undefined,
       });
       if (res.status === 401) {
