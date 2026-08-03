@@ -121,5 +121,5 @@ export class LocalSessionStore implements SessionStore {
 
 export async function hasLocalSession(storage: KeyValueStore): Promise<boolean> {
   const state = await storage.get<LocalSessionState>(SESSION_STATE_KEY);
-  return state?.currentSongId != null;
+  return state !== null;
 }

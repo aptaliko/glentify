@@ -99,8 +99,8 @@ describe('LocalSessionStore', () => {
 
     // Verify played history exists before endSession
     let data = await store.load(true, null);
-    let song1Before = data.genreGroups.flatMap((g) => g.songs).find((s) => s.id === 1);
-    let song2Before = data.genreGroups.flatMap((g) => g.songs).find((s) => s.id === 2);
+    const song1Before = data.genreGroups.flatMap((g) => g.songs).find((s) => s.id === 1);
+    const song2Before = data.genreGroups.flatMap((g) => g.songs).find((s) => s.id === 2);
     expect(song1Before?.played).toBe(true);
     expect(song2Before?.played).toBe(true);
 
@@ -137,5 +137,12 @@ describe('hasLocalSession', () => {
     const store = await LocalSessionStore.start(1, referenceData(), storage);
     await store.endSession();
     expect(await hasLocalSession(storage)).toBe(false);
+  });
+
+  it('is still true after endSequence (played history preserved for resume)', async () => {
+    const storage = inMemoryStore();
+    const store = await LocalSessionStore.start(1, referenceData(), storage);
+    await store.endSequence();
+    expect(await hasLocalSession(storage)).toBe(true);
   });
 });

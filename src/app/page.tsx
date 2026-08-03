@@ -101,11 +101,13 @@ export default function HomePage() {
         Ξεκίνα γλέντι
       </Link>
 
-      <Link href="/programs" className="btn btn-outline btn-lg">
-        Σταθερά προγράμματα
-      </Link>
+      {!native && (
+        <Link href="/programs" className="btn btn-outline btn-lg">
+          Σταθερά προγράμματα
+        </Link>
+      )}
 
-      <Link href="/admin/songs" className="link">Διαχείριση (admin)</Link>
+      {!native && <Link href="/admin/songs" className="link">Διαχείριση (admin)</Link>}
     </main>
   );
 }
