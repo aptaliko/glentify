@@ -49,3 +49,5 @@ CONFIG
 
 cp -R .mobile-build/out out
 echo "Mobile static export written to ./out"
+
+npx cap sync
