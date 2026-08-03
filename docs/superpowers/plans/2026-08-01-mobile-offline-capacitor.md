@@ -2106,6 +2106,8 @@ git commit -m "Add Capacitor native project scaffolding for iOS and Android"
 
 ### Task 13: End-to-end manual verification
 
+> **Depends on Task 14** (added after the final whole-branch review found the mobile app has no way to reach the deployed API — every native `fetch` was an origin-relative path, which resolves to the local Capacitor bundle on a device, not the server). Step 3 below cannot pass until Task 14 lands.
+
 **Files:** none (verification only).
 
 - [ ] **Step 1: Full automated suite**
@@ -2130,3 +2132,114 @@ Then disable the simulator/emulator's network (Simulator: toggle Network Link Co
 - [ ] **Step 4: Record results**
 
 If any step in Step 3 fails, note exactly which one and the observed behavior — this determines whether a follow-up task is needed before considering the feature done. Do not mark this task complete until the full offline pass in Step 3 succeeds.
+
+---
+
+### Task 14: Wire mobile API base URL for login and sync
+
+**Added after the final whole-branch review of Tasks 1-12.** Every task up to this point built the mobile auth chain (bearer tokens, CORS, token storage) and the sync flow, but nothing ever gave the native app a way to address the deployed API — `src/app/login/page.tsx` and `src/app/page.tsx` both call `fetch('/api/...')` with an origin-relative path. On web that resolves against the page's own origin, which is correct. On a Capacitor device, the page's own origin is the local static bundle (`capacitor://localhost` / `https://localhost`), not the deployed server — so both calls silently hit nothing useful. Login and sync are both non-functional on-device without this task. This gap wasn't visible to any single task's review because no earlier task's brief mentioned an API origin at all.
+
+The app is deployed at `https://glentify-kohl.vercel.app`. Following the pattern already established for `NEXT_PUBLIC_MOBILE_BUILD` (Task 10's fix): the base URL must be baked into the mobile build **inline in the build script's subshell**, never added to `.env.local` — `.env.local` also holds `AUTH_SECRET`/`APP_PASSWORD`/the DB connection string, and `scripts/build-mobile.sh` currently loads all of `.env.local` into the mobile build via `dotenv -e .env.local`. Adding a new `NEXT_PUBLIC_*` var to `.env.local` would be the obvious-but-wrong move — it works today only because nothing currently in the mobile bundle happens to read those other vars, but it invites a future leak. This task also uses the opportunity to check whether the mobile build needs `.env.local` loaded at all (the mobile export excludes `api/`, `admin/`, and `programs/` — the only routes that would plausibly need DB/secret env vars — so it likely doesn't).
+
+**Files:**
+- Create: `src/lib/apiClient.ts`
+- Create: `src/lib/apiClient.test.ts`
+- Modify: `src/app/login/page.tsx`
+- Modify: `src/app/page.tsx`
+- Modify: `scripts/build-mobile.sh`
+
+**Interfaces:**
+- Produces: `apiUrl(path: string): string` — prefixes a path with the deployed API base URL when running as the mobile build, returns the path unchanged otherwise. Consumed by both `login/page.tsx` and `page.tsx`.
+- Consumes: nothing new; reads `process.env.NEXT_PUBLIC_API_BASE_URL` directly (same mechanism as `NEXT_PUBLIC_MOBILE_BUILD` in `src/lib/platform.ts`).
+
+- [ ] **Step 1: Write the failing test for `apiUrl`**
+
+```ts
+// src/lib/apiClient.test.ts
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { apiUrl } from './apiClient';
+
+describe('apiUrl', () => {
+  const originalEnv = process.env.NEXT_PUBLIC_API_BASE_URL;
+
+  afterEach(() => {
+    process.env.NEXT_PUBLIC_API_BASE_URL = originalEnv;
+  });
+
+  it('returns the path unchanged when no base URL is configured (web build)', () => {
+    delete process.env.NEXT_PUBLIC_API_BASE_URL;
+    expect(apiUrl('/api/login')).toBe('/api/login');
+  });
+
+  it('prefixes the path with the base URL when one is configured (mobile build)', () => {
+    process.env.NEXT_PUBLIC_API_BASE_URL = 'https://glentify-kohl.vercel.app';
+    expect(apiUrl('/api/login')).toBe('https://glentify-kohl.vercel.app/api/login');
+  });
+});
+```
+
+- [ ] **Step 2: Run the test to verify it fails**
+
+Run: `npx vitest run src/lib/apiClient.test.ts`
+Expected: FAIL — module doesn't exist yet.
+
+- [ ] **Step 3: Implement `src/lib/apiClient.ts`**
+
+```ts
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? '';
+
+export function apiUrl(path: string): string {
+  return `${API_BASE_URL}${path}`;
+}
+```
+
+- [ ] **Step 4: Run the test to verify it passes**
+
+Run: `npx vitest run src/lib/apiClient.test.ts`
+Expected: PASS.
+
+- [ ] **Step 5: Wire `apiUrl` into the login page**
+
+In `src/app/login/page.tsx`, import `apiUrl` from `@/lib/apiClient` and change the fetch call from `fetch('/api/login', {...})` to `fetch(apiUrl('/api/login'), {...})`. Nothing else in this file changes — `isNativePlatform()` inside `handleSubmit` stays as-is (it's an event-handler call, not a render-time one, so it has none of the hydration-flash concerns `isNativeApp()` exists for).
+
+- [ ] **Step 6: Wire `apiUrl` into the home page's sync**
+
+In `src/app/page.tsx`, import `apiUrl` from `@/lib/apiClient` and change `handleSync`'s fetch call from `fetch('/api/reference-data', {...})` to `fetch(apiUrl('/api/reference-data'), {...})`. The existing bearer-token logic (`Authorization: Bearer ${token}` when a token exists) is unchanged — `apiUrl` only affects which origin the request goes to, not its headers.
+
+- [ ] **Step 7: Bake the base URL into the mobile build**
+
+In `scripts/build-mobile.sh`, add `NEXT_PUBLIC_API_BASE_URL=https://glentify-kohl.vercel.app` inline in the same subshell invocation that already sets `NEXT_PUBLIC_MOBILE_BUILD=1`:
+
+```bash
+(cd .mobile-build && NEXT_PUBLIC_MOBILE_BUILD=1 NEXT_PUBLIC_API_BASE_URL=https://glentify-kohl.vercel.app npx dotenv -e .env.local -- npx next build)
+```
+
+Do not add `NEXT_PUBLIC_API_BASE_URL` to `.env.local`, `.env.example`, or `next.config.ts` — inline in this subshell is the only place it should exist, matching `NEXT_PUBLIC_MOBILE_BUILD`.
+
+- [ ] **Step 8: Investigate whether `.env.local` is still needed for the mobile build**
+
+The mobile export deletes `src/app/api`, `src/app/admin`, and `src/app/programs` before building — those are the only parts of the app that plausibly read secrets like `AUTH_SECRET`, `APP_PASSWORD`, or a DB connection string. Grep what's left in `.mobile-build/src` after staging (or reason from `src/app`'s remaining tree) for any reference to `process.env` outside `NEXT_PUBLIC_*` vars. If nothing remaining needs `.env.local`, drop `npx dotenv -e .env.local --` from the mobile build invocation (`(cd .mobile-build && NEXT_PUBLIC_MOBILE_BUILD=1 NEXT_PUBLIC_API_BASE_URL=https://glentify-kohl.vercel.app npx next build)`). If you find a real dependency, leave it and note what it is in your report — don't guess.
+
+- [ ] **Step 9: Run the full test suite**
+
+Run: `npm test && npx tsc --noEmit`
+Expected: both pass.
+
+- [ ] **Step 10: Verify both builds**
+
+Run: `npm run build` (web — confirm `NEXT_PUBLIC_API_BASE_URL` is NOT set for this build, so `apiUrl` returns paths unchanged; grep `.next` output isn't necessary, but do confirm the env var is absent from your shell/`.env.local` before running this) then `npm run build:mobile`. Both must succeed. After `build:mobile`, grep the emitted `out/` directory for the literal string `glentify-kohl.vercel.app` to confirm the base URL was actually inlined into the client bundle (e.g. `grep -r "glentify-kohl.vercel.app" out/_next/static | head -1`). Clean up `.mobile-build/` and `out/` afterward (gitignored scratch).
+
+- [ ] **Step 11: Manual regression check on web**
+
+Run: `npm run dev`, confirm `/login` still POSTs to the same origin and works exactly as before (no visible change — `apiUrl('/api/login')` returns `/api/login` unchanged when `NEXT_PUBLIC_API_BASE_URL` is unset).
+
+- [ ] **Step 12: Commit**
+
+```bash
+git add src/lib/apiClient.ts src/lib/apiClient.test.ts src/app/login/page.tsx src/app/page.tsx scripts/build-mobile.sh
+git commit -m "Wire mobile API base URL into login and sync"
+```
+
+- [ ] **Step 13: Update Task 13's dependency note**
+
+Once this task is committed, Task 13 Step 3 (mobile cold-start offline pass) is unblocked — a real device build can now reach `https://glentify-kohl.vercel.app` for login and sync. No plan-doc edit required here beyond what's already written above; this step is a reminder for whoever runs Task 13 next.
