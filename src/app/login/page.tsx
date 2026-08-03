@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { isNativePlatform } from '@/lib/platform';
+import { saveAuthToken } from '@/lib/authToken';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -20,6 +22,10 @@ export default function LoginPage() {
       const body = await res.json();
       setError(body.error ?? 'Κάτι πήγε στραβά');
       return;
+    }
+    if (isNativePlatform()) {
+      const body = await res.json();
+      await saveAuthToken(body.token);
     }
     router.push('/');
     router.refresh();
