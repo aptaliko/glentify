@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import SongPicker from '@/components/SongPicker';
-import { isNativePlatform } from '@/lib/platform';
+import { isNativeApp } from '@/lib/platform';
 import { LocalSessionStore } from '@/lib/sessionStore';
 import { preferencesStore } from '@/lib/preferencesStore';
 import { loadReferenceData } from '@/lib/offlineCache';
@@ -13,14 +13,11 @@ import type { ReferenceData } from '@/lib/referenceData';
 
 export default function NewSessionPage() {
   const router = useRouter();
-  const [native, setNative] = useState(false);
+  // Resolved during render (not in an effect) so the native branch is chosen before
+  // SongPicker can mount with its web/remote data source. See isNativeApp().
+  const native = isNativeApp();
   const [referenceData, setReferenceData] = useState<ReferenceData | null>(null);
   const [checkedCache, setCheckedCache] = useState(false);
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setNative(isNativePlatform());
-  }, []);
 
   useEffect(() => {
     if (!native) return;

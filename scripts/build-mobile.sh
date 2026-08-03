@@ -43,7 +43,9 @@ const nextConfig: NextConfig = {
 export default nextConfig;
 CONFIG
 
-(cd .mobile-build && npx dotenv -e .env.local -- npx next build)
+# NEXT_PUBLIC_MOBILE_BUILD marks this bundle as the native/Capacitor one, so pages can
+# resolve the platform during render (prerender included) instead of after hydration.
+(cd .mobile-build && NEXT_PUBLIC_MOBILE_BUILD=1 npx dotenv -e .env.local -- npx next build)
 
 cp -R .mobile-build/out out
 echo "Mobile static export written to ./out"
