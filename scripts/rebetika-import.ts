@@ -7,7 +7,7 @@ import { findOrCreateGenre, findOrCreateRhythm, findOrCreateComposer } from './l
 
 interface ImportRow {
   title: string;
-  lyrics: string;
+  lyrics: string | null;
   rhythm: string | null;
   composer: string | null;
   year: number | null;
@@ -26,8 +26,10 @@ function normalizeTitle(s: string): string {
 }
 
 async function main() {
-  const dataPath = join(__dirname, 'data', 'rebetika-import.json');
+  const fileName = process.argv[2] || 'rebetika-import.json';
+  const dataPath = join(__dirname, 'data', fileName);
   const rows: ImportRow[] = JSON.parse(readFileSync(dataPath, 'utf-8'));
+  console.log(`Reading ${rows.length} rows from ${fileName}`);
 
   const genreId = await findOrCreateGenre('Ρεμπέτικο');
 
