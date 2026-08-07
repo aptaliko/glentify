@@ -1,13 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { NextRequest } from 'next/server';
 import { proxy } from './proxy';
-import { getAuthCookieValue, getAuthCookieName } from './lib/auth';
+import { createSessionToken, getAuthCookieName } from './lib/auth';
 
 describe('proxy', () => {
   const originalEnv = { ...process.env };
 
   beforeEach(() => {
-    process.env.APP_PASSWORD = 'secret123';
     process.env.AUTH_SECRET = 'test-secret';
   });
 
@@ -16,7 +15,7 @@ describe('proxy', () => {
   });
 
   it('allows an /api/* request carrying a valid bearer token', () => {
-    const token = getAuthCookieValue();
+    const token = createSessionToken(42);
     const req = new NextRequest('https://example.com/api/reference-data', {
       headers: { authorization: `Bearer ${token}` },
     });
@@ -33,7 +32,7 @@ describe('proxy', () => {
   });
 
   it('adds CORS headers for a known Capacitor origin', () => {
-    const token = getAuthCookieValue();
+    const token = createSessionToken(42);
     const req = new NextRequest('https://example.com/api/reference-data', {
       headers: { authorization: `Bearer ${token}`, origin: 'capacitor://localhost' },
     });
@@ -42,7 +41,7 @@ describe('proxy', () => {
   });
 
   it('does not add CORS headers for an unknown origin', () => {
-    const token = getAuthCookieValue();
+    const token = createSessionToken(42);
     const req = new NextRequest('https://example.com/api/reference-data', {
       headers: { authorization: `Bearer ${token}`, origin: 'https://evil.example.com' },
     });
@@ -61,7 +60,7 @@ describe('proxy', () => {
   });
 
   it('allows an /api/* request carrying only a valid cookie (no bearer token)', () => {
-    const cookieValue = getAuthCookieValue();
+    const cookieValue = createSessionToken(42);
     const cookieName = getAuthCookieName();
     const req = new NextRequest('https://example.com/api/reference-data', {
       headers: { cookie: `${cookieName}=${cookieValue}` },
@@ -75,5 +74,18 @@ describe('proxy', () => {
     const res = proxy(req);
     expect(res.status).toBe(307);
     expect(res.headers.get('location')).toContain('/login');
+  });
+
+  it('does not require auth for /register (public path)', () => {
+    const req = new NextRequest('https://example.com/register');
+    const res = proxy(req);
+    expect(res.status).not.toBe(401);
+    expect(res.status).not.toBe(307);
+  });
+
+  it('does not require auth for /api/register (public path)', () => {
+    const req = new NextRequest('https://example.com/api/register', { method: 'POST' });
+    const res = proxy(req);
+    expect(res.status).not.toBe(401);
   });
 });

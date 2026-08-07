@@ -1,14 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAuthCookieName, isAuthCookieValid } from '@/lib/auth';
+import { getAuthCookieName, verifySessionToken } from '@/lib/auth';
 
 const MOBILE_ORIGINS = new Set(['capacitor://localhost', 'http://localhost', 'https://localhost']);
+
+// Paths reachable without a session — auth pages and the API endpoints that establish one.
+const PUBLIC_PATHS = new Set([
+  '/login',
+  '/register',
+  '/forgot-password',
+  '/reset-password',
+  '/api/login',
+  '/api/register',
+  '/api/forgot-password',
+  '/api/reset-password',
+]);
 
 function corsHeaders(origin: string | null): Record<string, string> {
   if (!origin || !MOBILE_ORIGINS.has(origin)) return {};
   return {
     'Access-Control-Allow-Origin': origin,
     'Access-Control-Allow-Headers': 'Authorization, Content-Type',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
   };
 }
 
@@ -31,15 +43,15 @@ export function proxy(request: NextRequest) {
     return new NextResponse(null, { status: 204, headers: cors });
   }
 
-  if (pathname === '/login' || pathname === '/api/login') {
+  if (PUBLIC_PATHS.has(pathname)) {
     return applyCors(NextResponse.next(), cors);
   }
 
   const cookie = request.cookies.get(getAuthCookieName())?.value;
   const bearer = getBearerToken(request);
-  const isAuthed = isAuthCookieValid(cookie) || isAuthCookieValid(bearer);
+  const userId = verifySessionToken(cookie) ?? verifySessionToken(bearer);
 
-  if (!isAuthed) {
+  if (userId === null) {
     if (pathname.startsWith('/api/')) {
       return applyCors(NextResponse.json({ error: 'Unauthorized' }, { status: 401 }), cors);
     }
@@ -47,7 +59,9 @@ export function proxy(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  return applyCors(NextResponse.next(), cors);
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set('x-user-id', String(userId));
+  return applyCors(NextResponse.next({ request: { headers: requestHeaders } }), cors);
 }
 
 export const config = {
