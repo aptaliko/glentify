@@ -43,6 +43,13 @@
       "when": 1785504487988,
       "tag": "0005_add_song_keys",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1786136659228,
+      "tag": "0006_glamorous_solo",
+      "breakpoints": true
     }
   ]
 }

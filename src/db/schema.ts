@@ -1,5 +1,22 @@
 import { pgTable, serial, text, integer, timestamp, boolean, unique } from 'drizzle-orm/pg-core';
 
+export const users = pgTable('users', {
+  id: serial('id').primaryKey(),
+  email: text('email').notNull().unique(),
+  passwordHash: text('password_hash').notNull(),
+  role: text('role').notNull().default('user'), // 'admin' | 'user'
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+export const passwordResetTokens = pgTable('password_reset_tokens', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id').notNull().references(() => users.id),
+  tokenHash: text('token_hash').notNull(),
+  expiresAt: timestamp('expires_at').notNull(),
+  usedAt: timestamp('used_at'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
 export const regions = pgTable('regions', {
   id: serial('id').primaryKey(),
   name: text('name').notNull(),
@@ -94,6 +111,8 @@ export const sequenceSongs = pgTable('sequence_songs', {
   position: integer('position').notNull(),
 });
 
+export type UserRow = typeof users.$inferSelect;
+export type PasswordResetTokenRow = typeof passwordResetTokens.$inferSelect;
 export type RegionRow = typeof regions.$inferSelect;
 export type RhythmRow = typeof rhythms.$inferSelect;
 export type DromosRow = typeof dromoi.$inferSelect;
