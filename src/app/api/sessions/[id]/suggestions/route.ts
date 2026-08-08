@@ -8,8 +8,10 @@ import { listComposers } from '@/db/queries/composers';
 import { listAxisTypes, listAllAxisValues } from '@/db/queries/axisValues';
 import { listGenres } from '@/db/queries/genres';
 import { buildSuggestionsResponse, type AxisValue, type SongWithAxes } from '@/lib/suggestions';
+import { getUserId } from '@/lib/requestUser';
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const ownerId = getUserId(request);
   const { id } = await params;
   const sessionId = Number(id);
   const session = await getSessionById(sessionId);
@@ -36,7 +38,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   const [allSongs, regions, rhythms, dromoi, composers, axisTypes, genres, playedSongIdList, currentSongWithAxes, allAxisValues] =
     await Promise.all([
-      listSongs(),
+      listSongs(ownerId),
       listRegions(),
       listRhythms(),
       listDromoi(),
@@ -44,7 +46,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       listAxisTypes(),
       listGenres(),
       getPlayedSongIds(sessionId),
-      getSongWithAxisValues(session.currentSongId),
+      getSongWithAxisValues(ownerId, session.currentSongId),
       listAllAxisValues(),
     ]);
 
