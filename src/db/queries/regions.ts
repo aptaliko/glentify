@@ -20,8 +20,11 @@ function findTopLevelRegionId(regionId: number, byId: Map<number, RegionRow>): n
   return current ? current.id : regionId;
 }
 
-export async function getUsedTopLevelRegionsForGenre(genreId: number): Promise<RegionRow[]> {
-  const genreSongs = await db.select({ id: songs.id }).from(songs).where(eq(songs.genreId, genreId));
+export async function getUsedTopLevelRegionsForGenre(ownerId: number, genreId: number): Promise<RegionRow[]> {
+  const genreSongs = await db
+    .select({ id: songs.id })
+    .from(songs)
+    .where(and(eq(songs.genreId, genreId), eq(songs.ownerId, ownerId)));
   const songIds = genreSongs.map((s) => s.id);
   if (songIds.length === 0) return [];
 
