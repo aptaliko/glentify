@@ -1326,6 +1326,7 @@ git commit -m "Scope songs by ownerId"
 - Modify: `src/db/queries/sessions.ts`
 - Modify: `src/app/api/programs/route.ts`, `src/app/api/programs/[id]/route.ts`
 - Modify: `src/app/api/sessions/route.ts`, `src/app/api/sessions/[id]/route.ts`
+- Modify: `src/app/api/sessions/[id]/suggestions/route.ts` (existing file, missed when this plan was first written — discovered during Task 13: it calls `getSessionById`, which this task scopes by owner)
 
 **Interfaces:**
 - Consumes: `getUserId` (Task 12).
@@ -1406,7 +1407,13 @@ Read `src/app/api/programs/route.ts` and `src/app/api/programs/[id]/route.ts`, a
 
 Read `src/app/api/sessions/route.ts` and `src/app/api/sessions/[id]/route.ts`, add `const ownerId = getUserId(request);` at the top of each handler, pass `ownerId` into `getActiveSession`/`createSession`/`getSessionById`. For `advanceToSong`/`endSequence`/`endSession` (which take only a `sessionId`), first call `getSessionById(ownerId, sessionId)` and return `404` if it's `undefined`, confirming the session belongs to the caller before mutating it.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: Update `src/app/api/sessions/[id]/suggestions/route.ts`**
+
+This file already calls `getUserId(request)` and passes `ownerId` into `listSongs`/`getSongWithAxisValues` (fixed as an out-of-brief necessity during Task 13, since those two functions' signatures changed then). It still calls the unscoped `getSessionById(sessionId)` — change that one call site to `getSessionById(ownerId, sessionId)`.
+
+Today, when `getSessionById` finds a session that exists but isn't the caller's, `session` is `undefined` and line 18's existing `if (!session) return NextResponse.json({ error: 'Δεν βρέθηκε session' }, { status: 404 });` already fires correctly — no further change needed there; owner-scoping `getSessionById` alone closes both the wrong-owner-session-read gap *and* the downstream symptom Task 13 flagged (a cross-owner request no longer reaches the `currentSongWithAxes` lookup at all, so the misleading `500` on line 53 stops being reachable via this path — it now correctly resolves as a `404` on line 18 instead, before any owner-mismatch is possible).
+
+- [ ] **Step 6: Commit**
 
 ```bash
 git add src/db/queries/programs.ts src/db/queries/sessions.ts src/app/api/programs/ src/app/api/sessions/
@@ -1420,6 +1427,7 @@ git commit -m "Scope programs and sessions by ownerId"
 **Files:**
 - Modify: `src/db/queries/regions.ts`, `src/db/queries/rhythms.ts`, `src/db/queries/dromoi.ts`, `src/db/queries/genres.ts`, `src/db/queries/composers.ts`
 - Modify: `src/app/api/regions/route.ts`, `src/app/api/regions/[id]/route.ts` (and the equivalent `rhythms`, `dromoi`, `genres`, `composers` routes)
+- Modify: `src/app/api/sessions/[id]/suggestions/route.ts` (existing file, missed when this plan was first written — discovered during Task 13: it calls `listRegions`/`listRhythms`/`listDromoi`/`listComposers`/`listGenres`, whose signatures this task changes)
 
 **Interfaces:**
 - Consumes: `getUserId` (Task 12), `getUserById` (Task 5).
@@ -1717,6 +1725,10 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
 
 For each of `src/app/api/rhythms/`, `src/app/api/dromoi/`, `src/app/api/genres/`, `src/app/api/composers/`: mirror Step 3 exactly, swapping `Region`/`regions`/`region` for the matching type/module/Greek-noun (`Rhythm`/`rhythms`/`ρυθμός`, `Dromos`/`dromoi`/`δρόμος`, `Genre`/`genres`/`είδος`, `Composer`/`composers`/`συνθέτης`), and importing `getRhythmById`/`getDromosById`/`getGenreById`/`getComposerById` from Step 2 instead of `getRegionById`. `genres`' create/update schema has no `parentId` field — keep it to just `{ name: z.string().min(1) }`.
 
+- [ ] **Step 4.5: Update `src/app/api/sessions/[id]/suggestions/route.ts`**
+
+This file (already touched in Task 14 for `getSessionById`) calls `listRegions()`, `listRhythms()`, `listDromoi()`, `listComposers()`, `listGenres()` with no arguments, inside a `Promise.all`. All five now require a leading `userId` argument (Step 1/2 of this task). Change all five call sites to pass the `ownerId` already in scope from `getUserId(request)` — e.g. `listRegions(ownerId)`, `listRhythms(ownerId)`, etc. This makes the suggestion engine's lookup tables consistent with what the requesting user is actually allowed to see (shared baseline ∪ their own personal additions), matching every other consumer of these functions.
+
 - [ ] **Step 5: Update the admin taxonomy pages to be admin-only**
 
 In each of `src/app/admin/regions/page.tsx`, `rhythms/page.tsx`, `dromoi/page.tsx`, `genres/page.tsx`, `composers/page.tsx`: these pages already call the routes above unauthenticated-looking (auth is transparent via cookie); no client code changes are needed for the happy path, since a non-admin's `POST`/`PATCH`/`DELETE` there would create a *personal* row (harmless) and a `DELETE`/`PATCH` on someone else's baseline row now correctly 403s. Leave the pages as-is — the personal "+ Νέα τιμή" inline flow for regular users is delivered by whichever song-form dropdown consumes it (already covered by the same `POST` routes; no separate page needed for MVP).
@@ -1724,7 +1736,7 @@ In each of `src/app/admin/regions/page.tsx`, `rhythms/page.tsx`, `dromoi/page.ts
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/db/queries/regions.ts src/db/queries/rhythms.ts src/db/queries/dromoi.ts src/db/queries/genres.ts src/db/queries/composers.ts src/app/api/regions/ src/app/api/rhythms/ src/app/api/dromoi/ src/app/api/genres/ src/app/api/composers/
+git add src/db/queries/regions.ts src/db/queries/rhythms.ts src/db/queries/dromoi.ts src/db/queries/genres.ts src/db/queries/composers.ts src/app/api/regions/ src/app/api/rhythms/ src/app/api/dromoi/ src/app/api/genres/ src/app/api/composers/ src/app/api/sessions/\[id\]/suggestions/route.ts
 git commit -m "Split shared taxonomies into admin baseline (NULL owner) and personal rows"
 ```
 
