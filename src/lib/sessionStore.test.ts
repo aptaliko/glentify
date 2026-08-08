@@ -23,7 +23,7 @@ function inMemoryStore(): KeyValueStore {
 
 function referenceData(): ReferenceData {
   const regions: RegionRow[] = [];
-  const genres: GenreRow[] = [{ id: 1, name: 'Παραδοσιακό' }];
+  const genres: GenreRow[] = [{ id: 1, name: 'Παραδοσιακό', ownerId: null }];
   return {
     songs: [makeSong(1, 'Τραγούδι Α'), makeSong(2, 'Τραγούδι Β')],
     axisValues: [],
@@ -38,7 +38,7 @@ function referenceData(): ReferenceData {
 
 function referenceDataWithThreeSongs(): ReferenceData {
   const regions: RegionRow[] = [];
-  const genres: GenreRow[] = [{ id: 1, name: 'Παραδοσιακό' }];
+  const genres: GenreRow[] = [{ id: 1, name: 'Παραδοσιακό', ownerId: null }];
   return {
     songs: [makeSong(1, 'Τραγούδι Α'), makeSong(2, 'Τραγούδι Β'), makeSong(3, 'Τραγούδι Γ')],
     axisValues: [],
