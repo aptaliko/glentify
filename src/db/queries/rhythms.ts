@@ -1,13 +1,18 @@
 import { db } from '../client';
 import { rhythms, songAxisValues } from '../schema';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, or, isNull } from 'drizzle-orm';
 import type { RhythmRow } from '../schema';
 
-export async function listRhythms(): Promise<RhythmRow[]> {
-  return db.select().from(rhythms);
+export async function listRhythms(userId: number): Promise<RhythmRow[]> {
+  return db.select().from(rhythms).where(or(isNull(rhythms.ownerId), eq(rhythms.ownerId, userId)));
 }
 
-export async function createRhythm(data: { name: string }): Promise<RhythmRow> {
+export async function getRhythmById(id: number): Promise<RhythmRow | undefined> {
+  const rows = await db.select().from(rhythms).where(eq(rhythms.id, id));
+  return rows[0];
+}
+
+export async function createRhythm(data: { name: string; ownerId: number | null }): Promise<RhythmRow> {
   const rows = await db.insert(rhythms).values(data).returning();
   return rows[0];
 }

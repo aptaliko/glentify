@@ -1,10 +1,15 @@
 import { db } from '../client';
 import { regions, songAxisValues, songs } from '../schema';
-import { eq, and, inArray } from 'drizzle-orm';
+import { eq, and, or, isNull, inArray } from 'drizzle-orm';
 import type { RegionRow } from '../schema';
 
-export async function listRegions(): Promise<RegionRow[]> {
-  return db.select().from(regions);
+export async function listRegions(userId: number): Promise<RegionRow[]> {
+  return db.select().from(regions).where(or(isNull(regions.ownerId), eq(regions.ownerId, userId)));
+}
+
+export async function getRegionById(id: number): Promise<RegionRow | undefined> {
+  const rows = await db.select().from(regions).where(eq(regions.id, id));
+  return rows[0];
 }
 
 function findTopLevelRegionId(regionId: number, byId: Map<number, RegionRow>): number {
@@ -36,7 +41,7 @@ export async function getUsedTopLevelRegionsForGenre(genreId: number): Promise<R
   return allRegions.filter((r) => topLevelIds.has(r.id));
 }
 
-export async function createRegion(data: { name: string; parentId: number | null }): Promise<RegionRow> {
+export async function createRegion(data: { name: string; parentId: number | null; ownerId: number | null }): Promise<RegionRow> {
   const rows = await db.insert(regions).values(data).returning();
   return rows[0];
 }

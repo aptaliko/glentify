@@ -39,12 +39,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const [allSongs, regions, rhythms, dromoi, composers, axisTypes, genres, playedSongIdList, currentSongWithAxes, allAxisValues] =
     await Promise.all([
       listSongs(ownerId),
-      listRegions(),
-      listRhythms(),
-      listDromoi(),
-      listComposers(),
+      listRegions(ownerId),
+      listRhythms(ownerId),
+      listDromoi(ownerId),
+      listComposers(ownerId),
       listAxisTypes(),
-      listGenres(),
+      listGenres(ownerId),
       getPlayedSongIds(sessionId),
       getSongWithAxisValues(ownerId, session.currentSongId),
       listAllAxisValues(),

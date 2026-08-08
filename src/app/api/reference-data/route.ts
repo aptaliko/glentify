@@ -15,11 +15,11 @@ export async function GET(request: NextRequest) {
     listSongs(ownerId),
     listAllAxisValues(),
     listAxisTypes(),
-    listRegions(),
-    listRhythms(),
-    listDromoi(),
-    listComposers(),
-    listGenres(),
+    listRegions(ownerId),
+    listRhythms(ownerId),
+    listDromoi(ownerId),
+    listComposers(ownerId),
+    listGenres(ownerId),
   ]);
   const payload: ReferenceData = { songs, axisValues, axisTypes, regions, rhythms, dromoi, composers, genres };
   return NextResponse.json(payload);
