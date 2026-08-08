@@ -57,7 +57,7 @@ export const songs = pgTable('songs', {
   notes: text('notes'),
   maleKey: text('male_key'),
   femaleKey: text('female_key'),
-  ownerId: integer('owner_id').references(() => users.id),
+  ownerId: integer('owner_id').notNull().references(() => users.id),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
@@ -90,7 +90,7 @@ export const sessions = pgTable('sessions', {
   startedAt: timestamp('started_at').notNull().defaultNow(),
   endedAt: timestamp('ended_at'),
   currentSongId: integer('current_song_id').references(() => songs.id),
-  ownerId: integer('owner_id').references(() => users.id),
+  ownerId: integer('owner_id').notNull().references(() => users.id),
 });
 
 export const sessionPlayedSongs = pgTable('session_played_songs', {
@@ -103,7 +103,7 @@ export const sessionPlayedSongs = pgTable('session_played_songs', {
 export const programs = pgTable('programs', {
   id: serial('id').primaryKey(),
   title: text('title').notNull(),
-  ownerId: integer('owner_id').references(() => users.id),
+  ownerId: integer('owner_id').notNull().references(() => users.id),
 });
 
 export const programSequences = pgTable('program_sequences', {
