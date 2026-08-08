@@ -41,7 +41,7 @@ export async function getUsedTopLevelRegionsForGenre(ownerId: number, genreId: n
   for (const row of axisRows) {
     if (row.refId !== null) topLevelIds.add(findTopLevelRegionId(row.refId, byId));
   }
-  return allRegions.filter((r) => topLevelIds.has(r.id));
+  return allRegions.filter((r) => topLevelIds.has(r.id) && (r.ownerId === null || r.ownerId === ownerId));
 }
 
 export async function createRegion(data: { name: string; parentId: number | null; ownerId: number | null }): Promise<RegionRow> {
