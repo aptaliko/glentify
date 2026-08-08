@@ -1,5 +1,5 @@
 import { db } from '../client';
-import { songs, sessionPlayedSongs, sessions, songAxisValues, regions } from '../schema';
+import { songs, sessionPlayedSongs, sessions, songAxisValues, regions, users } from '../schema';
 import { eq, ilike, and, inArray, type SQL } from 'drizzle-orm';
 import type { SongRow, SongAxisValueRow } from '../schema';
 import { replaceSongAxisValues, getAxisValuesForSong, type AxisValueInput } from './axisValues';
@@ -98,6 +98,15 @@ export async function updateSong(ownerId: number, id: number, data: SongInput): 
   if (rows.length === 0) return undefined;
   await replaceSongAxisValues(id, data.axisValues);
   return rows[0];
+}
+
+export async function searchSuggestionSongs(titleQuery: string): Promise<SongRow[]> {
+  const rows = await db
+    .select({ song: songs })
+    .from(songs)
+    .innerJoin(users, eq(songs.ownerId, users.id))
+    .where(and(eq(users.role, 'admin'), ilike(songs.title, `%${titleQuery}%`)));
+  return rows.map((r) => r.song);
 }
 
 export async function deleteSong(ownerId: number, id: number): Promise<void> {
