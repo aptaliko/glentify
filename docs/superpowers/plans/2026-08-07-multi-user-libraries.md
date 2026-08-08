@@ -1422,7 +1422,181 @@ git commit -m "Scope programs and sessions by ownerId"
 
 ---
 
-## Task 15: Shared baseline vs. personal taxonomies (all 5 tables)
+## Task 15: Close ownership gap in program-sequence routes
+
+**Why this task exists:** discovered during Task 14. That task's brief (and the original design) assumed `src/db/queries/programs.ts`'s sequence/sequence-song helpers (`getSequenceById`, `createSequence`, `updateSequence`, `deleteSequence`, `listSongsForSequence`, `addSongToSequence`, `removeSongFromSequence`, `reorderSequenceSongs`) are "only ever reached through an owner-checked program/sequence first." That assumption is false in the current code: none of the four route files under `src/app/api/programs/[id]/sequences/**` call `getProgramById` or any other ownership check. As it stands, any authenticated user can read, rename, delete, or reorder another user's program sequences and the songs in them by guessing/incrementing `seqId`/`entryId` — a real cross-owner data-access gap, not just a compile-time inconvenience like the plan's other documented "known breakage until Task N" cases. This task closes it before the plan moves on to taxonomies.
+
+**Files:**
+- Modify: `src/app/api/programs/[id]/sequences/route.ts`
+- Modify: `src/app/api/programs/[id]/sequences/[seqId]/route.ts`
+- Modify: `src/app/api/programs/[id]/sequences/[seqId]/songs/route.ts`
+- Modify: `src/app/api/programs/[id]/sequences/[seqId]/songs/[entryId]/route.ts`
+
+**Interfaces:**
+- Consumes: `getUserId` (Task 12), `getProgramById(ownerId, id)` (Task 14, already owner-scoped), `getSequenceById(id)` (existing, unscoped — returns a `ProgramSequenceRow` including `programId`, used here only *after* the program itself has already been proven to belong to the caller).
+- No new query functions are needed — every route in this URL tree already receives the program's `id` as a route param, so ownership can be checked by combining the two existing functions above. `getSequenceById`/`createSequence`/`updateSequence`/`deleteSequence`/`listSongsForSequence`/`addSongToSequence`/`removeSongFromSequence`/`reorderSequenceSongs` themselves stay unchanged (still id-based) — the ownership check happens at the route layer, one level up, exactly like Task 13/14's pattern for songs/programs/sessions.
+
+- [ ] **Step 1: Rewrite `src/app/api/programs/[id]/sequences/route.ts`**
+
+```ts
+// src/app/api/programs/[id]/sequences/route.ts
+import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
+import { getProgramById, createSequence } from '@/db/queries/programs';
+import { getUserId } from '@/lib/requestUser';
+
+const createSchema = z.object({ title: z.string().min(1) });
+
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const ownerId = getUserId(request);
+  const { id } = await params;
+  const program = await getProgramById(ownerId, Number(id));
+  if (!program) return NextResponse.json({ error: 'Δεν βρέθηκε' }, { status: 404 });
+  const parsed = createSchema.safeParse(await request.json());
+  if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  const sequence = await createSequence(Number(id), parsed.data.title);
+  return NextResponse.json(sequence, { status: 201 });
+}
+```
+
+- [ ] **Step 2: Rewrite `src/app/api/programs/[id]/sequences/[seqId]/route.ts`**
+
+The route param type must now include `id` (the program id from the outer segment) alongside `seqId` — Next.js already passes it at runtime, the old file just didn't declare it in the type because it didn't need it yet.
+
+```ts
+// src/app/api/programs/[id]/sequences/[seqId]/route.ts
+import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
+import { getProgramById, getSequenceById, updateSequence, deleteSequence, listSongsForSequence } from '@/db/queries/programs';
+import { getUserId } from '@/lib/requestUser';
+
+const updateSchema = z.object({ title: z.string().min(1) });
+
+async function assertOwnsSequence(ownerId: number, programId: number, seqId: number) {
+  const program = await getProgramById(ownerId, programId);
+  if (!program) return undefined;
+  const sequence = await getSequenceById(seqId);
+  if (!sequence || sequence.programId !== programId) return undefined;
+  return sequence;
+}
+
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string; seqId: string }> }) {
+  const ownerId = getUserId(request);
+  const { id, seqId } = await params;
+  const sequence = await assertOwnsSequence(ownerId, Number(id), Number(seqId));
+  if (!sequence) return NextResponse.json({ error: 'Δεν βρέθηκε' }, { status: 404 });
+  const songs = await listSongsForSequence(sequence.id);
+  return NextResponse.json({ ...sequence, songs });
+}
+
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string; seqId: string }> }) {
+  const ownerId = getUserId(request);
+  const { id, seqId } = await params;
+  const sequence = await assertOwnsSequence(ownerId, Number(id), Number(seqId));
+  if (!sequence) return NextResponse.json({ error: 'Δεν βρέθηκε' }, { status: 404 });
+  const parsed = updateSchema.safeParse(await request.json());
+  if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  const updated = await updateSequence(Number(seqId), parsed.data.title);
+  return NextResponse.json(updated);
+}
+
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string; seqId: string }> }) {
+  const ownerId = getUserId(request);
+  const { id, seqId } = await params;
+  const sequence = await assertOwnsSequence(ownerId, Number(id), Number(seqId));
+  if (!sequence) return NextResponse.json({ error: 'Δεν βρέθηκε' }, { status: 404 });
+  await deleteSequence(Number(seqId));
+  return NextResponse.json({ ok: true });
+}
+```
+
+- [ ] **Step 3: Rewrite `src/app/api/programs/[id]/sequences/[seqId]/songs/route.ts`**
+
+Same `assertOwnsSequence` shape as Step 2 — file-local, not shared/imported across files, matching how `assertCanModify` is written per-file in Task 16's taxonomy routes rather than factored into a shared module.
+
+```ts
+// src/app/api/programs/[id]/sequences/[seqId]/songs/route.ts
+import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
+import { getProgramById, getSequenceById, addSongToSequence, reorderSequenceSongs } from '@/db/queries/programs';
+import { getUserId } from '@/lib/requestUser';
+
+const addSchema = z.object({ songId: z.number().int() });
+const reorderSchema = z.object({ orderedIds: z.array(z.number().int()) });
+
+async function assertOwnsSequence(ownerId: number, programId: number, seqId: number): Promise<boolean> {
+  const program = await getProgramById(ownerId, programId);
+  if (!program) return false;
+  const sequence = await getSequenceById(seqId);
+  return sequence !== undefined && sequence.programId === programId;
+}
+
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string; seqId: string }> }) {
+  const ownerId = getUserId(request);
+  const { id, seqId } = await params;
+  if (!(await assertOwnsSequence(ownerId, Number(id), Number(seqId)))) {
+    return NextResponse.json({ error: 'Δεν βρέθηκε' }, { status: 404 });
+  }
+  const parsed = addSchema.safeParse(await request.json());
+  if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  await addSongToSequence(Number(seqId), parsed.data.songId);
+  return NextResponse.json({ ok: true }, { status: 201 });
+}
+
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string; seqId: string }> }) {
+  const ownerId = getUserId(request);
+  const { id, seqId } = await params;
+  if (!(await assertOwnsSequence(ownerId, Number(id), Number(seqId)))) {
+    return NextResponse.json({ error: 'Δεν βρέθηκε' }, { status: 404 });
+  }
+  const parsed = reorderSchema.safeParse(await request.json());
+  if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  await reorderSequenceSongs(Number(seqId), parsed.data.orderedIds);
+  return NextResponse.json({ ok: true });
+}
+```
+
+- [ ] **Step 4: Rewrite `src/app/api/programs/[id]/sequences/[seqId]/songs/[entryId]/route.ts`**
+
+This route already receives `id` and `seqId` in its URL, even though the old file's param type only declared `entryId`.
+
+```ts
+// src/app/api/programs/[id]/sequences/[seqId]/songs/[entryId]/route.ts
+import { NextRequest, NextResponse } from 'next/server';
+import { getProgramById, getSequenceById, removeSongFromSequence } from '@/db/queries/programs';
+import { getUserId } from '@/lib/requestUser';
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string; seqId: string; entryId: string }> }
+) {
+  const ownerId = getUserId(request);
+  const { id, seqId, entryId } = await params;
+  const program = await getProgramById(ownerId, Number(id));
+  if (!program) return NextResponse.json({ error: 'Δεν βρέθηκε' }, { status: 404 });
+  const sequence = await getSequenceById(Number(seqId));
+  if (!sequence || sequence.programId !== Number(id)) {
+    return NextResponse.json({ error: 'Δεν βρέθηκε' }, { status: 404 });
+  }
+  await removeSongFromSequence(Number(entryId));
+  return NextResponse.json({ ok: true });
+}
+```
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/app/api/programs/
+git commit -m "Close ownership gap in program-sequence routes"
+```
+
+- [ ] **Step 6: Manual verification**
+
+As two different logged-in users (A and B), with A owning a program that has at least one sequence with one song in it: confirm B gets 404 from `GET`/`PATCH`/`DELETE` on A's `seqId` (via A's own `programId` guessed/known, or any `id`), and 404 from `POST`/`PATCH` on A's sequence's songs endpoint, and 404 trying to `DELETE` a song entry from A's sequence. Confirm A can still do all of the above on their own program/sequence normally.
+
+---
+
+## Task 16: Shared baseline vs. personal taxonomies (all 5 tables)
 
 **Files:**
 - Modify: `src/db/queries/regions.ts`, `src/db/queries/rhythms.ts`, `src/db/queries/dromoi.ts`, `src/db/queries/genres.ts`, `src/db/queries/composers.ts`
@@ -1810,7 +1984,7 @@ The value this creates belongs to whichever user is logged in — ownership is d
 
 - [ ] **Step 8: Add the same inline creation to the genre dropdown**
 
-In `src/app/admin/songs/new/page.tsx` (and the edit form, mirrored per Step 3 of Task 17's guidance to check both), add:
+In `src/app/admin/songs/new/page.tsx` (and the edit form, mirrored per Step 3 of Task 18's guidance to check both), add:
 
 ```tsx
 const [creatingGenre, setCreatingGenre] = useState(false);
@@ -1879,7 +2053,7 @@ Log in as the admin (created in Task 11) and as a second, freshly registered use
 
 ---
 
-## Task 16: Suggestion-on-create
+## Task 17: Suggestion-on-create
 
 **Files:**
 - Modify: `src/db/queries/axisValues.ts`
@@ -2034,7 +2208,7 @@ As a non-admin user, start typing a title that matches one of the admin's existi
 
 ---
 
-## Task 17: Sheet-music image upload
+## Task 18: Sheet-music image upload
 
 **Files:**
 - Modify: `package.json` (add `@vercel/blob`)
@@ -2184,7 +2358,7 @@ Upload a photo on the new-song form, save, start a session with that song as cur
 
 ---
 
-## Task 18: Password reset via Resend
+## Task 19: Password reset via Resend
 
 **Files:**
 - Modify: `package.json` (add `resend`)
@@ -2434,7 +2608,7 @@ Set `RESEND_API_KEY` and `RESEND_FROM_EMAIL` (a verified sender on your Resend d
 
 ---
 
-## Task 19: Account deletion (GDPR)
+## Task 20: Account deletion (GDPR)
 
 **Files:**
 - Create: `src/db/queries/accountDeletion.ts`
@@ -2594,7 +2768,7 @@ As a non-admin test user, delete the account via `/account`. Confirm redirect to
 
 ---
 
-## Task 20: Update README and final full-flow verification
+## Task 21: Update README and final full-flow verification
 
 **Files:**
 - Modify: `README.md`
