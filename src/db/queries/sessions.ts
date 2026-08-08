@@ -1,20 +1,24 @@
 import { db } from '../client';
 import { sessions, sessionPlayedSongs } from '../schema';
-import { eq, isNull, desc } from 'drizzle-orm';
+import { eq, isNull, desc, and } from 'drizzle-orm';
 import type { SessionRow } from '../schema';
 
-export async function getActiveSession(): Promise<SessionRow | undefined> {
-  const rows = await db.select().from(sessions).where(isNull(sessions.endedAt)).orderBy(desc(sessions.startedAt));
+export async function getActiveSession(ownerId: number): Promise<SessionRow | undefined> {
+  const rows = await db
+    .select()
+    .from(sessions)
+    .where(and(isNull(sessions.endedAt), eq(sessions.ownerId, ownerId)))
+    .orderBy(desc(sessions.startedAt));
   return rows[0];
 }
 
-export async function createSession(label: string | null, startingSongId: number): Promise<SessionRow> {
-  const rows = await db.insert(sessions).values({ label, currentSongId: startingSongId }).returning();
+export async function createSession(ownerId: number, label: string | null, startingSongId: number): Promise<SessionRow> {
+  const rows = await db.insert(sessions).values({ ownerId, label, currentSongId: startingSongId }).returning();
   return rows[0];
 }
 
-export async function getSessionById(id: number): Promise<SessionRow | undefined> {
-  const rows = await db.select().from(sessions).where(eq(sessions.id, id));
+export async function getSessionById(ownerId: number, id: number): Promise<SessionRow | undefined> {
+  const rows = await db.select().from(sessions).where(and(eq(sessions.id, id), eq(sessions.ownerId, ownerId)));
   return rows[0];
 }
 
@@ -32,22 +36,30 @@ async function markCurrentAsPlayedIfAny(sessionId: number, currentSongId: number
   }
 }
 
+// Unscoped internal lookup: callers of advanceToSong/endSequence/endSession are expected to have
+// already verified ownership via the exported, owner-scoped getSessionById (see route handlers),
+// so these helpers only need the row's currentSongId and must not duplicate that check.
+async function getSessionByIdUnscoped(id: number): Promise<SessionRow | undefined> {
+  const rows = await db.select().from(sessions).where(eq(sessions.id, id));
+  return rows[0];
+}
+
 export async function advanceToSong(sessionId: number, nextSongId: number): Promise<void> {
-  const session = await getSessionById(sessionId);
+  const session = await getSessionByIdUnscoped(sessionId);
   if (!session) throw new Error(`Session ${sessionId} not found`);
   await markCurrentAsPlayedIfAny(sessionId, session.currentSongId);
   await db.update(sessions).set({ currentSongId: nextSongId }).where(eq(sessions.id, sessionId));
 }
 
 export async function endSequence(sessionId: number): Promise<void> {
-  const session = await getSessionById(sessionId);
+  const session = await getSessionByIdUnscoped(sessionId);
   if (!session) throw new Error(`Session ${sessionId} not found`);
   await markCurrentAsPlayedIfAny(sessionId, session.currentSongId);
   await db.update(sessions).set({ currentSongId: null }).where(eq(sessions.id, sessionId));
 }
 
 export async function endSession(sessionId: number): Promise<void> {
-  const session = await getSessionById(sessionId);
+  const session = await getSessionByIdUnscoped(sessionId);
   if (!session) throw new Error(`Session ${sessionId} not found`);
   await markCurrentAsPlayedIfAny(sessionId, session.currentSongId);
   await db.update(sessions).set({ currentSongId: null, endedAt: new Date() }).where(eq(sessions.id, sessionId));

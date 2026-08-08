@@ -3,26 +3,32 @@ import { programs, programSequences, sequenceSongs, songs } from '../schema';
 import { eq, and, asc, max } from 'drizzle-orm';
 import type { ProgramRow, ProgramSequenceRow, SongRow } from '../schema';
 
-export async function listPrograms(): Promise<ProgramRow[]> {
-  return db.select().from(programs);
+export async function listPrograms(ownerId: number): Promise<ProgramRow[]> {
+  return db.select().from(programs).where(eq(programs.ownerId, ownerId));
 }
 
-export async function getProgramById(id: number): Promise<ProgramRow | undefined> {
-  const rows = await db.select().from(programs).where(eq(programs.id, id));
+export async function getProgramById(ownerId: number, id: number): Promise<ProgramRow | undefined> {
+  const rows = await db.select().from(programs).where(and(eq(programs.id, id), eq(programs.ownerId, ownerId)));
   return rows[0];
 }
 
-export async function createProgram(title: string): Promise<ProgramRow> {
-  const rows = await db.insert(programs).values({ title }).returning();
+export async function createProgram(ownerId: number, title: string): Promise<ProgramRow> {
+  const rows = await db.insert(programs).values({ ownerId, title }).returning();
   return rows[0];
 }
 
-export async function updateProgram(id: number, title: string): Promise<ProgramRow> {
-  const rows = await db.update(programs).set({ title }).where(eq(programs.id, id)).returning();
+export async function updateProgram(ownerId: number, id: number, title: string): Promise<ProgramRow | undefined> {
+  const rows = await db
+    .update(programs)
+    .set({ title })
+    .where(and(eq(programs.id, id), eq(programs.ownerId, ownerId)))
+    .returning();
   return rows[0];
 }
 
-export async function deleteProgram(id: number): Promise<void> {
+export async function deleteProgram(ownerId: number, id: number): Promise<void> {
+  const program = await getProgramById(ownerId, id);
+  if (!program) throw new Error('Το πρόγραμμα δεν βρέθηκε');
   const sequences = await db.select({ id: programSequences.id }).from(programSequences).where(eq(programSequences.programId, id));
   for (const seq of sequences) {
     await db.delete(sequenceSongs).where(eq(sequenceSongs.sequenceId, seq.id));

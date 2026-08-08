@@ -14,7 +14,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const ownerId = getUserId(request);
   const { id } = await params;
   const sessionId = Number(id);
-  const session = await getSessionById(sessionId);
+  const session = await getSessionById(ownerId, sessionId);
   if (!session) return NextResponse.json({ error: 'Δεν βρέθηκε session' }, { status: 404 });
 
   const showPlayed = request.nextUrl.searchParams.get('showPlayed') === 'true';
