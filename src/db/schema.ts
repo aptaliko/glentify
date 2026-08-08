@@ -21,36 +21,43 @@ export const regions = pgTable('regions', {
   id: serial('id').primaryKey(),
   name: text('name').notNull(),
   parentId: integer('parent_id'),
+  ownerId: integer('owner_id').references(() => users.id),
 });
 
 export const rhythms = pgTable('rhythms', {
   id: serial('id').primaryKey(),
   name: text('name').notNull(),
+  ownerId: integer('owner_id').references(() => users.id),
 });
 
 export const dromoi = pgTable('dromoi', {
   id: serial('id').primaryKey(),
   name: text('name').notNull(),
+  ownerId: integer('owner_id').references(() => users.id),
 });
 
 export const genres = pgTable('genres', {
   id: serial('id').primaryKey(),
   name: text('name').notNull(),
+  ownerId: integer('owner_id').references(() => users.id),
 });
 
 export const composers = pgTable('composers', {
   id: serial('id').primaryKey(),
   name: text('name').notNull(),
+  ownerId: integer('owner_id').references(() => users.id),
 });
 
 export const songs = pgTable('songs', {
   id: serial('id').primaryKey(),
   title: text('title').notNull(),
   lyrics: text('lyrics'),
+  imageUrl: text('image_url'),
   genreId: integer('genre_id').notNull().references(() => genres.id),
   notes: text('notes'),
   maleKey: text('male_key'),
   femaleKey: text('female_key'),
+  ownerId: integer('owner_id').references(() => users.id),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
@@ -83,6 +90,7 @@ export const sessions = pgTable('sessions', {
   startedAt: timestamp('started_at').notNull().defaultNow(),
   endedAt: timestamp('ended_at'),
   currentSongId: integer('current_song_id').references(() => songs.id),
+  ownerId: integer('owner_id').references(() => users.id),
 });
 
 export const sessionPlayedSongs = pgTable('session_played_songs', {
@@ -95,6 +103,7 @@ export const sessionPlayedSongs = pgTable('session_played_songs', {
 export const programs = pgTable('programs', {
   id: serial('id').primaryKey(),
   title: text('title').notNull(),
+  ownerId: integer('owner_id').references(() => users.id),
 });
 
 export const programSequences = pgTable('program_sequences', {
