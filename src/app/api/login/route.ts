@@ -1,13 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { isValidPassword, getAuthCookieName, getAuthCookieValue } from '@/lib/auth';
+import { z } from 'zod';
+import { getUserByEmail } from '@/db/queries/users';
+import { verifyPassword } from '@/lib/passwordHash';
+import { createSessionToken, getAuthCookieName } from '@/lib/auth';
+
+const loginSchema = z.object({ email: z.email(), password: z.string().min(1) });
 
 export async function POST(request: NextRequest) {
-  const body = await request.json();
-  if (typeof body.password !== 'string' || !isValidPassword(body.password)) {
-    return NextResponse.json({ error: 'Λάθος κωδικός' }, { status: 401 });
+  const parsed = loginSchema.safeParse(await request.json());
+  if (!parsed.success) return NextResponse.json({ error: 'Λάθος email ή κωδικός' }, { status: 401 });
+
+  const user = await getUserByEmail(parsed.data.email);
+  if (!user || !verifyPassword(parsed.data.password, user.passwordHash)) {
+    return NextResponse.json({ error: 'Λάθος email ή κωδικός' }, { status: 401 });
   }
-  const response = NextResponse.json({ ok: true, token: getAuthCookieValue() });
-  response.cookies.set(getAuthCookieName(), getAuthCookieValue(), {
+
+  const token = createSessionToken(user.id);
+  const response = NextResponse.json({ ok: true, token });
+  response.cookies.set(getAuthCookieName(), token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
