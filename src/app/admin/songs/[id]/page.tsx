@@ -22,6 +22,23 @@ export default function EditSongPage() {
   const [femaleKey, setFemaleKey] = useState('');
   const [axisValues, setAxisValues] = useState<AxisValueEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [creatingGenre, setCreatingGenre] = useState(false);
+  const [newGenreName, setNewGenreName] = useState('');
+
+  async function handleCreateGenre() {
+    if (!newGenreName.trim()) return;
+    const res = await fetch('/api/genres', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: newGenreName.trim() }),
+    });
+    if (!res.ok) return;
+    const created: Option = await res.json();
+    setGenres((prev) => [...prev, created]);
+    setGenreId(String(created.id));
+    setCreatingGenre(false);
+    setNewGenreName('');
+  }
 
   useEffect(() => {
     fetch('/api/genres').then((r) => r.json()).then(setGenres);
@@ -92,10 +109,35 @@ export default function EditSongPage() {
           placeholder="Στίχοι (προαιρετικό, μπορούν να προστεθούν αργότερα)"
           className="textarea textarea-bordered h-48"
         />
-        <select value={genreId} onChange={(e) => setGenreId(e.target.value)} className="select select-bordered" required>
+        <select
+          value={creatingGenre ? '__new__' : genreId}
+          onChange={(e) => {
+            if (e.target.value === '__new__') {
+              setCreatingGenre(true);
+            } else {
+              setCreatingGenre(false);
+              setGenreId(e.target.value);
+            }
+          }}
+          className="select select-bordered"
+          required
+        >
           <option value="">Είδος...</option>
           {genres.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+          <option value="__new__">+ Νέο είδος...</option>
         </select>
+        {creatingGenre && (
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={newGenreName}
+              onChange={(e) => setNewGenreName(e.target.value)}
+              placeholder="Όνομα νέου είδους"
+              className="input input-bordered flex-1"
+            />
+            <button type="button" onClick={handleCreateGenre} className="btn btn-secondary">Δημιουργία</button>
+          </div>
+        )}
         <SongAxisEditor value={axisValues} onChange={setAxisValues} />
         <div className="flex gap-3">
           <input value={maleKey} onChange={(e) => setMaleKey(e.target.value)} placeholder="Τόνος (άντρας)" className="input input-bordered flex-1" />
