@@ -2,6 +2,7 @@ import { db } from '../client';
 import { programs, programSequences, sequenceSongs, songs } from '../schema';
 import { eq, and, asc, max } from 'drizzle-orm';
 import type { ProgramRow, ProgramSequenceRow, SongRow } from '../schema';
+import type { OfflineProgram } from '@/lib/referenceData';
 
 export async function listPrograms(ownerId: number): Promise<ProgramRow[]> {
   return db.select().from(programs).where(eq(programs.ownerId, ownerId));
@@ -101,4 +102,20 @@ export async function reorderSequenceSongs(sequenceId: number, orderedSequenceSo
       .set({ position })
       .where(and(eq(sequenceSongs.id, sequenceSongId), eq(sequenceSongs.sequenceId, sequenceId)));
   }
+}
+
+export async function listProgramsWithSequencesAndSongs(ownerId: number): Promise<OfflineProgram[]> {
+  const programList = await listPrograms(ownerId);
+  return Promise.all(
+    programList.map(async (program) => {
+      const sequenceList = await listSequencesForProgram(program.id);
+      const sequences = await Promise.all(
+        sequenceList.map(async (sequence) => {
+          const entries = await listSongsForSequence(sequence.id);
+          return { id: sequence.id, title: sequence.title, songIds: entries.map((e) => e.song.id) };
+        })
+      );
+      return { id: program.id, title: program.title, sequences };
+    })
+  );
 }

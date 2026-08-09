@@ -25,6 +25,7 @@ function referenceData(): ReferenceData {
     composers: [],
     axisTypes: [],
     genres: [],
+    programs: [],
   };
 }
 
