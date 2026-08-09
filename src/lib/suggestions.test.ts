@@ -225,7 +225,7 @@ describe('buildSuggestionsResponse', () => {
       { song: candidate, axisValues: [av('region', 3), av('rhythm', 1)] },
     ];
     const result = buildSuggestionsResponse({
-      currentSongWithAxes: { id: 1, title: 'Τραγούδι Α', lyrics: null, maleKey: null, femaleKey: null, axisValues: [av('region', 3), av('rhythm', 1)] },
+      currentSongWithAxes: { id: 1, title: 'Τραγούδι Α', lyrics: null, imageUrl: null, maleKey: null, femaleKey: null, axisValues: [av('region', 3), av('rhythm', 1)] },
       allSongs,
       playedSongIds: new Set(),
       showPlayed: false,

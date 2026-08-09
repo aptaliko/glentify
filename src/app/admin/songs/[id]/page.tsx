@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { upload } from '@vercel/blob/client';
 import SongAxisEditor, { type AxisValueEntry } from '@/components/SongAxisEditor';
 
 interface Option {
@@ -21,9 +22,26 @@ export default function EditSongPage() {
   const [maleKey, setMaleKey] = useState('');
   const [femaleKey, setFemaleKey] = useState('');
   const [axisValues, setAxisValues] = useState<AxisValueEntry[]>([]);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [creatingGenre, setCreatingGenre] = useState(false);
   const [newGenreName, setNewGenreName] = useState('');
+
+  async function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    setError(null);
+    try {
+      const blob = await upload(file.name, file, { access: 'public', handleUploadUrl: '/api/songs/image-upload' });
+      setImageUrl(blob.url);
+    } catch {
+      setError('Αποτυχία μεταφόρτωσης εικόνας');
+    } finally {
+      setUploading(false);
+    }
+  }
 
   async function handleCreateGenre() {
     if (!newGenreName.trim()) return;
@@ -49,6 +67,7 @@ export default function EditSongPage() {
       setNotes(song.notes ?? '');
       setMaleKey(song.maleKey ?? '');
       setFemaleKey(song.femaleKey ?? '');
+      setImageUrl(song.imageUrl ?? null);
       setAxisValues(
         song.axisValues.map((v: { axisType: string; refId: number | null; yearValue: number | null }) => ({
           axisType: v.axisType,
@@ -73,6 +92,7 @@ export default function EditSongPage() {
         maleKey: maleKey || null,
         femaleKey: femaleKey || null,
         axisValues,
+        imageUrl,
       }),
     });
     if (!res.ok) {
@@ -138,6 +158,12 @@ export default function EditSongPage() {
             <button type="button" onClick={handleCreateGenre} className="btn btn-secondary">Δημιουργία</button>
           </div>
         )}
+        <div className="flex flex-col gap-2">
+          <label className="label-text">Εικόνα παρτιτούρας (προαιρετικό, εναλλακτικά ή μαζί με τους στίχους)</label>
+          <input type="file" accept="image/png,image/jpeg,image/webp" onChange={handleImageChange} className="file-input file-input-bordered" />
+          {uploading && <span className="loading loading-spinner loading-sm" />}
+          {imageUrl && <img src={imageUrl} alt="Προεπισκόπηση παρτιτούρας" className="max-h-64 rounded-box object-contain" />}
+        </div>
         <SongAxisEditor value={axisValues} onChange={setAxisValues} />
         <div className="flex gap-3">
           <input value={maleKey} onChange={(e) => setMaleKey(e.target.value)} placeholder="Τόνος (άντρας)" className="input input-bordered flex-1" />

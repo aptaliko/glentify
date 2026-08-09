@@ -185,6 +185,7 @@ export interface CurrentSongPayload {
   id: number;
   title: string;
   lyrics: string | null;
+  imageUrl: string | null;
   maleKey: string | null;
   femaleKey: string | null;
 }
@@ -276,6 +277,7 @@ export function buildSuggestionsResponse(input: BuildSuggestionsInput): Suggesti
     id: currentSongWithAxes.id,
     title: currentSongWithAxes.title,
     lyrics: currentSongWithAxes.lyrics,
+    imageUrl: currentSongWithAxes.imageUrl,
     maleKey: currentSongWithAxes.maleKey,
     femaleKey: currentSongWithAxes.femaleKey,
   };

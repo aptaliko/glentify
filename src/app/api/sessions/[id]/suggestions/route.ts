@@ -74,6 +74,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         id: currentSongWithAxes.id,
         title: currentSongWithAxes.title,
         lyrics: currentSongWithAxes.lyrics,
+        imageUrl: currentSongWithAxes.imageUrl,
         maleKey: currentSongWithAxes.maleKey,
         femaleKey: currentSongWithAxes.femaleKey,
         axisValues: currentAxisValues,
