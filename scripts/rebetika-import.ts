@@ -1,8 +1,8 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { db } from '../src/db/client';
-import { songs, songAxisValues } from '../src/db/schema';
+import { songs, songAxisValues, users } from '../src/db/schema';
 import { findOrCreateGenre, findOrCreateRhythm, findOrCreateComposer } from './lib/seed-helpers';
 
 interface ImportRow {
@@ -31,9 +31,21 @@ async function main() {
   const rows: ImportRow[] = JSON.parse(readFileSync(dataPath, 'utf-8'));
   console.log(`Reading ${rows.length} rows from ${fileName}`);
 
+  // Multi-user import: attribute everything this script inserts to the admin account, so it
+  // joins the shared suggestion-pool repertoire like the rest of the pre-existing songs (see
+  // scripts/migrate-to-multiuser.ts). Requires exactly one admin to exist already.
+  const [admin] = await db.select({ id: users.id }).from(users).where(eq(users.role, 'admin')).limit(1);
+  if (!admin) {
+    console.error('No admin user found. Run scripts/migrate-to-multiuser.ts first.');
+    process.exit(1);
+  }
+
   const genreId = await findOrCreateGenre('Ρεμπέτικο');
 
-  const existing = await db.select({ title: songs.title }).from(songs).where(eq(songs.genreId, genreId));
+  const existing = await db
+    .select({ title: songs.title })
+    .from(songs)
+    .where(and(eq(songs.genreId, genreId), eq(songs.ownerId, admin.id)));
   const existingNorm = new Set(existing.map((s) => normalizeTitle(s.title)));
 
   let inserted = 0;
@@ -49,7 +61,7 @@ async function main() {
     try {
       const [song] = await db
         .insert(songs)
-        .values({ title: row.title, lyrics: row.lyrics, genreId })
+        .values({ ownerId: admin.id, title: row.title, lyrics: row.lyrics, genreId })
         .returning();
 
       if (row.rhythm) {
