@@ -13,7 +13,8 @@
     "db:migrate": "dotenv -e .env.local -- tsx scripts/migrate.ts",
     "db:smoke": "dotenv -e .env.local -- tsx scripts/smoke-schema.ts",
     "db:seed:axis-types": "dotenv -e .env.local -- tsx scripts/seed-axis-types.ts",
-    "db:migrate-to-multiuser": "dotenv -e .env.local -- tsx scripts/migrate-to-multiuser.ts"
+    "db:migrate-to-multiuser": "dotenv -e .env.local -- tsx scripts/migrate-to-multiuser.ts",
+    "db:migrate:finalize": "dotenv -e .env.local -- tsx scripts/migrate-finalize.ts"
   },
   "dependencies": {
     "@capacitor/core": "^8.5.0",
