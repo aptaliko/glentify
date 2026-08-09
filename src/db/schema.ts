@@ -1,39 +1,63 @@
 import { pgTable, serial, text, integer, timestamp, boolean, unique } from 'drizzle-orm/pg-core';
 
+export const users = pgTable('users', {
+  id: serial('id').primaryKey(),
+  email: text('email').notNull().unique(),
+  passwordHash: text('password_hash').notNull(),
+  role: text('role').notNull().default('user'), // 'admin' | 'user'
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+export const passwordResetTokens = pgTable('password_reset_tokens', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id').notNull().references(() => users.id),
+  tokenHash: text('token_hash').notNull(),
+  expiresAt: timestamp('expires_at').notNull(),
+  usedAt: timestamp('used_at'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
 export const regions = pgTable('regions', {
   id: serial('id').primaryKey(),
   name: text('name').notNull(),
   parentId: integer('parent_id'),
+  ownerId: integer('owner_id').references(() => users.id),
 });
 
 export const rhythms = pgTable('rhythms', {
   id: serial('id').primaryKey(),
   name: text('name').notNull(),
+  ownerId: integer('owner_id').references(() => users.id),
 });
 
 export const dromoi = pgTable('dromoi', {
   id: serial('id').primaryKey(),
   name: text('name').notNull(),
+  ownerId: integer('owner_id').references(() => users.id),
 });
 
 export const genres = pgTable('genres', {
   id: serial('id').primaryKey(),
   name: text('name').notNull(),
+  ownerId: integer('owner_id').references(() => users.id),
 });
 
 export const composers = pgTable('composers', {
   id: serial('id').primaryKey(),
   name: text('name').notNull(),
+  ownerId: integer('owner_id').references(() => users.id),
 });
 
 export const songs = pgTable('songs', {
   id: serial('id').primaryKey(),
   title: text('title').notNull(),
   lyrics: text('lyrics'),
+  imageUrl: text('image_url'),
   genreId: integer('genre_id').notNull().references(() => genres.id),
   notes: text('notes'),
   maleKey: text('male_key'),
   femaleKey: text('female_key'),
+  ownerId: integer('owner_id').notNull().references(() => users.id),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
@@ -66,6 +90,7 @@ export const sessions = pgTable('sessions', {
   startedAt: timestamp('started_at').notNull().defaultNow(),
   endedAt: timestamp('ended_at'),
   currentSongId: integer('current_song_id').references(() => songs.id),
+  ownerId: integer('owner_id').notNull().references(() => users.id),
 });
 
 export const sessionPlayedSongs = pgTable('session_played_songs', {
@@ -78,6 +103,7 @@ export const sessionPlayedSongs = pgTable('session_played_songs', {
 export const programs = pgTable('programs', {
   id: serial('id').primaryKey(),
   title: text('title').notNull(),
+  ownerId: integer('owner_id').notNull().references(() => users.id),
 });
 
 export const programSequences = pgTable('program_sequences', {
@@ -94,6 +120,8 @@ export const sequenceSongs = pgTable('sequence_songs', {
   position: integer('position').notNull(),
 });
 
+export type UserRow = typeof users.$inferSelect;
+export type PasswordResetTokenRow = typeof passwordResetTokens.$inferSelect;
 export type RegionRow = typeof regions.$inferSelect;
 export type RhythmRow = typeof rhythms.$inferSelect;
 export type DromosRow = typeof dromoi.$inferSelect;

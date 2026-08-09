@@ -40,6 +40,8 @@ export default function SongAxisEditor({
   const [newAxisType, setNewAxisType] = useState('');
   const [newRefId, setNewRefId] = useState('');
   const [newYear, setNewYear] = useState('');
+  const [creatingValue, setCreatingValue] = useState(false);
+  const [newValueName, setNewValueName] = useState('');
 
   useEffect(() => {
     fetch('/api/axis-types')
@@ -90,6 +92,23 @@ export default function SongAxisEditor({
     onChange(value.filter((v) => v.axisType !== axisType));
   }
 
+  async function handleCreateValue() {
+    if (!selectedType?.lookupTable || !newValueName.trim()) return;
+    const endpoint = LOOKUP_ENDPOINTS[selectedType.lookupTable];
+    const body = selectedType.lookupTable === 'regions' ? { name: newValueName.trim(), parentId: null } : { name: newValueName.trim() };
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) return;
+    const created: Option = await res.json();
+    setOptionsByAxis((prev) => ({ ...prev, [selectedType.key]: [...(prev[selectedType.key] ?? []), created] }));
+    setNewRefId(String(created.id));
+    setCreatingValue(false);
+    setNewValueName('');
+  }
+
   return (
     <div className="card border border-base-300 bg-base-100">
       <div className="card-body gap-2 p-4">
@@ -118,6 +137,8 @@ export default function SongAxisEditor({
                 setNewAxisType(e.target.value);
                 setNewRefId('');
                 setNewYear('');
+                setCreatingValue(false);
+                setNewValueName('');
               }}
               className="select select-bordered select-sm"
             >
@@ -136,12 +157,39 @@ export default function SongAxisEditor({
               />
             )}
             {selectedType && selectedType.key !== 'year' && (
-              <select value={newRefId} onChange={(e) => setNewRefId(e.target.value)} className="select select-bordered select-sm">
-                <option value="">Τιμή...</option>
-                {(optionsByAxis[selectedType.key] ?? []).map((o) => (
-                  <option key={o.id} value={o.id}>{o.name}</option>
-                ))}
-              </select>
+              <>
+                <select
+                  value={creatingValue ? '__new__' : newRefId}
+                  onChange={(e) => {
+                    if (e.target.value === '__new__') {
+                      setCreatingValue(true);
+                      setNewRefId('');
+                    } else {
+                      setCreatingValue(false);
+                      setNewRefId(e.target.value);
+                    }
+                  }}
+                  className="select select-bordered select-sm"
+                >
+                  <option value="">Τιμή...</option>
+                  {(optionsByAxis[selectedType.key] ?? []).map((o) => (
+                    <option key={o.id} value={o.id}>{o.name}</option>
+                  ))}
+                  <option value="__new__">+ Νέα τιμή...</option>
+                </select>
+                {creatingValue && (
+                  <>
+                    <input
+                      type="text"
+                      value={newValueName}
+                      onChange={(e) => setNewValueName(e.target.value)}
+                      placeholder="Όνομα νέας τιμής"
+                      className="input input-bordered input-sm"
+                    />
+                    <button type="button" onClick={handleCreateValue} className="btn btn-secondary btn-sm">Δημιουργία</button>
+                  </>
+                )}
+              </>
             )}
             {selectedType && (
               <button type="button" onClick={handleAdd} className="btn btn-primary btn-sm">

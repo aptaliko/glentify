@@ -30,14 +30,26 @@ function KeyBadges({ maleKey, femaleKey }: { maleKey: string | null; femaleKey: 
   );
 }
 
-function LyricsCard({ lyrics, maleKey, femaleKey }: { lyrics: string | null; maleKey: string | null; femaleKey: string | null }) {
+function LyricsCard({
+  lyrics,
+  imageUrl,
+  maleKey,
+  femaleKey,
+}: {
+  lyrics: string | null;
+  imageUrl: string | null;
+  maleKey: string | null;
+  femaleKey: string | null;
+}) {
   return (
     <div className="card flex flex-col gap-3 bg-base-100 p-6 shadow sm:p-8">
       <KeyBadges maleKey={maleKey} femaleKey={femaleKey} />
-      {lyrics ? (
+      {imageUrl ? (
+        <img src={imageUrl} alt="Παρτιτούρα" className="mx-auto max-h-[70vh] w-auto object-contain" />
+      ) : lyrics ? (
         <pre className="whitespace-pre-wrap text-center font-sans text-xl sm:text-2xl leading-relaxed text-base-content">{lyrics}</pre>
       ) : (
-        <p className="text-lg italic text-base-content/50">Δεν έχουν προστεθεί ακόμη στίχοι για αυτό το τραγούδι.</p>
+        <p className="text-lg italic text-base-content/50">Δεν έχουν προστεθεί ακόμη στίχοι ή παρτιτούρα για αυτό το τραγούδι.</p>
       )}
     </div>
   );
@@ -144,7 +156,12 @@ export default function LiveSessionView({
 
       <div className="flex-1 p-4 sm:p-6">
         <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,320px)]">
-          <LyricsCard lyrics={currentSong.lyrics} maleKey={currentSong.maleKey} femaleKey={currentSong.femaleKey} />
+          <LyricsCard
+            lyrics={currentSong.lyrics}
+            imageUrl={currentSong.imageUrl}
+            maleKey={currentSong.maleKey}
+            femaleKey={currentSong.femaleKey}
+          />
           <div className="card overflow-hidden bg-base-100 shadow">
             <h2 className="border-b border-base-300 bg-base-200 px-4 py-2 text-sm font-semibold tracking-wide text-base-content/70 uppercase">
               {data.mode === 'filtered' ? data.listTitle : 'Όλα τα τραγούδια'}

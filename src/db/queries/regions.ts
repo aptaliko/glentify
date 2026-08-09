@@ -1,10 +1,15 @@
 import { db } from '../client';
 import { regions, songAxisValues, songs } from '../schema';
-import { eq, and, inArray } from 'drizzle-orm';
+import { eq, and, or, isNull, inArray } from 'drizzle-orm';
 import type { RegionRow } from '../schema';
 
-export async function listRegions(): Promise<RegionRow[]> {
-  return db.select().from(regions);
+export async function listRegions(userId: number): Promise<RegionRow[]> {
+  return db.select().from(regions).where(or(isNull(regions.ownerId), eq(regions.ownerId, userId)));
+}
+
+export async function getRegionById(id: number): Promise<RegionRow | undefined> {
+  const rows = await db.select().from(regions).where(eq(regions.id, id));
+  return rows[0];
 }
 
 function findTopLevelRegionId(regionId: number, byId: Map<number, RegionRow>): number {
@@ -15,8 +20,11 @@ function findTopLevelRegionId(regionId: number, byId: Map<number, RegionRow>): n
   return current ? current.id : regionId;
 }
 
-export async function getUsedTopLevelRegionsForGenre(genreId: number): Promise<RegionRow[]> {
-  const genreSongs = await db.select({ id: songs.id }).from(songs).where(eq(songs.genreId, genreId));
+export async function getUsedTopLevelRegionsForGenre(ownerId: number, genreId: number): Promise<RegionRow[]> {
+  const genreSongs = await db
+    .select({ id: songs.id })
+    .from(songs)
+    .where(and(eq(songs.genreId, genreId), eq(songs.ownerId, ownerId)));
   const songIds = genreSongs.map((s) => s.id);
   if (songIds.length === 0) return [];
 
@@ -33,10 +41,10 @@ export async function getUsedTopLevelRegionsForGenre(genreId: number): Promise<R
   for (const row of axisRows) {
     if (row.refId !== null) topLevelIds.add(findTopLevelRegionId(row.refId, byId));
   }
-  return allRegions.filter((r) => topLevelIds.has(r.id));
+  return allRegions.filter((r) => topLevelIds.has(r.id) && (r.ownerId === null || r.ownerId === ownerId));
 }
 
-export async function createRegion(data: { name: string; parentId: number | null }): Promise<RegionRow> {
+export async function createRegion(data: { name: string; parentId: number | null; ownerId: number | null }): Promise<RegionRow> {
   const rows = await db.insert(regions).values(data).returning();
   return rows[0];
 }

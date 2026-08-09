@@ -5,14 +5,16 @@ import { listRegions } from '@/db/queries/regions';
 import { listRhythms } from '@/db/queries/rhythms';
 import { listDromoi } from '@/db/queries/dromoi';
 import { listComposers } from '@/db/queries/composers';
-import { listAxisTypes, listAllAxisValues } from '@/db/queries/axisValues';
+import { listAxisTypes, getAxisValuesForOwner } from '@/db/queries/axisValues';
 import { listGenres } from '@/db/queries/genres';
 import { buildSuggestionsResponse, type AxisValue, type SongWithAxes } from '@/lib/suggestions';
+import { getUserId } from '@/lib/requestUser';
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const ownerId = getUserId(request);
   const { id } = await params;
   const sessionId = Number(id);
-  const session = await getSessionById(sessionId);
+  const session = await getSessionById(ownerId, sessionId);
   if (!session) return NextResponse.json({ error: 'Δεν βρέθηκε session' }, { status: 404 });
 
   const showPlayed = request.nextUrl.searchParams.get('showPlayed') === 'true';
@@ -36,16 +38,16 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   const [allSongs, regions, rhythms, dromoi, composers, axisTypes, genres, playedSongIdList, currentSongWithAxes, allAxisValues] =
     await Promise.all([
-      listSongs(),
-      listRegions(),
-      listRhythms(),
-      listDromoi(),
-      listComposers(),
+      listSongs(ownerId),
+      listRegions(ownerId),
+      listRhythms(ownerId),
+      listDromoi(ownerId),
+      listComposers(ownerId),
       listAxisTypes(),
-      listGenres(),
+      listGenres(ownerId),
       getPlayedSongIds(sessionId),
-      getSongWithAxisValues(session.currentSongId),
-      listAllAxisValues(),
+      getSongWithAxisValues(ownerId, session.currentSongId),
+      getAxisValuesForOwner(ownerId),
     ]);
 
   if (!currentSongWithAxes) return NextResponse.json({ error: 'Το τρέχον τραγούδι δεν βρέθηκε' }, { status: 500 });
@@ -72,6 +74,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         id: currentSongWithAxes.id,
         title: currentSongWithAxes.title,
         lyrics: currentSongWithAxes.lyrics,
+        imageUrl: currentSongWithAxes.imageUrl,
         maleKey: currentSongWithAxes.maleKey,
         femaleKey: currentSongWithAxes.femaleKey,
         axisValues: currentAxisValues,

@@ -37,6 +37,11 @@ export default function HomePage() {
       .finally(() => setLoaded(true));
   }, [native]);
 
+  async function handleLogout() {
+    await fetch(apiUrl('/api/logout'), { method: 'POST' });
+    window.location.href = '/login';
+  }
+
   async function handleSync() {
     setSyncStatus('syncing');
     try {
@@ -109,6 +114,13 @@ export default function HomePage() {
       )}
 
       {!native && <Link href="/admin/songs" className="link">Διαχείριση (admin)</Link>}
+
+      {!native && (
+        <div className="flex gap-4 text-sm">
+          <Link href="/account" className="link">Λογαριασμός</Link>
+          <button onClick={handleLogout} className="link">Αποσύνδεση</button>
+        </div>
+      )}
     </main>
   );
 }

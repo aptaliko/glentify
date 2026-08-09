@@ -2,12 +2,14 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { isNativePlatform } from '@/lib/platform';
 import { saveAuthToken } from '@/lib/authToken';
 import { apiUrl } from '@/lib/apiClient';
 
 export default function LoginPage() {
   const router = useRouter();
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
 
@@ -17,11 +19,11 @@ export default function LoginPage() {
     const res = await fetch(apiUrl('/api/login'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password }),
+      body: JSON.stringify({ email, password }),
     });
     if (!res.ok) {
       const body = await res.json();
-      setError(body.error ?? 'Κάτι πήγε στραβά');
+      setError(typeof body.error === 'string' ? body.error : 'Κάτι πήγε στραβά');
       return;
     }
     if (isNativePlatform()) {
@@ -43,17 +45,27 @@ export default function LoginPage() {
             </div>
           )}
           <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Email"
+            className="input input-bordered input-lg w-full"
+            autoFocus
+            required
+          />
+          <input
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Κωδικός"
             className="input input-bordered input-lg w-full"
-            autoFocus
             required
           />
-          <button type="submit" className="btn btn-primary btn-lg">
-            Είσοδος
-          </button>
+          <button type="submit" className="btn btn-primary btn-lg">Είσοδος</button>
+          <div className="flex justify-between text-sm">
+            <Link href="/register" className="link">Νέος λογαριασμός</Link>
+            <Link href="/forgot-password" className="link">Ξέχασα τον κωδικό</Link>
+          </div>
         </form>
       </div>
     </main>

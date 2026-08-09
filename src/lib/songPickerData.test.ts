@@ -9,10 +9,10 @@ function makeSong(id: number, title: string, genreId = 1): SongRow {
 
 // Νησιά(1) -> Νησιά Αιγαίου(2) -> Κυκλάδες(3) -> Νάξος(4)
 const regions: RegionRow[] = [
-  { id: 1, name: 'Νησιά', parentId: null },
-  { id: 2, name: 'Νησιά Αιγαίου', parentId: 1 },
-  { id: 3, name: 'Κυκλάδες', parentId: 2 },
-  { id: 4, name: 'Νάξος', parentId: 3 },
+  { id: 1, name: 'Νησιά', parentId: null, ownerId: null },
+  { id: 2, name: 'Νησιά Αιγαίου', parentId: 1, ownerId: null },
+  { id: 3, name: 'Κυκλάδες', parentId: 2, ownerId: null },
+  { id: 4, name: 'Νάξος', parentId: 3, ownerId: null },
 ];
 
 function referenceData(): ReferenceData {

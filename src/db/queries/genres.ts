@@ -1,13 +1,18 @@
 import { db } from '../client';
 import { genres, songs } from '../schema';
-import { eq } from 'drizzle-orm';
+import { eq, or, isNull } from 'drizzle-orm';
 import type { GenreRow } from '../schema';
 
-export async function listGenres(): Promise<GenreRow[]> {
-  return db.select().from(genres);
+export async function listGenres(userId: number): Promise<GenreRow[]> {
+  return db.select().from(genres).where(or(isNull(genres.ownerId), eq(genres.ownerId, userId)));
 }
 
-export async function createGenre(data: { name: string }): Promise<GenreRow> {
+export async function getGenreById(id: number): Promise<GenreRow | undefined> {
+  const rows = await db.select().from(genres).where(eq(genres.id, id));
+  return rows[0];
+}
+
+export async function createGenre(data: { name: string; ownerId: number | null }): Promise<GenreRow> {
   const rows = await db.insert(genres).values(data).returning();
   return rows[0];
 }

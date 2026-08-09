@@ -12,16 +12,20 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "dotenv -e .env.local -- tsx scripts/migrate.ts",
     "db:smoke": "dotenv -e .env.local -- tsx scripts/smoke-schema.ts",
-    "db:seed:axis-types": "dotenv -e .env.local -- tsx scripts/seed-axis-types.ts"
+    "db:seed:axis-types": "dotenv -e .env.local -- tsx scripts/seed-axis-types.ts",
+    "db:migrate-to-multiuser": "dotenv -e .env.local -- tsx scripts/migrate-to-multiuser.ts",
+    "db:migrate:finalize": "dotenv -e .env.local -- tsx scripts/migrate-finalize.ts"
   },
   "dependencies": {
     "@capacitor/core": "^8.5.0",
     "@capacitor/preferences": "^8.0.1",
     "@neondatabase/serverless": "^1.1.0",
+    "@vercel/blob": "^2.7.0",
     "drizzle-orm": "^0.45.2",
     "next": "16.2.12",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "resend": "^6.18.1",
     "zod": "^4.4.3"
   },
   "devDependencies": {

@@ -84,6 +84,7 @@ export class LocalSessionStore implements SessionStore {
             id: currentEntry.song.id,
             title: currentEntry.song.title,
             lyrics: currentEntry.song.lyrics,
+            imageUrl: currentEntry.song.imageUrl,
             maleKey: currentEntry.song.maleKey,
             femaleKey: currentEntry.song.femaleKey,
             axisValues: currentEntry.axisValues,

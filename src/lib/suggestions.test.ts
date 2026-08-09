@@ -32,12 +32,12 @@ function av(axisType: string, refId: number | null, yearValue: number | null = n
 // Region tree: Νησιά(1) -> Νησιά Αιγαίου(2) -> Κυκλάδες(3) -> Νάξος(4) -> Απείρανθος(5)
 //              Νησιά(1) -> Κύθηρα(6)
 const regions: RegionRow[] = [
-  { id: 1, name: 'Νησιά', parentId: null },
-  { id: 2, name: 'Νησιά Αιγαίου', parentId: 1 },
-  { id: 3, name: 'Κυκλάδες', parentId: 2 },
-  { id: 4, name: 'Νάξος', parentId: 3 },
-  { id: 5, name: 'Απείρανθος', parentId: 4 },
-  { id: 6, name: 'Κύθηρα', parentId: 1 },
+  { id: 1, name: 'Νησιά', parentId: null, ownerId: null },
+  { id: 2, name: 'Νησιά Αιγαίου', parentId: 1, ownerId: null },
+  { id: 3, name: 'Κυκλάδες', parentId: 2, ownerId: null },
+  { id: 4, name: 'Νάξος', parentId: 3, ownerId: null },
+  { id: 5, name: 'Απείρανθος', parentId: 4, ownerId: null },
+  { id: 6, name: 'Κύθηρα', parentId: 1, ownerId: null },
 ];
 
 describe('getRegionAncestorIds', () => {
@@ -187,14 +187,14 @@ describe('getSuggestions', () => {
 });
 
 describe('buildSuggestionsResponse', () => {
-  const rhythms: RhythmRow[] = [{ id: 1, name: 'Καλαματιανός' }];
-  const dromoi: DromosRow[] = [{ id: 1, name: 'Ραστ' }];
+  const rhythms: RhythmRow[] = [{ id: 1, name: 'Καλαματιανός', ownerId: null }];
+  const dromoi: DromosRow[] = [{ id: 1, name: 'Ραστ', ownerId: null }];
   const composers: ComposerRow[] = [];
   const axisTypes: AxisTypeRow[] = [
     { id: 1, key: 'region', label: 'Περιοχή', lookupTable: 'regions', hierarchical: true },
     { id: 2, key: 'rhythm', label: 'Ρυθμός', lookupTable: 'rhythms', hierarchical: false },
   ];
-  const genres: GenreRow[] = [{ id: 1, name: 'Παραδοσιακό' }];
+  const genres: GenreRow[] = [{ id: 1, name: 'Παραδοσιακό', ownerId: null }];
   const lookups = { regions, rhythms, dromoi, composers, axisTypes, genres };
 
   it('returns an empty grouped response when there is no current song', () => {
@@ -225,7 +225,7 @@ describe('buildSuggestionsResponse', () => {
       { song: candidate, axisValues: [av('region', 3), av('rhythm', 1)] },
     ];
     const result = buildSuggestionsResponse({
-      currentSongWithAxes: { id: 1, title: 'Τραγούδι Α', lyrics: null, maleKey: null, femaleKey: null, axisValues: [av('region', 3), av('rhythm', 1)] },
+      currentSongWithAxes: { id: 1, title: 'Τραγούδι Α', lyrics: null, imageUrl: null, maleKey: null, femaleKey: null, axisValues: [av('region', 3), av('rhythm', 1)] },
       allSongs,
       playedSongIds: new Set(),
       showPlayed: false,
