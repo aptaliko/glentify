@@ -1,5 +1,5 @@
 import { db } from '../client';
-import { songAxisValues, axisTypes, regions, rhythms, dromoi, composers } from '../schema';
+import { songAxisValues, axisTypes, regions, rhythms, dromoi, composers, songs } from '../schema';
 import { eq, inArray, or, isNull } from 'drizzle-orm';
 import type { SongAxisValueRow, AxisTypeRow } from '../schema';
 
@@ -18,6 +18,25 @@ export async function getAxisValuesForSongIds(songIds: number[]): Promise<SongAx
 
 export async function listAllAxisValues(): Promise<SongAxisValueRow[]> {
   return db.select().from(songAxisValues);
+}
+
+// Scoped equivalent of listAllAxisValues(): axis values for every song owned by ownerId, in one
+// query (join, not a two-step listSongs()-then-getAxisValuesForSongIds() round trip) so callers
+// that fetch this alongside several other owner-scoped lists can keep doing so inside a single
+// Promise.all instead of serializing on songIds first.
+export async function getAxisValuesForOwner(ownerId: number): Promise<SongAxisValueRow[]> {
+  const rows = await db
+    .select({
+      id: songAxisValues.id,
+      songId: songAxisValues.songId,
+      axisType: songAxisValues.axisType,
+      refId: songAxisValues.refId,
+      yearValue: songAxisValues.yearValue,
+    })
+    .from(songAxisValues)
+    .innerJoin(songs, eq(songAxisValues.songId, songs.id))
+    .where(eq(songs.ownerId, ownerId));
+  return rows;
 }
 
 export interface AxisValueInput {

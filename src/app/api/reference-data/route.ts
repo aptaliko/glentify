@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { listSongs } from '@/db/queries/songs';
-import { listAllAxisValues, listAxisTypes } from '@/db/queries/axisValues';
+import { getAxisValuesForOwner, listAxisTypes } from '@/db/queries/axisValues';
 import { listRegions } from '@/db/queries/regions';
 import { listRhythms } from '@/db/queries/rhythms';
 import { listDromoi } from '@/db/queries/dromoi';
@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
   const ownerId = getUserId(request);
   const [songs, axisValues, axisTypes, regions, rhythms, dromoi, composers, genres] = await Promise.all([
     listSongs(ownerId),
-    listAllAxisValues(),
+    getAxisValuesForOwner(ownerId),
     listAxisTypes(),
     listRegions(ownerId),
     listRhythms(ownerId),

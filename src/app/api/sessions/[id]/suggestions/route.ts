@@ -5,7 +5,7 @@ import { listRegions } from '@/db/queries/regions';
 import { listRhythms } from '@/db/queries/rhythms';
 import { listDromoi } from '@/db/queries/dromoi';
 import { listComposers } from '@/db/queries/composers';
-import { listAxisTypes, listAllAxisValues } from '@/db/queries/axisValues';
+import { listAxisTypes, getAxisValuesForOwner } from '@/db/queries/axisValues';
 import { listGenres } from '@/db/queries/genres';
 import { buildSuggestionsResponse, type AxisValue, type SongWithAxes } from '@/lib/suggestions';
 import { getUserId } from '@/lib/requestUser';
@@ -47,7 +47,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       listGenres(ownerId),
       getPlayedSongIds(sessionId),
       getSongWithAxisValues(ownerId, session.currentSongId),
-      listAllAxisValues(),
+      getAxisValuesForOwner(ownerId),
     ]);
 
   if (!currentSongWithAxes) return NextResponse.json({ error: 'Το τρέχον τραγούδι δεν βρέθηκε' }, { status: 500 });
