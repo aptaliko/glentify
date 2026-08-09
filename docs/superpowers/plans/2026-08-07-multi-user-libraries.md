@@ -2768,10 +2768,35 @@ As a non-admin test user, delete the account via `/account`. Confirm redirect to
 
 ---
 
-## Task 21: Update README and final full-flow verification
+## Task 21: Update README, add account/logout nav, and final full-flow verification
 
 **Files:**
-- Modify: `README.md`
+- Modify: `README.md`, `.env.example`
+- Modify: `src/app/page.tsx` (add nav links, discovered missing during this task's own review — see Step 0)
+
+**Why Step 0 exists:** while preparing this task, the controller discovered there is currently no logout control and no link to `/account` (Task 20) anywhere in the app's UI — `src/app/api/logout/route.ts` exists but nothing in `src/` calls it, and `/account` is only reachable by typing the URL directly. This predates the multi-user work but becomes a real usability gap now that accounts are real (not a single shared password) — closing it belongs in this final task alongside the README, not as a whole new task.
+
+- [ ] **Step 0: Add "Λογαριασμός" and "Αποσύνδεση" links to the home page**
+
+In `src/app/page.tsx`, add a logout handler near the other handlers:
+
+```tsx
+async function handleLogout() {
+  await fetch(apiUrl('/api/logout'), { method: 'POST' });
+  window.location.href = '/login';
+}
+```
+
+Render it web-only (matching the existing `!native` pattern already used for "Σταθερά προγράμματα"/"Διαχείριση (admin)"), placed after the existing admin link:
+
+```tsx
+{!native && (
+  <div className="flex gap-4 text-sm">
+    <Link href="/account" className="link">Λογαριασμός</Link>
+    <button onClick={handleLogout} className="link">Αποσύνδεση</button>
+  </div>
+)}
+```
 
 - [ ] **Step 1: Document the new env vars and setup step**
 
@@ -2789,10 +2814,10 @@ Update `.env.example` to list `AUTH_SECRET`, `RESEND_API_KEY`, `RESEND_FROM_EMAI
 - [ ] **Step 2: Commit**
 
 ```bash
-git add README.md .env.example
-git commit -m "Document multi-user setup in README"
+git add README.md .env.example src/app/page.tsx
+git commit -m "Document multi-user setup in README; add account/logout nav links"
 ```
 
 - [ ] **Step 3: Full-flow manual verification**
 
-Run `npm test` (all unit tests green) and `npm run lint` (clean), then walk through, in order: register → login → create a personal song via suggestion-on-create → upload a sheet-music photo on a second song → start a live session and confirm both the lyrics song and the image song render correctly → forgot-password → reset → log in with the new password → delete the (non-admin) account and confirm cleanup. This is the final acceptance check for the whole feature.
+Run `npm test` (all unit tests green) and `npm run lint` (clean), then walk through, in order: register → login → confirm the new "Λογαριασμός"/"Αποσύνδεση" links appear on the home page and work → log back in → create a personal song via suggestion-on-create → upload a sheet-music photo on a second song → start a live session and confirm both the lyrics song and the image song render correctly → forgot-password → reset → log in with the new password → delete the (non-admin) account and confirm cleanup. This is the final acceptance check for the whole feature.
