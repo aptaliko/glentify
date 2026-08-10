@@ -2,6 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { nativeApiFetch } from '@/lib/nativeApiFetch';
+import { isNativeApp } from '@/lib/platform';
+import { preferencesStore } from '@/lib/preferencesStore';
+import { setSelectedEditSongId } from '@/lib/adminEditStore';
 
 interface Song {
   id: number;
@@ -10,12 +15,14 @@ interface Song {
 }
 
 export default function SongsAdminPage() {
+  const native = isNativeApp();
+  const router = useRouter();
   const [songs, setSongs] = useState<Song[]>([]);
   const [search, setSearch] = useState('');
 
   async function load(q: string) {
     const url = q ? `/api/songs?search=${encodeURIComponent(q)}` : '/api/songs';
-    const res = await fetch(url);
+    const res = await nativeApiFetch(url);
     setSongs(await res.json());
   }
 
@@ -27,6 +34,11 @@ export default function SongsAdminPage() {
   function handleSearch(e: React.FormEvent) {
     e.preventDefault();
     load(search);
+  }
+
+  async function handleOpenSong(id: number) {
+    await setSelectedEditSongId(preferencesStore, id);
+    router.push('/admin/local/songs/edit');
   }
 
   return (
@@ -42,7 +54,11 @@ export default function SongsAdminPage() {
       <ul className="list rounded-box bg-base-100 shadow">
         {songs.map((s) => (
           <li key={s.id} className="list-row items-center">
-            <Link href={`/admin/songs/${s.id}`} className="link link-hover">{s.title}</Link>
+            {native ? (
+              <button onClick={() => handleOpenSong(s.id)} className="link link-hover text-left">{s.title}</button>
+            ) : (
+              <Link href={`/admin/songs/${s.id}`} className="link link-hover">{s.title}</Link>
+            )}
             {!s.lyrics && <span className="badge badge-warning badge-sm">λείπουν στίχοι</span>}
           </li>
         ))}
