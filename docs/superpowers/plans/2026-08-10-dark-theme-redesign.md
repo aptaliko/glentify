@@ -26,7 +26,7 @@
 **Interfaces:**
 - Produces: a daisyUI theme named `glentify-dark`, set as the sole default theme (`--default`), consumed automatically by every existing page/component via daisyUI's semantic classes. No new exported symbols, functions, or types — this is a CSS-only change.
 
-- [ ] **Step 1: Read the current file**
+- [x] **Step 1: Read the current file**
 
 `src/app/globals.css` currently contains:
 
@@ -52,7 +52,7 @@ body {
 }
 ```
 
-- [ ] **Step 2: Replace the theme block and `:root` color-scheme**
+- [x] **Step 2: Replace the theme block and `:root` color-scheme**
 
 Replace:
 
@@ -70,10 +70,13 @@ with:
 
 ```css
 @plugin "daisyui" {
-  themes: glentify-dark --default;
+  themes: false;
 }
 
-:root:has(input.theme-controller[value=glentify-dark]:checked), [data-theme="glentify-dark"] {
+@plugin "daisyui/theme" {
+  name: "glentify-dark";
+  default: true;
+  prefersdark: false;
   color-scheme: dark;
   --color-base-100: #14141c;
   --color-base-200: #1c1f26;
@@ -104,9 +107,9 @@ with:
 }
 ```
 
-This follows the same token structure daisyUI's own built-in dark themes use (e.g. `node_modules/daisyui/theme/night.css`) — `:root:has(...)` covers daisyUI's theme-controller input pattern (unused here since there's no toggle, but keeping it matches daisyUI's own generated themes and costs nothing), `[data-theme="glentify-dark"]` is the selector Tailwind/daisyUI's `<html data-theme>` (set automatically since this is the sole `--default` theme) actually matches.
+This is daisyUI 5's actual custom-theme authoring mechanism (`@plugin "daisyui/theme"`, distinct from the main `@plugin "daisyui"` block) — passing `default: true` makes the plugin itself prepend an unconditional `:where(:root),` to the generated selector, which is what makes the tokens apply everywhere without needing any `data-theme` attribute or theme-switcher UI (confirmed by reading `node_modules/daisyui/theme/index.js`).
 
-- [ ] **Step 3: Update the explanatory comment**
+- [x] **Step 3: Update the explanatory comment**
 
 Replace:
 
@@ -124,17 +127,17 @@ with:
    in dim venues/stages while keeping the same "always this one look" design. */
 ```
 
-- [ ] **Step 4: Run the build**
+- [x] **Step 4: Run the build**
 
 Run: `npm run build`
 Expected: succeeds with no errors (this is the only available check for a pure-CSS change — there is no unit-testable logic here).
 
-- [ ] **Step 5: Run the existing test suite as a regression sanity check**
+- [x] **Step 5: Run the existing test suite as a regression sanity check**
 
 Run: `npm test`
 Expected: all existing tests still pass unchanged (this change touches no `.ts`/`.tsx` logic, so the count/result should be identical to before this task).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/app/globals.css
@@ -150,34 +153,34 @@ git commit -m "Replace locked light theme with locked dark glentify-dark theme"
 **Interfaces:**
 - Consumes: the `glentify-dark` theme tokens from Task 1.
 
-- [ ] **Step 1: Verify the web app**
+- [x] **Step 1: Verify the web app**
 
 Run: `npm run dev`, open `http://localhost:3000` in a browser.
 
 Check: home page, login/register, `/session/new` (song picker), an active session page, `/programs` and a program's detail/sequence pages, `/account`. Confirm: dark background renders (no leftover white flash on load), all text is legible, primary buttons show the teal accent with readable white text, links are distinguishable from body text.
 
-- [ ] **Step 2: Verify the admin pages**
+- [x] **Step 2: Verify the admin pages**
 
 In the same running dev server, check: `/admin/songs` (list), `/admin/songs/new` and an existing song's edit page (dense form with many fields — this is the page most likely to expose a contrast problem), and the admin pages for programs/rhythms/regions/composers if present under `/admin`.
 
 Confirm: form inputs have a visible border/background distinct from the page background, placeholder text is legible but visibly lighter than entered text, validation/error messages (`alert alert-error` style) are readable on the dark background, disabled/read-only states are still distinguishable from normal fields.
 
-- [ ] **Step 3: Fix any contrast problem found, in `src/app/globals.css` only**
+- [x] **Step 3: Fix any contrast problem found, in `src/app/globals.css` only**
 
 If Steps 1-2 find any element that's hard to read: adjust the specific token(s) in the `glentify-dark` block from Task 1 (e.g. lighten `--color-base-300` if borders are too faint, or adjust `--color-*-content` if text-on-color contrast is weak). Re-run the affected page's check after each adjustment. Do not add any color override outside this one theme block — see this plan's Global Constraints.
 
-- [ ] **Step 4: Verify the native (Android) build**
+- [x] **Step 4: Verify the native (Android) build**
 
 Run: `npm run build:mobile`, then in Android Studio press **Run** with the device selected (same flow as the existing mobile testing process).
 
 Check on-device: home screen, "Ξεκίνα γλέντι" song picker, an active local session, "Σταθερά προγράμματα" list → program → sequence playback. Confirm the same dark background/teal-accent look as the web check, no light-theme flash on launch, and that text remains legible in bright ambient light (hold the phone under a bright lamp or near a window — this is the practical equivalent of the original "glanceable on stage" requirement) as well as in a dim room.
 
-- [ ] **Step 5: Final regression check**
+- [x] **Step 5: Final regression check**
 
 Run, in order: `npm test`, `npm run lint`, `npx tsc --noEmit`, `npm run build`.
 Expected: all clean (identical results to before this plan — this task makes no source code changes beyond the possible token tuning in Step 3).
 
-- [ ] **Step 6: Commit any Step 3 tuning**
+- [x] **Step 6: Commit any Step 3 tuning**
 
 If Step 3 changed any token values:
 
