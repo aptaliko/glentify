@@ -120,6 +120,19 @@ export const sequenceSongs = pgTable('sequence_songs', {
   position: integer('position').notNull(),
 });
 
+export const programCollaborators = pgTable(
+  'program_collaborators',
+  {
+    id: serial('id').primaryKey(),
+    programId: integer('program_id').notNull().references(() => programs.id),
+    userId: integer('user_id').notNull().references(() => users.id),
+    addedAt: timestamp('added_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    uniqueProgramUser: unique().on(table.programId, table.userId),
+  })
+);
+
 export type UserRow = typeof users.$inferSelect;
 export type PasswordResetTokenRow = typeof passwordResetTokens.$inferSelect;
 export type RegionRow = typeof regions.$inferSelect;
@@ -135,3 +148,4 @@ export type SessionPlayedSongRow = typeof sessionPlayedSongs.$inferSelect;
 export type ProgramRow = typeof programs.$inferSelect;
 export type ProgramSequenceRow = typeof programSequences.$inferSelect;
 export type SequenceSongRow = typeof sequenceSongs.$inferSelect;
+export type ProgramCollaboratorRow = typeof programCollaborators.$inferSelect;

@@ -1,6 +1,6 @@
 {
-  "id": "ee3882c4-ba7b-444a-8e67-365df4fa37f0",
-  "prevId": "88735a3d-cefb-4649-af23-c08d80bdea08",
+  "id": "bffea30c-3fbf-41af-93f4-296b2cc9f4a4",
+  "prevId": "ee3882c4-ba7b-444a-8e67-365df4fa37f0",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -251,6 +251,80 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.program_collaborators": {
+      "name": "program_collaborators",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "program_id": {
+          "name": "program_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "added_at": {
+          "name": "added_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "program_collaborators_program_id_programs_id_fk": {
+          "name": "program_collaborators_program_id_programs_id_fk",
+          "tableFrom": "program_collaborators",
+          "tableTo": "programs",
+          "columnsFrom": [
+            "program_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "program_collaborators_user_id_users_id_fk": {
+          "name": "program_collaborators_user_id_users_id_fk",
+          "tableFrom": "program_collaborators",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "program_collaborators_program_id_user_id_unique": {
+          "name": "program_collaborators_program_id_user_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "program_id",
+            "user_id"
+          ]
+        }
+      },
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
