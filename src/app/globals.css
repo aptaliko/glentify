@@ -1,10 +1,36 @@
 @import "tailwindcss";
 @plugin "daisyui" {
-  themes: corporate --default;
+  themes: glentify-dark --default;
 }
 
-:root {
-  color-scheme: light;
+:root:has(input.theme-controller[value=glentify-dark]:checked), [data-theme="glentify-dark"] {
+  color-scheme: dark;
+  --color-base-100: #14141c;
+  --color-base-200: #1c1f26;
+  --color-base-300: #262a33;
+  --color-base-content: #e5e7eb;
+  --color-primary: #0d9488;
+  --color-primary-content: #ffffff;
+  --color-secondary: #262a33;
+  --color-secondary-content: #e5e7eb;
+  --color-accent: #0d9488;
+  --color-accent-content: #ffffff;
+  --color-neutral: #1c1f26;
+  --color-neutral-content: #e5e7eb;
+  --color-info: #38bdf8;
+  --color-info-content: #06202e;
+  --color-success: #34d399;
+  --color-success-content: #052e21;
+  --color-warning: #fbbf24;
+  --color-warning-content: #2e1e02;
+  --color-error: #f87171;
+  --color-error-content: #2e0a0a;
+  --radius-selector: 1rem;
+  --radius-field: 0.75rem;
+  --radius-box: 1.25rem;
+  --border: 1px;
+  --depth: 0;
+  --noise: 0;
 }
 
 @theme inline {
@@ -12,8 +38,10 @@
   --font-mono: var(--font-geist-mono);
 }
 
-/* Locked to a single (light) daisyUI theme regardless of the OS/browser color
-   scheme -- this is a tablet UI meant to be glanceable on stage, not a themed app. */
+/* Locked to a single (dark) daisyUI theme regardless of the OS/browser color
+   scheme -- this is a tablet UI meant to be glanceable on stage, not a themed
+   app. Dark was chosen over the previous light theme because it reduces glare
+   in dim venues/stages while keeping the same "always this one look" design. */
 body {
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
 }
