@@ -116,7 +116,7 @@ export default function LocalSequencePage() {
             <h2 className="text-sm font-semibold text-base-content/60">Λίστα σειράς</h2>
             <ul className="flex flex-col gap-1">
               {songs.map((s, i) => (
-                <li key={s.id}>
+                <li key={i}>
                   <button
                     onClick={() => setIndex(i)}
                     className={`btn btn-ghost btn-sm w-full justify-start text-left ${i === index ? 'btn-active' : ''}`}
