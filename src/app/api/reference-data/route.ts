@@ -6,12 +6,13 @@ import { listRhythms } from '@/db/queries/rhythms';
 import { listDromoi } from '@/db/queries/dromoi';
 import { listComposers } from '@/db/queries/composers';
 import { listGenres } from '@/db/queries/genres';
+import { listProgramsWithSequencesAndSongs } from '@/db/queries/programs';
 import type { ReferenceData } from '@/lib/referenceData';
 import { getUserId } from '@/lib/requestUser';
 
 export async function GET(request: NextRequest) {
   const ownerId = getUserId(request);
-  const [songs, axisValues, axisTypes, regions, rhythms, dromoi, composers, genres] = await Promise.all([
+  const [songs, axisValues, axisTypes, regions, rhythms, dromoi, composers, genres, programs] = await Promise.all([
     listSongs(ownerId),
     getAxisValuesForOwner(ownerId),
     listAxisTypes(),
@@ -20,7 +21,8 @@ export async function GET(request: NextRequest) {
     listDromoi(ownerId),
     listComposers(ownerId),
     listGenres(ownerId),
+    listProgramsWithSequencesAndSongs(ownerId),
   ]);
-  const payload: ReferenceData = { songs, axisValues, axisTypes, regions, rhythms, dromoi, composers, genres };
+  const payload: ReferenceData = { songs, axisValues, axisTypes, regions, rhythms, dromoi, composers, genres, programs };
   return NextResponse.json(payload);
 }

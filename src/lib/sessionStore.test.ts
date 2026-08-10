@@ -33,6 +33,7 @@ function referenceData(): ReferenceData {
     composers: [],
     axisTypes: [],
     genres,
+    programs: [],
   };
 }
 
@@ -48,6 +49,7 @@ function referenceDataWithThreeSongs(): ReferenceData {
     composers: [],
     axisTypes: [],
     genres,
+    programs: [],
   };
 }
 

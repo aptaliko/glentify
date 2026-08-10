@@ -1,4 +1,4 @@
-import type { ReferenceData } from './referenceData';
+import { normalizeReferenceData, type ReferenceData } from './referenceData';
 
 const DB_NAME = 'glentify-offline';
 const DB_VERSION = 1;
@@ -36,5 +36,5 @@ export async function loadReferenceData(): Promise<ReferenceData | null> {
     request.onerror = () => reject(request.error);
   });
   db.close();
-  return result;
+  return result ? normalizeReferenceData(result) : null;
 }
