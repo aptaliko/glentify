@@ -107,6 +107,12 @@ export default function HomePage() {
         Ξεκίνα γλέντι
       </Link>
 
+      {native && (
+        <Link href="/programs/local" className="btn btn-outline btn-lg">
+          Σταθερά προγράμματα
+        </Link>
+      )}
+
       {!native && (
         <Link href="/programs" className="btn btn-outline btn-lg">
           Σταθερά προγράμματα
