@@ -39,6 +39,11 @@ export async function getSongById(ownerId: number, id: number): Promise<SongRow 
   return rows[0];
 }
 
+export async function getSongsByIds(ids: number[]): Promise<SongRow[]> {
+  if (ids.length === 0) return [];
+  return db.select().from(songs).where(inArray(songs.id, ids));
+}
+
 export interface SongWithAxisValues extends SongRow {
   axisValues: SongAxisValueRow[];
 }

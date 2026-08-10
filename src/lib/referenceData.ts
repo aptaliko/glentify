@@ -34,3 +34,18 @@ export interface ReferenceData {
 export function normalizeReferenceData(data: ReferenceData): ReferenceData {
   return { ...data, programs: data.programs ?? [] };
 }
+
+export function collectReferencedSongIds(programs: OfflineProgram[]): number[] {
+  const ids = new Set<number>();
+  for (const program of programs) {
+    for (const sequence of program.sequences) {
+      for (const id of sequence.songIds) ids.add(id);
+    }
+  }
+  return [...ids];
+}
+
+export function mergeReferencedSongs(ownSongs: SongRow[], extraSongs: SongRow[]): SongRow[] {
+  const ownIds = new Set(ownSongs.map((s) => s.id));
+  return [...ownSongs, ...extraSongs.filter((s) => !ownIds.has(s.id))];
+}
