@@ -6,6 +6,14 @@ import Link from 'next/link';
 interface Program {
   id: number;
   title: string;
+  role: 'creator' | 'collaborator';
+  sharedWithEmails: string[];
+}
+
+function sharedBadgeText(emails: string[]): string {
+  if (emails.length === 0) return '';
+  if (emails.length === 1) return `μοιράζεται με ${emails[0]}`;
+  return `μοιράζεται με ${emails[0]} +${emails.length - 1}`;
 }
 
 export default function ProgramsAdminPage() {
@@ -97,9 +105,16 @@ export default function ProgramsAdminPage() {
               </form>
             ) : (
               <>
-                <Link href={`/admin/programs/${p.id}`} className="link link-hover flex-1">{p.title}</Link>
+                <div className="flex flex-1 flex-col gap-1">
+                  <Link href={`/admin/programs/${p.id}`} className="link link-hover">{p.title}</Link>
+                  {p.sharedWithEmails.length > 0 && (
+                    <span className="badge badge-ghost badge-xs w-fit">{sharedBadgeText(p.sharedWithEmails)}</span>
+                  )}
+                </div>
                 <button onClick={() => startEditing(p)} className="btn btn-ghost btn-sm">Μετονομασία</button>
-                <button onClick={() => handleDelete(p.id)} className="btn btn-ghost btn-sm text-error">Διαγραφή</button>
+                {p.role === 'creator' && (
+                  <button onClick={() => handleDelete(p.id)} className="btn btn-ghost btn-sm text-error">Διαγραφή</button>
+                )}
               </>
             )}
           </li>
