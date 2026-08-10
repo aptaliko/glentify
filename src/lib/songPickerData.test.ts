@@ -18,6 +18,7 @@ const regions: RegionRow[] = [
 function referenceData(): ReferenceData {
   return {
     songs: [makeSong(1, 'Τραγούδι Νάξου', 1), makeSong(2, 'Τραγούδι Άλλου Είδους', 2)],
+    sharedSongs: [],
     axisValues: [{ id: 1, songId: 1, axisType: 'region', refId: 4, yearValue: null }],
     regions,
     rhythms: [],

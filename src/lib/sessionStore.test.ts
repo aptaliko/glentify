@@ -26,6 +26,7 @@ function referenceData(): ReferenceData {
   const genres: GenreRow[] = [{ id: 1, name: 'Παραδοσιακό', ownerId: null }];
   return {
     songs: [makeSong(1, 'Τραγούδι Α'), makeSong(2, 'Τραγούδι Β')],
+    sharedSongs: [],
     axisValues: [],
     regions,
     rhythms: [],
@@ -42,6 +43,7 @@ function referenceDataWithThreeSongs(): ReferenceData {
   const genres: GenreRow[] = [{ id: 1, name: 'Παραδοσιακό', ownerId: null }];
   return {
     songs: [makeSong(1, 'Τραγούδι Α'), makeSong(2, 'Τραγούδι Β'), makeSong(3, 'Τραγούδι Γ')],
+    sharedSongs: [],
     axisValues: [],
     regions,
     rhythms: [],

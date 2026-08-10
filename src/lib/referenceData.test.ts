@@ -24,6 +24,7 @@ function song(id: number, title: string): SongRow {
 function referenceData(): ReferenceData {
   return {
     songs: [],
+    sharedSongs: [],
     axisValues: [],
     regions: [],
     rhythms: [],
@@ -66,6 +67,23 @@ describe('normalizeReferenceData', () => {
 
     const result = normalizeReferenceData(legacyData);
     expect(result.programs).toEqual([]);
+  });
+
+  it('defaults sharedSongs to an empty array when missing (pre-feature cached blob)', () => {
+    const legacyData = {
+      songs: [],
+      axisValues: [],
+      regions: [],
+      rhythms: [],
+      dromoi: [],
+      composers: [],
+      axisTypes: [],
+      genres: [],
+      programs: [],
+    } as unknown as ReferenceData;
+
+    const result = normalizeReferenceData(legacyData);
+    expect(result.sharedSongs).toEqual([]);
   });
 });
 

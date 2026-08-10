@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { loadReferenceData } from '@/lib/offlineCache';
 import { preferencesStore } from '@/lib/preferencesStore';
 import { getSelectedProgramId, setSelectedSequenceId } from '@/lib/localProgramsStore';
+import { mergeReferencedSongs } from '@/lib/referenceData';
 import type { ReferenceData, OfflineSequence } from '@/lib/referenceData';
 import type { SongRow } from '@/db/schema';
 
@@ -50,7 +51,9 @@ export default function LocalProgramPage() {
     );
   }
 
-  const songsById = new Map<number, SongRow>(referenceData.songs.map((s) => [s.id, s]));
+  const songsById = new Map<number, SongRow>(
+    mergeReferencedSongs(referenceData.songs, referenceData.sharedSongs).map((s) => [s.id, s])
+  );
 
   return (
     <main className="flex min-h-screen flex-col items-center gap-6 bg-base-200 p-4">

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getProgramAccess, listCollaborators, addCollaborator, isCollaborator } from '@/db/queries/programs';
-import { getUserByEmail } from '@/db/queries/users';
+import { getProgramAccess, getProgramById, listCollaborators, addCollaborator, isCollaborator } from '@/db/queries/programs';
+import { getUserByEmail, getUserById } from '@/db/queries/users';
 import { getUserId } from '@/lib/requestUser';
 
 const addSchema = z.object({ email: z.email() });
@@ -11,7 +11,13 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const { id } = await params;
   const role = await getProgramAccess(userId, Number(id));
   if (!role) return NextResponse.json({ error: 'Δεν βρέθηκε' }, { status: 404 });
-  return NextResponse.json(await listCollaborators(Number(id)));
+  const program = await getProgramById(Number(id));
+  const creator = program ? await getUserById(program.ownerId) : undefined;
+  const collaborators = await listCollaborators(Number(id));
+  return NextResponse.json({
+    creator: creator ? { id: creator.id, email: creator.email } : null,
+    collaborators,
+  });
 }
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -36,5 +42,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   }
 
   await addCollaborator(Number(id), target.id);
-  return NextResponse.json(await listCollaborators(Number(id)), { status: 201 });
+  const program = await getProgramById(Number(id));
+  const creator = program ? await getUserById(program.ownerId) : undefined;
+  return NextResponse.json({
+    creator: creator ? { id: creator.id, email: creator.email } : null,
+    collaborators: await listCollaborators(Number(id)),
+  }, { status: 201 });
 }

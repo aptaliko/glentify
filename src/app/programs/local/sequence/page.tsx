@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { loadReferenceData } from '@/lib/offlineCache';
 import { preferencesStore } from '@/lib/preferencesStore';
 import { getSelectedProgramId, getSelectedSequenceId } from '@/lib/localProgramsStore';
+import { mergeReferencedSongs } from '@/lib/referenceData';
 import type { ReferenceData } from '@/lib/referenceData';
 import type { SongRow } from '@/db/schema';
 
@@ -39,7 +40,9 @@ export default function LocalSequencePage() {
 
   const program = referenceData?.programs.find((p) => p.id === programId) ?? null;
   const sequence = program?.sequences.find((s) => s.id === sequenceId) ?? null;
-  const songsById = new Map<number, SongRow>((referenceData?.songs ?? []).map((s) => [s.id, s]));
+  const songsById = new Map<number, SongRow>(
+    mergeReferencedSongs(referenceData?.songs ?? [], referenceData?.sharedSongs ?? []).map((s) => [s.id, s])
+  );
   const songs = sequence
     ? sequence.songIds.map((id) => songsById.get(id)).filter((s): s is SongRow => s !== undefined)
     : [];

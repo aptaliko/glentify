@@ -14,6 +14,7 @@ export interface OfflineProgram {
 
 export interface ReferenceData {
   songs: SongRow[];
+  sharedSongs: SongRow[]; // songs referenced by a shared program's sequences but not owned by the requester — kept separate from `songs` so the offline song picker (src/lib/songPickerData.ts) and session suggestion ranking (src/lib/sessionStore.ts) never treat a collaborator's songs as the user's own; only the program/sequence viewers (src/app/programs/local/*) look across both.
   axisValues: SongAxisValueRow[];
   regions: RegionRow[];
   rhythms: RhythmRow[];
@@ -26,13 +27,13 @@ export interface ReferenceData {
 
 /**
  * Normalizes a ReferenceData blob loaded from disk/cache, tolerating data
- * persisted before the `programs` field existed. The `ReferenceData` type
- * annotation on `data` is what the compiler expects; real-world cached
- * blobs can still be missing `programs` at runtime, which is exactly the
- * case this function exists to handle.
+ * persisted before the `programs`/`sharedSongs` fields existed. The
+ * `ReferenceData` type annotation on `data` is what the compiler expects;
+ * real-world cached blobs can still be missing these fields at runtime,
+ * which is exactly the case this function exists to handle.
  */
 export function normalizeReferenceData(data: ReferenceData): ReferenceData {
-  return { ...data, programs: data.programs ?? [] };
+  return { ...data, programs: data.programs ?? [], sharedSongs: data.sharedSongs ?? [] };
 }
 
 export function collectReferencedSongIds(programs: OfflineProgram[]): number[] {

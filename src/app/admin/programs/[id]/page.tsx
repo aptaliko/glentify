@@ -43,6 +43,7 @@ export default function ProgramAdminPage() {
   const [editingSeqTitle, setEditingSeqTitle] = useState('');
   const [role, setRole] = useState<'creator' | 'collaborator' | null>(null);
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
+  const [creator, setCreator] = useState<Collaborator | null>(null);
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [newCollaboratorEmail, setNewCollaboratorEmail] = useState('');
   const [collaboratorError, setCollaboratorError] = useState<string | null>(null);
@@ -64,7 +65,9 @@ export default function ProgramAdminPage() {
       );
       return;
     }
-    setCollaborators(await res.json());
+    const data = await res.json();
+    setCreator(data.creator);
+    setCollaborators(data.collaborators);
   }
 
   useEffect(() => {
@@ -212,9 +215,21 @@ export default function ProgramAdminPage() {
               </div>
             )}
             <ul className="flex flex-col gap-1">
+              {creator && (
+                <li className="flex items-center gap-2">
+                  <span className="flex-1">
+                    {creator.email}
+                    {currentUser?.id === creator.id && ' (εσύ)'}
+                    {' — δημιουργός'}
+                  </span>
+                </li>
+              )}
               {collaborators.map((c) => (
                 <li key={c.id} className="flex items-center gap-2">
-                  <span className="flex-1">{c.email}</span>
+                  <span className="flex-1">
+                    {c.email}
+                    {currentUser?.id === c.id && ' (εσύ)'}
+                  </span>
                   {role === 'creator' && (
                     <button onClick={() => handleRemoveCollaborator(c.id)} className="btn btn-ghost btn-xs text-error">
                       Αφαίρεση
@@ -222,7 +237,7 @@ export default function ProgramAdminPage() {
                   )}
                 </li>
               ))}
-              {collaborators.length === 0 && <li className="text-sm text-base-content/50">Κανένας συνεργάτης ακόμη</li>}
+              {collaborators.length === 0 && !creator && <li className="text-sm text-base-content/50">Κανένας συνεργάτης ακόμη</li>}
             </ul>
             {role === 'creator' && (
               <form onSubmit={handleAddCollaborator} className="flex gap-2">
