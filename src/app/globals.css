@@ -1,9 +1,12 @@
 @import "tailwindcss";
 @plugin "daisyui" {
-  themes: glentify-dark --default;
+  themes: false;
 }
 
-:root:has(input.theme-controller[value=glentify-dark]:checked), [data-theme="glentify-dark"] {
+@plugin "daisyui/theme" {
+  name: "glentify-dark";
+  default: true;
+  prefersdark: false;
   color-scheme: dark;
   --color-base-100: #14141c;
   --color-base-200: #1c1f26;
