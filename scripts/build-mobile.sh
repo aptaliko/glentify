@@ -18,7 +18,8 @@ rsync -a \
 ln -s ../node_modules .mobile-build/node_modules
 
 rm -rf .mobile-build/src/app/api
-rm -rf .mobile-build/src/app/admin
+rm -rf ".mobile-build/src/app/admin/songs/[id]"
+rm -rf ".mobile-build/src/app/admin/programs/[id]"
 rm -rf ".mobile-build/src/app/programs/[id]"
 rm -f ".mobile-build/src/app/programs/page.tsx"
 rm -rf .mobile-build/src/app/session/\[id\]
@@ -31,6 +32,11 @@ fi
 
 if [ -d .mobile-build/src/app/session/\[id\] ]; then
   echo "build-mobile: src/app/session/[id] survived staging, aborting" >&2
+  exit 1
+fi
+
+if [ -d ".mobile-build/src/app/admin/songs/[id]" ] || [ -d ".mobile-build/src/app/admin/programs/[id]" ]; then
+  echo "build-mobile: a dynamic admin route survived staging, aborting" >&2
   exit 1
 fi
 
