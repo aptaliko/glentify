@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { nativeApiFetch } from '@/lib/nativeApiFetch';
 
 interface Genre {
   id: number;
@@ -13,7 +14,7 @@ export default function GenresAdminPage() {
   const [error, setError] = useState<string | null>(null);
 
   async function load() {
-    const res = await fetch('/api/genres');
+    const res = await nativeApiFetch('/api/genres');
     setGenres(await res.json());
   }
 
@@ -25,7 +26,7 @@ export default function GenresAdminPage() {
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    const res = await fetch('/api/genres', {
+    const res = await nativeApiFetch('/api/genres', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name }),
@@ -40,7 +41,7 @@ export default function GenresAdminPage() {
 
   async function handleDelete(id: number) {
     setError(null);
-    const res = await fetch(`/api/genres/${id}`, { method: 'DELETE' });
+    const res = await nativeApiFetch(`/api/genres/${id}`, { method: 'DELETE' });
     if (!res.ok) {
       const body = await res.json();
       setError(body.error);

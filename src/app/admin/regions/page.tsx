@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { nativeApiFetch } from '@/lib/nativeApiFetch';
 
 interface Region {
   id: number;
@@ -15,7 +16,7 @@ export default function RegionsAdminPage() {
   const [error, setError] = useState<string | null>(null);
 
   async function load() {
-    const res = await fetch('/api/regions');
+    const res = await nativeApiFetch('/api/regions');
     setRegions(await res.json());
   }
 
@@ -27,7 +28,7 @@ export default function RegionsAdminPage() {
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    const res = await fetch('/api/regions', {
+    const res = await nativeApiFetch('/api/regions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, parentId: parentId ? Number(parentId) : null }),
@@ -43,7 +44,7 @@ export default function RegionsAdminPage() {
 
   async function handleDelete(id: number) {
     setError(null);
-    const res = await fetch(`/api/regions/${id}`, { method: 'DELETE' });
+    const res = await nativeApiFetch(`/api/regions/${id}`, { method: 'DELETE' });
     if (!res.ok) {
       const body = await res.json();
       setError(body.error);

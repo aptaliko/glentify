@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { nativeApiFetch } from '@/lib/nativeApiFetch';
 
 interface Composer {
   id: number;
@@ -13,7 +14,7 @@ export default function ComposersAdminPage() {
   const [error, setError] = useState<string | null>(null);
 
   async function load() {
-    const res = await fetch('/api/composers');
+    const res = await nativeApiFetch('/api/composers');
     setComposers(await res.json());
   }
 
@@ -25,7 +26,7 @@ export default function ComposersAdminPage() {
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    const res = await fetch('/api/composers', {
+    const res = await nativeApiFetch('/api/composers', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name }),
@@ -40,7 +41,7 @@ export default function ComposersAdminPage() {
 
   async function handleDelete(id: number) {
     setError(null);
-    const res = await fetch(`/api/composers/${id}`, { method: 'DELETE' });
+    const res = await nativeApiFetch(`/api/composers/${id}`, { method: 'DELETE' });
     if (!res.ok) {
       const body = await res.json();
       setError(body.error);

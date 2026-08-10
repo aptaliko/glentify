@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { nativeApiFetch } from '@/lib/nativeApiFetch';
 
 interface Dromos {
   id: number;
@@ -13,7 +14,7 @@ export default function DromoiAdminPage() {
   const [error, setError] = useState<string | null>(null);
 
   async function load() {
-    const res = await fetch('/api/dromoi');
+    const res = await nativeApiFetch('/api/dromoi');
     setDromoi(await res.json());
   }
 
@@ -25,7 +26,7 @@ export default function DromoiAdminPage() {
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    const res = await fetch('/api/dromoi', {
+    const res = await nativeApiFetch('/api/dromoi', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name }),
@@ -40,7 +41,7 @@ export default function DromoiAdminPage() {
 
   async function handleDelete(id: number) {
     setError(null);
-    const res = await fetch(`/api/dromoi/${id}`, { method: 'DELETE' });
+    const res = await nativeApiFetch(`/api/dromoi/${id}`, { method: 'DELETE' });
     if (!res.ok) {
       const body = await res.json();
       setError(body.error);
