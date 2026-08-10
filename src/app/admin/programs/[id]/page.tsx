@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 
 interface Sequence {
   id: number;
@@ -31,6 +31,7 @@ interface Collaborator {
 
 export default function ProgramAdminPage() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
   const [title, setTitle] = useState('');
   const [sequences, setSequences] = useState<Sequence[]>([]);
   const [newSeqTitle, setNewSeqTitle] = useState('');
@@ -174,7 +175,18 @@ export default function ProgramAdminPage() {
   }
 
   async function handleRemoveCollaborator(userId: number) {
-    await fetch(`/api/programs/${params.id}/collaborators/${userId}`, { method: 'DELETE' });
+    const res = await fetch(`/api/programs/${params.id}/collaborators/${userId}`, { method: 'DELETE' });
+    if (!res.ok) {
+      const body = await res.json();
+      setCollaboratorError(typeof body.error === 'string' ? body.error : 'Αποτυχία αφαίρεσης συνεργάτη');
+      return;
+    }
+    if (userId === currentUser?.id) {
+      // Self-leave: this user no longer has access to this program, so its
+      // data (including the collaborators list) is no longer fetchable.
+      router.push('/admin/programs');
+      return;
+    }
     await loadCollaborators();
   }
 
