@@ -4,6 +4,13 @@ import { deleteUserCascade } from '@/db/queries/accountDeletion';
 import { getUserId } from '@/lib/requestUser';
 import { getAuthCookieName } from '@/lib/auth';
 
+export async function GET(request: NextRequest) {
+  const userId = getUserId(request);
+  const user = await getUserById(userId);
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  return NextResponse.json({ id: user.id, email: user.email, role: user.role });
+}
+
 export async function DELETE(request: NextRequest) {
   const userId = getUserId(request);
   const user = await getUserById(userId);

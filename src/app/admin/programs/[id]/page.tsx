@@ -19,6 +19,16 @@ interface SequenceSongEntry {
   song: Song;
 }
 
+interface CurrentUser {
+  id: number;
+  email: string;
+}
+
+interface Collaborator {
+  id: number;
+  email: string;
+}
+
 export default function ProgramAdminPage() {
   const params = useParams<{ id: string }>();
   const [title, setTitle] = useState('');
@@ -30,19 +40,35 @@ export default function ProgramAdminPage() {
   const [searchResults, setSearchResults] = useState<Song[]>([]);
   const [editingSeqId, setEditingSeqId] = useState<number | null>(null);
   const [editingSeqTitle, setEditingSeqTitle] = useState('');
+  const [role, setRole] = useState<'creator' | 'collaborator' | null>(null);
+  const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+  const [newCollaboratorEmail, setNewCollaboratorEmail] = useState('');
+  const [collaboratorError, setCollaboratorError] = useState<string | null>(null);
 
   async function loadProgram() {
     const res = await fetch(`/api/programs/${params.id}`);
     const data = await res.json();
     setTitle(data.title);
     setSequences(data.sequences);
+    setRole(data.role);
+  }
+
+  async function loadCollaborators() {
+    const res = await fetch(`/api/programs/${params.id}/collaborators`);
+    setCollaborators(await res.json());
   }
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadProgram();
+    loadCollaborators();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.id]);
+
+  useEffect(() => {
+    fetch('/api/account').then((r) => r.json()).then(setCurrentUser);
+  }, []);
 
   async function refreshSequenceSongs(seqId: number) {
     const res = await fetch(`/api/programs/${params.id}/sequences/${seqId}`);
@@ -130,9 +156,78 @@ export default function ProgramAdminPage() {
     await refreshSequenceSongs(expandedSeqId);
   }
 
+  async function handleAddCollaborator(e: React.FormEvent) {
+    e.preventDefault();
+    setCollaboratorError(null);
+    const res = await fetch(`/api/programs/${params.id}/collaborators`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: newCollaboratorEmail }),
+    });
+    if (!res.ok) {
+      const body = await res.json();
+      setCollaboratorError(typeof body.error === 'string' ? body.error : 'Αποτυχία προσθήκης συνεργάτη');
+      return;
+    }
+    setNewCollaboratorEmail('');
+    await loadCollaborators();
+  }
+
+  async function handleRemoveCollaborator(userId: number) {
+    await fetch(`/api/programs/${params.id}/collaborators/${userId}`, { method: 'DELETE' });
+    await loadCollaborators();
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <h1 className="text-xl font-bold">{title}</h1>
+
+      {role && (
+        <div className="card border border-base-300 bg-base-100">
+          <div className="card-body gap-3 p-4">
+            <h2 className="font-semibold">Συνεργάτες</h2>
+            {collaboratorError && (
+              <div role="alert" className="alert alert-error alert-sm">
+                <span>{collaboratorError}</span>
+              </div>
+            )}
+            <ul className="flex flex-col gap-1">
+              {collaborators.map((c) => (
+                <li key={c.id} className="flex items-center gap-2">
+                  <span className="flex-1">{c.email}</span>
+                  {role === 'creator' && (
+                    <button onClick={() => handleRemoveCollaborator(c.id)} className="btn btn-ghost btn-xs text-error">
+                      Αφαίρεση
+                    </button>
+                  )}
+                </li>
+              ))}
+              {collaborators.length === 0 && <li className="text-sm text-base-content/50">Κανένας συνεργάτης ακόμη</li>}
+            </ul>
+            {role === 'creator' && (
+              <form onSubmit={handleAddCollaborator} className="flex gap-2">
+                <input
+                  type="email"
+                  value={newCollaboratorEmail}
+                  onChange={(e) => setNewCollaboratorEmail(e.target.value)}
+                  placeholder="Email συνεργάτη"
+                  className="input input-bordered input-sm flex-1"
+                  required
+                />
+                <button type="submit" className="btn btn-primary btn-sm">Προσθήκη</button>
+              </form>
+            )}
+            {role === 'collaborator' && currentUser && (
+              <button
+                onClick={() => handleRemoveCollaborator(currentUser.id)}
+                className="btn btn-outline btn-error btn-sm self-start"
+              >
+                Αποχώρηση από το πρόγραμμα
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       <form onSubmit={handleAddSequence} className="flex gap-2">
         <input
