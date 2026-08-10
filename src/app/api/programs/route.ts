@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { listPrograms, createProgram } from '@/db/queries/programs';
+import { listAccessiblePrograms, createProgram } from '@/db/queries/programs';
 import { getUserId } from '@/lib/requestUser';
 
 const createSchema = z.object({ title: z.string().min(1) });
 
 export async function GET(request: NextRequest) {
-  const ownerId = getUserId(request);
-  return NextResponse.json(await listPrograms(ownerId));
+  const userId = getUserId(request);
+  return NextResponse.json(await listAccessiblePrograms(userId));
 }
 
 export async function POST(request: NextRequest) {
