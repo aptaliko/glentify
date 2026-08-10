@@ -23,3 +23,14 @@ export interface ReferenceData {
   genres: GenreRow[];
   programs: OfflineProgram[];
 }
+
+/**
+ * Normalizes a ReferenceData blob loaded from disk/cache, tolerating data
+ * persisted before the `programs` field existed. The `ReferenceData` type
+ * annotation on `data` is what the compiler expects; real-world cached
+ * blobs can still be missing `programs` at runtime, which is exactly the
+ * case this function exists to handle.
+ */
+export function normalizeReferenceData(data: ReferenceData): ReferenceData {
+  return { ...data, programs: data.programs ?? [] };
+}
