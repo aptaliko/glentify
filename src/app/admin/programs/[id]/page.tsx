@@ -57,6 +57,13 @@ export default function ProgramAdminPage() {
 
   async function loadCollaborators() {
     const res = await fetch(`/api/programs/${params.id}/collaborators`);
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      setCollaboratorError(
+        typeof body?.error === 'string' ? body.error : 'Αποτυχία φόρτωσης συνεργατών'
+      );
+      return;
+    }
     setCollaborators(await res.json());
   }
 
@@ -166,8 +173,8 @@ export default function ProgramAdminPage() {
       body: JSON.stringify({ email: newCollaboratorEmail }),
     });
     if (!res.ok) {
-      const body = await res.json();
-      setCollaboratorError(typeof body.error === 'string' ? body.error : 'Αποτυχία προσθήκης συνεργάτη');
+      const body = await res.json().catch(() => null);
+      setCollaboratorError(typeof body?.error === 'string' ? body.error : 'Αποτυχία προσθήκης συνεργάτη');
       return;
     }
     setNewCollaboratorEmail('');
@@ -175,10 +182,11 @@ export default function ProgramAdminPage() {
   }
 
   async function handleRemoveCollaborator(userId: number) {
+    setCollaboratorError(null);
     const res = await fetch(`/api/programs/${params.id}/collaborators/${userId}`, { method: 'DELETE' });
     if (!res.ok) {
-      const body = await res.json();
-      setCollaboratorError(typeof body.error === 'string' ? body.error : 'Αποτυχία αφαίρεσης συνεργάτη');
+      const body = await res.json().catch(() => null);
+      setCollaboratorError(typeof body?.error === 'string' ? body.error : 'Αποτυχία αφαίρεσης συνεργάτη');
       return;
     }
     if (userId === currentUser?.id) {
