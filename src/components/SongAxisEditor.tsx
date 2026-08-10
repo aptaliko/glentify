@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { nativeApiFetch } from '@/lib/nativeApiFetch';
 
 interface AxisType {
   id: number;
@@ -44,7 +45,7 @@ export default function SongAxisEditor({
   const [newValueName, setNewValueName] = useState('');
 
   useEffect(() => {
-    fetch('/api/axis-types')
+    nativeApiFetch('/api/axis-types')
       .then((r) => r.json())
       .then(async (types: AxisType[]) => {
         setAxisTypes(types);
@@ -52,7 +53,7 @@ export default function SongAxisEditor({
           types
             .filter((t) => t.lookupTable)
             .map(async (t) => {
-              const res = await fetch(LOOKUP_ENDPOINTS[t.lookupTable as string]);
+              const res = await nativeApiFetch(LOOKUP_ENDPOINTS[t.lookupTable as string]);
               const options: Option[] = await res.json();
               return [t.key, options] as const;
             })
@@ -96,7 +97,7 @@ export default function SongAxisEditor({
     if (!selectedType?.lookupTable || !newValueName.trim()) return;
     const endpoint = LOOKUP_ENDPOINTS[selectedType.lookupTable];
     const body = selectedType.lookupTable === 'regions' ? { name: newValueName.trim(), parentId: null } : { name: newValueName.trim() };
-    const res = await fetch(endpoint, {
+    const res = await nativeApiFetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
