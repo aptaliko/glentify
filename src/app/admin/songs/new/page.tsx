@@ -4,6 +4,9 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { upload } from '@vercel/blob/client';
 import SongAxisEditor, { type AxisValueEntry } from '@/components/SongAxisEditor';
+import { nativeApiFetch } from '@/lib/nativeApiFetch';
+import { apiUrl } from '@/lib/apiClient';
+import { getAuthToken } from '@/lib/authToken';
 
 interface Option {
   id: number;
@@ -32,7 +35,12 @@ export default function NewSongPage() {
     setUploading(true);
     setError(null);
     try {
-      const blob = await upload(file.name, file, { access: 'public', handleUploadUrl: '/api/songs/image-upload' });
+      const token = await getAuthToken();
+      const blob = await upload(file.name, file, {
+        access: 'public',
+        handleUploadUrl: apiUrl('/api/songs/image-upload'),
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      });
       setImageUrl(blob.url);
     } catch {
       setError('Αποτυχία μεταφόρτωσης εικόνας');
@@ -42,7 +50,7 @@ export default function NewSongPage() {
   }
 
   useEffect(() => {
-    fetch('/api/genres').then((r) => r.json()).then(setGenres);
+    nativeApiFetch('/api/genres').then((r) => r.json()).then(setGenres);
   }, []);
 
   interface SuggestionSong {
@@ -64,7 +72,7 @@ export default function NewSongPage() {
         setSuggestions([]);
         return;
       }
-      fetch(`/api/songs/suggestions?title=${encodeURIComponent(title.trim())}`)
+      nativeApiFetch(`/api/songs/suggestions?title=${encodeURIComponent(title.trim())}`)
         .then((r) => r.json())
         .then(setSuggestions);
     }, 300);
@@ -83,7 +91,7 @@ export default function NewSongPage() {
 
   async function handleCreateGenre() {
     if (!newGenreName.trim()) return;
-    const res = await fetch('/api/genres', {
+    const res = await nativeApiFetch('/api/genres', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: newGenreName.trim() }),
@@ -99,7 +107,7 @@ export default function NewSongPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    const res = await fetch('/api/songs', {
+    const res = await nativeApiFetch('/api/songs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
