@@ -113,6 +113,12 @@ export default function HomePage() {
         </Link>
       )}
 
+      {native && (
+        <Link href="/admin/songs" className="btn btn-outline btn-lg">
+          Διαχείριση
+        </Link>
+      )}
+
       {!native && (
         <Link href="/programs" className="btn btn-outline btn-lg">
           Σταθερά προγράμματα
