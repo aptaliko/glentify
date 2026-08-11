@@ -7,18 +7,13 @@ import { nativeApiFetch } from '@/lib/nativeApiFetch';
 import { isNativeApp } from '@/lib/platform';
 import { preferencesStore } from '@/lib/preferencesStore';
 import { setSelectedEditProgramId } from '@/lib/adminEditStore';
+import { sharedBadgeText } from '@/lib/programBadge';
 
 interface Program {
   id: number;
   title: string;
   role: 'creator' | 'collaborator';
   sharedWithEmails: string[];
-}
-
-function sharedBadgeText(emails: string[]): string {
-  if (emails.length === 0) return '';
-  if (emails.length === 1) return `μοιράζεται με ${emails[0]}`;
-  return `μοιράζεται με ${emails[0]} +${emails.length - 1} ακόμα`;
 }
 
 export default function ProgramsAdminPage() {

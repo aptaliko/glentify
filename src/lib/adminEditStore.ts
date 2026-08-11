@@ -11,10 +11,18 @@ export async function getSelectedEditSongId(storage: KeyValueStore): Promise<num
   return storage.get<number>(SELECTED_EDIT_SONG_KEY);
 }
 
+export async function clearSelectedEditSongId(storage: KeyValueStore): Promise<void> {
+  await storage.set(SELECTED_EDIT_SONG_KEY, null);
+}
+
 export async function setSelectedEditProgramId(storage: KeyValueStore, id: number): Promise<void> {
   await storage.set(SELECTED_EDIT_PROGRAM_KEY, id);
 }
 
 export async function getSelectedEditProgramId(storage: KeyValueStore): Promise<number | null> {
   return storage.get<number>(SELECTED_EDIT_PROGRAM_KEY);
+}
+
+export async function clearSelectedEditProgramId(storage: KeyValueStore): Promise<void> {
+  await storage.set(SELECTED_EDIT_PROGRAM_KEY, null);
 }

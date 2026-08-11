@@ -1,5 +1,6 @@
 import { apiUrl } from './apiClient';
-import { getAuthToken } from './authToken';
+import { getAuthToken, clearAuthToken } from './authToken';
+import { isNativeApp } from './platform';
 
 /**
  * Drop-in replacement for `fetch()` in admin pages, so the same code works
@@ -7,6 +8,15 @@ import { getAuthToken } from './authToken';
  * against the deployed API, Bearer token — the cookie never reaches
  * `capacitor://localhost`). `getToken` is injectable for tests; every real
  * caller uses the default.
+ *
+ * On native, a 401 response means the stored token expired (session tokens
+ * last 30 days with no refresh path) — web recovers from this via proxy.ts's
+ * page-level redirect before the page ever renders, but proxy.ts is stripped
+ * from the mobile bundle entirely, so every ported admin page always renders
+ * and would otherwise crash trying to read a `{"error":"Unauthorized"}` body
+ * as real data. Clearing the token and sending the user back to /login here,
+ * once, in the one wrapper every admin call already goes through, covers
+ * every caller instead of needing a check at each of the nine call sites.
  */
 export async function nativeApiFetch(
   path: string,
@@ -16,5 +26,10 @@ export async function nativeApiFetch(
   const token = await getToken();
   const headers = new Headers(init?.headers);
   if (token) headers.set('Authorization', `Bearer ${token}`);
-  return fetch(apiUrl(path), { ...init, headers });
+  const response = await fetch(apiUrl(path), { ...init, headers });
+  if (response.status === 401 && isNativeApp()) {
+    await clearAuthToken();
+    window.location.href = '/login';
+  }
+  return response;
 }

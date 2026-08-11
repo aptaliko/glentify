@@ -7,7 +7,7 @@ import { nativeApiFetch } from '@/lib/nativeApiFetch';
 import { apiUrl } from '@/lib/apiClient';
 import { getAuthToken } from '@/lib/authToken';
 import { preferencesStore } from '@/lib/preferencesStore';
-import { getSelectedEditSongId } from '@/lib/adminEditStore';
+import { getSelectedEditSongId, clearSelectedEditSongId } from '@/lib/adminEditStore';
 import SongAxisEditor, { type AxisValueEntry } from '@/components/SongAxisEditor';
 
 interface Option {
@@ -130,6 +130,7 @@ export default function LocalEditSongPage() {
       setError(body.error);
       return;
     }
+    await clearSelectedEditSongId(preferencesStore);
     router.push('/admin/songs');
   }
 

@@ -54,8 +54,8 @@ CONFIG
 # resolve the platform during render (prerender included) instead of after hydration.
 # NEXT_PUBLIC_API_BASE_URL points fetch calls at the deployed API, since the on-device
 # origin (capacitor://localhost) serves only the static bundle, not the API routes.
-# No dotenv wrapper: nothing left in this bundle after staging (api/, admin/,
-# programs/page.tsx, programs/[id]/ removed above) reads AUTH_SECRET/APP_PASSWORD/DATABASE_URL,
+# No dotenv wrapper: nothing left in this bundle after staging (api/, admin/songs/[id],
+# admin/programs/[id], programs/page.tsx, programs/[id]/ removed above) reads AUTH_SECRET/APP_PASSWORD/DATABASE_URL,
 # so .env.local's contents aren't needed here. Next's own build still auto-loads .mobile-build/.env.local if
 # present (see environment-variables docs' load order) - this line never controlled
 # that, it only wrapped the invocation redundantly.

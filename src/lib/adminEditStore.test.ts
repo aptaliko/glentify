@@ -2,8 +2,10 @@ import { describe, it, expect } from 'vitest';
 import {
   setSelectedEditSongId,
   getSelectedEditSongId,
+  clearSelectedEditSongId,
   setSelectedEditProgramId,
   getSelectedEditProgramId,
+  clearSelectedEditProgramId,
 } from './adminEditStore';
 import type { KeyValueStore } from './preferencesStore';
 
@@ -49,5 +51,19 @@ describe('adminEditStore', () => {
     await setSelectedEditProgramId(store, 2);
     expect(await getSelectedEditSongId(store)).toBe(1);
     expect(await getSelectedEditProgramId(store)).toBe(2);
+  });
+
+  it('clears the selected edit song id', async () => {
+    const store = inMemoryStore();
+    await setSelectedEditSongId(store, 5);
+    await clearSelectedEditSongId(store);
+    expect(await getSelectedEditSongId(store)).toBeNull();
+  });
+
+  it('clears the selected edit program id', async () => {
+    const store = inMemoryStore();
+    await setSelectedEditProgramId(store, 9);
+    await clearSelectedEditProgramId(store);
+    expect(await getSelectedEditProgramId(store)).toBeNull();
   });
 });

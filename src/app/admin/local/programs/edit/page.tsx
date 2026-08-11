@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { nativeApiFetch } from '@/lib/nativeApiFetch';
 import { preferencesStore } from '@/lib/preferencesStore';
-import { getSelectedEditProgramId } from '@/lib/adminEditStore';
+import { getSelectedEditProgramId, clearSelectedEditProgramId } from '@/lib/adminEditStore';
 
 interface Sequence {
   id: number;
@@ -82,6 +82,7 @@ export default function LocalEditProgramPage() {
 
   useEffect(() => {
     if (programId === null) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadProgram(programId);
     loadCollaborators(programId);
   }, [programId]);
@@ -208,6 +209,7 @@ export default function LocalEditProgramPage() {
       return;
     }
     if (userId === currentUser?.id) {
+      await clearSelectedEditProgramId(preferencesStore);
       router.push('/admin/programs');
       return;
     }
