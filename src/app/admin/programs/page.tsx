@@ -2,7 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { sharedBadgeText } from '@/lib/programBadge';
+import { useRouter } from 'next/navigation';
+import { nativeApiFetch } from '@/lib/nativeApiFetch';
+import { isNativeApp } from '@/lib/platform';
+import { preferencesStore } from '@/lib/preferencesStore';
+import { setSelectedEditProgramId } from '@/lib/adminEditStore';
 
 interface Program {
   id: number;
@@ -11,7 +15,15 @@ interface Program {
   sharedWithEmails: string[];
 }
 
+function sharedBadgeText(emails: string[]): string {
+  if (emails.length === 0) return '';
+  if (emails.length === 1) return `μοιράζεται με ${emails[0]}`;
+  return `μοιράζεται με ${emails[0]} +${emails.length - 1} ακόμα`;
+}
+
 export default function ProgramsAdminPage() {
+  const native = isNativeApp();
+  const router = useRouter();
   const [programs, setPrograms] = useState<Program[]>([]);
   const [title, setTitle] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -19,7 +31,7 @@ export default function ProgramsAdminPage() {
   const [editingTitle, setEditingTitle] = useState('');
 
   async function load() {
-    const res = await fetch('/api/programs');
+    const res = await nativeApiFetch('/api/programs');
     setPrograms(await res.json());
   }
 
@@ -31,7 +43,7 @@ export default function ProgramsAdminPage() {
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    const res = await fetch('/api/programs', {
+    const res = await nativeApiFetch('/api/programs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title }),
@@ -45,7 +57,7 @@ export default function ProgramsAdminPage() {
   }
 
   async function handleDelete(id: number) {
-    await fetch(`/api/programs/${id}`, { method: 'DELETE' });
+    await nativeApiFetch(`/api/programs/${id}`, { method: 'DELETE' });
     await load();
   }
 
@@ -56,13 +68,18 @@ export default function ProgramsAdminPage() {
 
   async function handleRename(e: React.FormEvent, id: number) {
     e.preventDefault();
-    await fetch(`/api/programs/${id}`, {
+    await nativeApiFetch(`/api/programs/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title: editingTitle }),
     });
     setEditingId(null);
     await load();
+  }
+
+  async function handleOpenProgram(id: number) {
+    await setSelectedEditProgramId(preferencesStore, id);
+    router.push('/admin/local/programs/edit');
   }
 
   return (
@@ -101,7 +118,11 @@ export default function ProgramsAdminPage() {
             ) : (
               <>
                 <div className="flex flex-1 flex-col gap-1">
-                  <Link href={`/admin/programs/${p.id}`} className="link link-hover">{p.title}</Link>
+                  {native ? (
+                    <button onClick={() => handleOpenProgram(p.id)} className="link link-hover text-left">{p.title}</button>
+                  ) : (
+                    <Link href={`/admin/programs/${p.id}`} className="link link-hover">{p.title}</Link>
+                  )}
                   {p.sharedWithEmails.length > 0 && (
                     <span className="badge badge-ghost badge-xs w-fit">{sharedBadgeText(p.sharedWithEmails)}</span>
                   )}
