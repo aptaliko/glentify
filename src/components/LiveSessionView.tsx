@@ -173,14 +173,11 @@ export default function LiveSessionView({
                 ) : (
                   data.candidates.map((s) => <SongButton key={s.id} song={s} onPick={handlePick} />)
                 ))}
-              {data.mode === 'grouped' &&
-                data.genreGroups.map((group) => (
-                  <div key={group.genreId} className="flex flex-col gap-1">
-                    <h3 className="px-3 pt-2 text-xs font-semibold text-base-content/50 uppercase">{group.genreName}</h3>
-                    {group.songs.map((s) => (
-                      <SongButton key={s.id} song={s} onPick={handlePick} />
-                    ))}
-                  </div>
+              {data.mode === 'ungrouped' &&
+                (data.songs.length === 0 ? (
+                  <p className="px-3 py-4 text-sm text-base-content/50">Κανένα τραγούδι</p>
+                ) : (
+                  data.songs.map((s) => <SongButton key={s.id} song={s} onPick={handlePick} />)
                 ))}
             </div>
           </div>

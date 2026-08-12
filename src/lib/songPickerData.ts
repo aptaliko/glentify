@@ -57,7 +57,9 @@ function findTopLevelRegionId(regionId: number, byId: Map<number, RegionRow>): n
 }
 
 export function getUsedTopLevelRegionsLocal(genreId: number, data: ReferenceData): RegionRow[] {
-  const genreSongIds = new Set(data.songs.filter((s) => s.genreId === genreId).map((s) => s.id));
+  const genreSongIds = new Set(
+    data.axisValues.filter((av) => av.axisType === 'genre' && av.refId === genreId).map((av) => av.songId)
+  );
   if (genreSongIds.size === 0) return [];
   const byId = new Map(data.regions.map((r) => [r.id, r]));
   const topLevelIds = new Set<number>();
@@ -75,7 +77,12 @@ export function filterSongsLocal(data: ReferenceData, filters: SongPickerFilters
     const q = filters.search.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
     results = results.filter((s) => s.title.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').includes(q));
   }
-  if (filters.genreId) results = results.filter((s) => s.genreId === filters.genreId);
+  if (filters.genreId) {
+    const genreSongIds = new Set(
+      data.axisValues.filter((av) => av.axisType === 'genre' && av.refId === filters.genreId).map((av) => av.songId)
+    );
+    results = results.filter((s) => genreSongIds.has(s.id));
+  }
   if (!filters.regionId) return results;
 
   const allowedRegionIds = new Set([filters.regionId, ...getRegionDescendantIds(filters.regionId, data.regions)]);
