@@ -4,6 +4,7 @@ import { axisTypes } from '../src/db/schema';
 
 const AXIS_TYPES: { key: string; label: string; lookupTable: string | null; hierarchical: boolean }[] = [
   { key: 'region', label: 'Περιοχή', lookupTable: 'regions', hierarchical: true },
+  { key: 'genre', label: 'Είδος', lookupTable: 'genres', hierarchical: false },
   { key: 'rhythm', label: 'Ρυθμός', lookupTable: 'rhythms', hierarchical: false },
   { key: 'dromos', label: 'Δρόμος', lookupTable: 'dromoi', hierarchical: false },
   { key: 'composer', label: 'Συνθέτης', lookupTable: 'composers', hierarchical: false },
