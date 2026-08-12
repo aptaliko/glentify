@@ -1020,7 +1020,7 @@ git commit -m "Rewrite suggestions tests for genre-as-axis and the ungrouped fal
 **Interfaces:**
 - Consumes: `SuggestionsResponsePayload` (Task 8's new shape: `mode: 'filtered' | 'ungrouped'`, `songs: SuggestedSong[]` instead of `genreGroups`).
 
-**Plan-gap note (discovered during Task 5's execution, added here):** Task 5 dropped `songs.genreId`, which broke `src/db/queries/regions.ts`'s `getUsedTopLevelRegionsForGenre` — the server-side counterpart to `songPickerData.ts`'s `getUsedTopLevelRegionsLocal` (this task's Step 2 below), used by `GET /api/genres/[id]/regions` (in turn called by `remoteSongPickerDataSource.listRegionsForGenre`, Task 11). No task in the original plan covered this file; it belongs here because it's the same conceptual fix as this task's Step 2, just for the remote/server data path instead of the local/offline one.
+**Plan-gap note (discovered during Task 5's execution, added here):** Task 5 dropped `songs.genreId`, which broke `src/db/queries/regions.ts`'s `getUsedTopLevelRegionsForGenre` — the server-side counterpart to `songPickerData.ts`'s `getUsedTopLevelRegionsLocal` (this task's Step 2 below), used by `GET /api/genres/[id]/regions` (in turn called by `remoteSongPickerDataSource.listRegionsForGenre`, Task 12). No task in the original plan covered this file; it belongs here because it's the same conceptual fix as this task's Step 2, just for the remote/server data path instead of the local/offline one.
 
 - [ ] **Step 0: Fix `getUsedTopLevelRegionsForGenre` in `regions.ts`**
 
@@ -1184,7 +1184,340 @@ git commit -m "Update LiveSessionView and songPickerData for the ungrouped sugge
 
 ---
 
-## Task 11: New `SongPicker` — paginated list with a filter bar, no mandatory first step
+## Task 11: Fix remaining `genreId`/`genreGroups` fallout in tests and live scripts (plan gap found during Task 10)
+
+**Files:**
+- Modify: `src/lib/referenceData.test.ts`
+- Modify: `src/lib/sessionStore.test.ts`
+- Modify: `src/lib/songPickerData.test.ts`
+- Modify: `scripts/smoke-schema.ts`
+- Modify: `scripts/rebetika-import.ts`
+- Delete: `scripts/migrate-genre-to-axis.ts`
+- Delete: `scripts/tmp-*.ts` (all of them — leftover throwaway scripts from unrelated earlier session work, unrelated to any shipped feature)
+- Modify: `package.json` (remove the `db:migrate-genre-to-axis` entry)
+
+**Interfaces:** none new — this task only updates existing test fixtures/scripts to match the axis-based genre model already in place from Tasks 1-10.
+
+**Plan-gap note:** after Task 10, `npx tsc --noEmit` still shows errors in three `src/lib/*.test.ts` files (none covered by any task) plus several `scripts/*.ts` files. `src/lib/sessionStore.ts` itself needs no change — it already delegates entirely to `buildSuggestionsResponse` (fixed in Task 8); only its test's fixtures/assertions are stale. Two scripts (`smoke-schema.ts`, `rebetika-import.ts`) are real, maintained, repeated-use tools (per `package.json`'s `db:smoke` entry and `rebetika-import.ts`'s own recent maintenance history) and must be fixed, not deleted. `scripts/migrate-genre-to-axis.ts` (this plan's own Task 1 script) has permanently finished its job — the data it backfills is already safely in `song_axis_values` and the column it read from is now dropped, so the script can never run again; delete it and its `package.json` entry, matching this codebase's own established precedent (a prior plan's Task 9 deleted one-time scripts left dead by a column drop, for the same reason). The 25 `scripts/tmp-*.ts` files predate this plan entirely (debugging/cleanup scripts from earlier session work) and are unrelated debris — delete them too.
+
+- [ ] **Step 1: Fix `src/lib/referenceData.test.ts`**
+
+Read the current file first. In the `song()` helper, remove the `genreId: 1,` line — `SongRow` no longer has that field:
+```ts
+function song(id: number, title: string): SongRow {
+  return {
+    id,
+    title,
+    lyrics: null,
+    imageUrl: null,
+    notes: null,
+    maleKey: null,
+    femaleKey: null,
+    ownerId: 1,
+    createdAt: FIXED_DATE,
+    updatedAt: FIXED_DATE,
+  };
+}
+```
+Nothing else in this file changes.
+
+- [ ] **Step 2: Fix `src/lib/sessionStore.test.ts`**
+
+Read the current file first. Replace the `makeSong` helper:
+```ts
+function makeSong(id: number, title: string): SongRow {
+  return { id, title, lyrics: null, notes: null, maleKey: null, femaleKey: null, createdAt: new Date(), updatedAt: new Date() } as SongRow;
+}
+```
+(drops the `genreId` param and field — no call site in this file passes a third argument today, since none used a non-default value, so no call sites need updating).
+
+Then, in every test, replace `expect(data.mode).toBe('grouped')` with `expect(data.mode).toBe('ungrouped')`, and every `data.genreGroups.flatMap((g) => g.songs)` / `data.genreGroups[0].songs` pattern with the flat `data.songs` array directly:
+
+```ts
+  it('starts a session with the given starting song and no played songs', async () => {
+    const storage = inMemoryStore();
+    const store = await LocalSessionStore.start(1, referenceData(), storage);
+    const data = await store.load(false, null);
+    expect(data.currentSong?.id).toBe(1);
+    expect(data.mode).toBe('ungrouped');
+    expect(data.songs.map((s) => s.id)).toEqual([2]);
+  });
+
+  it('marks the current song played and advances on pickSong', async () => {
+    const storage = inMemoryStore();
+    const store = await LocalSessionStore.start(1, referenceData(), storage);
+    await store.pickSong(2);
+    const data = await store.load(true, null);
+    expect(data.currentSong?.id).toBe(2);
+    const song1 = data.songs.find((s) => s.id === 1);
+    expect(song1?.played).toBe(true);
+  });
+
+  it('clears the current song on endSequence, keeping played history', async () => {
+    const storage = inMemoryStore();
+    const store = await LocalSessionStore.start(1, referenceDataWithThreeSongs(), storage);
+    await store.pickSong(2); // marks song 1 as played, current = 2
+    await store.pickSong(3); // marks song 2 as played, current = 3
+    await store.endSequence(); // marks song 3 as played, current = null
+    // To verify played history was kept, pick a new song and inspect songs
+    await store.pickSong(1); // current = 1, playedSongIds should still be [2, 3]
+    const data = await store.load(true, null);
+    expect(data.currentSong?.id).toBe(1);
+    // Song 2 and 3 should show as played (proving endSequence preserved playedSongIds)
+    const song2 = data.songs.find((s) => s.id === 2);
+    const song3 = data.songs.find((s) => s.id === 3);
+    expect(song2?.played).toBe(true);
+    expect(song3?.played).toBe(true);
+  });
+
+  it('clears all local state on endSession', async () => {
+    const storage = inMemoryStore();
+    const ref = referenceDataWithThreeSongs();
+
+    // Build up some played history on the same store instance
+    const store = await LocalSessionStore.start(1, ref, storage);
+    await store.pickSong(2); // marks song 1 as played, current = 2
+    await store.pickSong(3); // marks song 2 as played, current = 3
+
+    // Verify played history exists before endSession
+    let data = await store.load(true, null);
+    const song1Before = data.songs.find((s) => s.id === 1);
+    const song2Before = data.songs.find((s) => s.id === 2);
+    expect(song1Before?.played).toBe(true);
+    expect(song2Before?.played).toBe(true);
+
+    // Clear everything via endSession on the same store instance
+    await store.endSession();
+
+    // Call pickSong directly on the SAME store instance (no new start() call)
+    // This exposes what endSession actually left in storage without masking it
+    await store.pickSong(1);
+    data = await store.load(true, null);
+
+    // Song 2 and 3 should NOT be marked as played if endSession correctly cleared playedSongIds
+    // If endSession was buggy (e.g. just called endSequence), they would still be marked as played
+    const song2After = data.songs.find((s) => s.id === 2);
+    const song3After = data.songs.find((s) => s.id === 3);
+    expect(song2After?.played).toBe(false);
+    expect(song3After?.played).toBe(false);
+  });
+```
+(The `referenceData()`/`referenceDataWithThreeSongs()` helpers and the `hasLocalSession` describe block are unchanged — none of them reference `genreId` or `genreGroups`.)
+
+- [ ] **Step 3: Fix `src/lib/songPickerData.test.ts`**
+
+Read the current file first. Replace the whole file:
+```ts
+import { describe, it, expect } from 'vitest';
+import { getUsedTopLevelRegionsLocal, filterSongsLocal } from './songPickerData';
+import type { ReferenceData } from './referenceData';
+import type { SongRow, RegionRow } from '@/db/schema';
+
+function makeSong(id: number, title: string): SongRow {
+  return { id, title, lyrics: null, notes: null, maleKey: null, femaleKey: null, createdAt: new Date(), updatedAt: new Date() } as SongRow;
+}
+
+// Νησιά(1) -> Νησιά Αιγαίου(2) -> Κυκλάδες(3) -> Νάξος(4)
+const regions: RegionRow[] = [
+  { id: 1, name: 'Νησιά', parentId: null, ownerId: null },
+  { id: 2, name: 'Νησιά Αιγαίου', parentId: 1, ownerId: null },
+  { id: 3, name: 'Κυκλάδες', parentId: 2, ownerId: null },
+  { id: 4, name: 'Νάξος', parentId: 3, ownerId: null },
+];
+
+function referenceData(): ReferenceData {
+  return {
+    songs: [makeSong(1, 'Τραγούδι Νάξου'), makeSong(2, 'Τραγούδι Άλλου Είδους')],
+    sharedSongs: [],
+    axisValues: [
+      { id: 1, songId: 1, axisType: 'region', refId: 4, yearValue: null },
+      { id: 2, songId: 1, axisType: 'genre', refId: 1, yearValue: null },
+      { id: 3, songId: 2, axisType: 'genre', refId: 2, yearValue: null },
+    ],
+    regions,
+    rhythms: [],
+    dromoi: [],
+    composers: [],
+    axisTypes: [],
+    genres: [],
+    programs: [],
+  };
+}
+
+describe('getUsedTopLevelRegionsLocal', () => {
+  it('returns the top-level ancestor of every region used by songs of the genre', () => {
+    const result = getUsedTopLevelRegionsLocal(1, referenceData());
+    expect(result.map((r) => r.id)).toEqual([1]);
+  });
+
+  it('returns an empty list for a genre with no songs', () => {
+    const result = getUsedTopLevelRegionsLocal(99, referenceData());
+    expect(result).toEqual([]);
+  });
+});
+
+describe('filterSongsLocal', () => {
+  it('filters by genreId', () => {
+    const result = filterSongsLocal(referenceData(), { genreId: 2 });
+    expect(result.map((s) => s.id)).toEqual([2]);
+  });
+
+  it('filters by case-insensitive title substring', () => {
+    const result = filterSongsLocal(referenceData(), { search: 'ναξου' });
+    expect(result.map((s) => s.id)).toEqual([1]);
+  });
+
+  it('filters by region, including descendants', () => {
+    const result = filterSongsLocal(referenceData(), { regionId: 2 });
+    expect(result.map((s) => s.id)).toEqual([1]);
+  });
+});
+```
+(Song 1 is now tagged `genre: 1` and `region: 4` (Νάξος); song 2 is tagged `genre: 2`. Expected outputs are unchanged from before — only the fixture's *mechanism* for expressing genre changed, from a `genreId` column value to an axis-value row, matching what `getUsedTopLevelRegionsLocal`/`filterSongsLocal` actually read after Task 10.)
+
+- [ ] **Step 4: Fix `scripts/smoke-schema.ts`**
+
+Read the current file first. Replace the whole file:
+```ts
+import { drizzle } from 'drizzle-orm/neon-http';
+import { neon } from '@neondatabase/serverless';
+import * as schema from '../src/db/schema';
+import { eq } from 'drizzle-orm';
+
+async function main() {
+  const sql = neon(process.env.DATABASE_URL!);
+  const db = drizzle(sql, { schema });
+
+  const [user] = await db
+    .insert(schema.users)
+    .values({ email: `smoke-test-${Date.now()}@smoke.invalid`, passwordHash: 'smoke-placeholder', role: 'user' })
+    .returning();
+  const [genre] = await db.insert(schema.genres).values({ name: 'Smoke Genre' }).returning();
+  const [composer] = await db.insert(schema.composers).values({ name: 'Smoke Composer' }).returning();
+  const [axisType] = await db
+    .insert(schema.axisTypes)
+    .values({ key: 'smoke_axis', label: 'Smoke Axis', lookupTable: null, hierarchical: false })
+    .returning();
+
+  const [song] = await db
+    .insert(schema.songs)
+    .values({ title: 'Smoke Song', lyrics: 'la la la', ownerId: user.id })
+    .returning();
+
+  const [genreAxisValue] = await db
+    .insert(schema.songAxisValues)
+    .values({ songId: song.id, axisType: 'genre', refId: genre.id, yearValue: null })
+    .returning();
+
+  const [axisValue] = await db
+    .insert(schema.songAxisValues)
+    .values({ songId: song.id, axisType: axisType.key, refId: null, yearValue: 1950 })
+    .returning();
+
+  const [session] = await db
+    .insert(schema.sessions)
+    .values({ label: 'Smoke Session', currentSongId: song.id, ownerId: user.id })
+    .returning();
+  const [played] = await db.insert(schema.sessionPlayedSongs).values({ sessionId: session.id, songId: song.id }).returning();
+
+  if (!user.id || !genre.id || !composer.id || !axisType.id || !song.id || !genreAxisValue.id || !axisValue.id || !session.id || !played.id) {
+    throw new Error('One or more inserts did not return an id');
+  }
+
+  await db.delete(schema.sessionPlayedSongs).where(eq(schema.sessionPlayedSongs.id, played.id));
+  await db.delete(schema.sessions).where(eq(schema.sessions.id, session.id));
+  await db.delete(schema.songAxisValues).where(eq(schema.songAxisValues.id, axisValue.id));
+  await db.delete(schema.songAxisValues).where(eq(schema.songAxisValues.id, genreAxisValue.id));
+  await db.delete(schema.songs).where(eq(schema.songs.id, song.id));
+  await db.delete(schema.axisTypes).where(eq(schema.axisTypes.id, axisType.id));
+  await db.delete(schema.composers).where(eq(schema.composers.id, composer.id));
+  await db.delete(schema.genres).where(eq(schema.genres.id, genre.id));
+  await db.delete(schema.users).where(eq(schema.users.id, user.id));
+
+  console.log('Schema smoke test passed');
+}
+
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});
+```
+(The `genre` insert/delete stays — it still validates the `genres` table itself. What changed: the `songs` insert no longer passes `genreId`; a new `genreAxisValue` row proves a song can be tagged with a genre via `song_axis_values`, exercised and cleaned up the same way the pre-existing `smoke_axis` row already was.)
+
+This script inserts test rows and deletes every one of them in the same run (against the real shared DB, like it always has) — running it as verification in Step 7 is safe and matches its existing purpose.
+
+- [ ] **Step 5: Fix `scripts/rebetika-import.ts`**
+
+Read the current file first. Replace the genre-lookup and song-insert logic:
+```ts
+  const genreId = await findOrCreateGenre('Ρεμπέτικο');
+
+  const ownerSongs = await db.select({ id: songs.id, title: songs.title }).from(songs).where(eq(songs.ownerId, admin.id));
+  const existingGenreAxisRows = await db
+    .select({ songId: songAxisValues.songId })
+    .from(songAxisValues)
+    .where(and(eq(songAxisValues.axisType, 'genre'), eq(songAxisValues.refId, genreId)));
+  const existingGenreSongIds = new Set(existingGenreAxisRows.map((r) => r.songId));
+  const existing = ownerSongs.filter((s) => existingGenreSongIds.has(s.id));
+  const existingNorm = new Set(existing.map((s) => normalizeTitle(s.title)));
+
+  let inserted = 0;
+  let skipped = 0;
+  let failed = 0;
+
+  for (const row of rows) {
+    const key = normalizeTitle(row.title);
+    if (existingNorm.has(key)) {
+      skipped++;
+      continue;
+    }
+    try {
+      const [song] = await db
+        .insert(songs)
+        .values({ ownerId: admin.id, title: row.title, lyrics: row.lyrics })
+        .returning();
+      await db.insert(songAxisValues).values({ songId: song.id, axisType: 'genre', refId: genreId, yearValue: null });
+
+      if (row.rhythm) {
+```
+(Everything from `if (row.rhythm) {` onward — the rhythm/composer/year axis-value inserts and the final counts/logging — is unchanged.)
+
+- [ ] **Step 6: Delete the obsolete Task 1 migration script and leftover throwaway scripts**
+
+```bash
+git rm scripts/migrate-genre-to-axis.ts
+git rm scripts/tmp-*.ts
+```
+Remove the `"db:migrate-genre-to-axis": "dotenv -e .env.local -- tsx scripts/migrate-genre-to-axis.ts"` line from `package.json`'s `"scripts"` section.
+
+- [ ] **Step 7: Verify**
+
+```bash
+npm test -- referenceData.test sessionStore.test songPickerData.test
+```
+Expected: all pass, pristine output.
+
+```bash
+npx tsc --noEmit
+```
+Expected: zero errors anywhere in the project.
+
+```bash
+npm run db:smoke
+```
+Expected: `Schema smoke test passed` — this runs against the real shared DB and cleans up fully after itself (matches its existing established behavior, unchanged by this task).
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add src/lib/referenceData.test.ts src/lib/sessionStore.test.ts src/lib/songPickerData.test.ts scripts/smoke-schema.ts scripts/rebetika-import.ts package.json
+git commit -m "Fix remaining genreId/genreGroups fallout in tests and live scripts, remove obsolete one-time/throwaway scripts"
+```
+(The `git rm` from Step 6 stages the deletions automatically; they'll be included in this same commit since they're already staged.)
+
+---
+
+## Task 12: New `SongPicker` — paginated list with a filter bar, no mandatory first step
 
 **Files:**
 - Modify: `src/components/SongPicker.tsx`
@@ -1433,7 +1766,7 @@ git commit -m "Replace the genre-first SongPicker wizard with a paginated, filte
 
 ---
 
-## Task 12: Client-side default-view preference
+## Task 13: Client-side default-view preference
 
 **Files:**
 - Create: `src/lib/suggestionViewPreference.ts`
@@ -1553,7 +1886,7 @@ Add state and a load-on-mount effect near the top of the component body (alongsi
     getDefaultViewPreference(preferencesStore).then(setDefaultView);
   }, []);
 ```
-Apply the preference when the response is `ungrouped` and no manual filter is active — add this right after `const [data, setData] = useState...` block's `load` is defined, by adjusting what gets passed to `store.load`. Since `store.load(showPlayed, manualActiveAxisTypes)` already accepts an explicit active-axis-types override, reuse that mechanism: when `defaultView.type === 'filterGenre'` and the user hasn't manually touched filters yet (`manualActiveAxisTypes === null`), pass `['genre']` as the active types instead of `null`, and separately pass the specific `genreId` through — however, `store.load`'s existing signature only accepts axis *types*, not specific *values*, since the "current song's own axis value" is what gets matched. This preference only makes sense in the initial `SongPicker` (Task 11) context or as a *filter type toggle*, not as a value substitute in the mid-session ranking view — so scope this preference's effect narrowly to the `groupByGenre`-style relabeling of the `ungrouped` list, not to the `SongPicker`.
+Apply the preference when the response is `ungrouped` and no manual filter is active — add this right after `const [data, setData] = useState...` block's `load` is defined, by adjusting what gets passed to `store.load`. Since `store.load(showPlayed, manualActiveAxisTypes)` already accepts an explicit active-axis-types override, reuse that mechanism: when `defaultView.type === 'filterGenre'` and the user hasn't manually touched filters yet (`manualActiveAxisTypes === null`), pass `['genre']` as the active types instead of `null`, and separately pass the specific `genreId` through — however, `store.load`'s existing signature only accepts axis *types*, not specific *values*, since the "current song's own axis value" is what gets matched. This preference only makes sense in the initial `SongPicker` (Task 12) context or as a *filter type toggle*, not as a value substitute in the mid-session ranking view — so scope this preference's effect narrowly to the `groupByGenre`-style relabeling of the `ungrouped` list, not to the `SongPicker`.
 
 Add a small settings toggle in the header, near the existing `showPlayed` checkbox:
 ```tsx
@@ -1619,7 +1952,7 @@ git commit -m "Add client-side default-view preference (none / group-by-genre) t
 
 ---
 
-## Task 13: Full manual verification
+## Task 14: Full manual verification
 
 No further code changes expected. Full walkthrough on `npm run dev`, using the real `farantosgeo@gmail.com` account (or a throwaway registered account if you prefer not to touch it, matching the pattern used in earlier features this session).
 
