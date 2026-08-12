@@ -24,6 +24,7 @@ export interface AxisValueEntry {
 
 const LOOKUP_ENDPOINTS: Record<string, string> = {
   regions: '/api/regions',
+  genres: '/api/genres',
   rhythms: '/api/rhythms',
   dromoi: '/api/dromoi',
   composers: '/api/composers',
