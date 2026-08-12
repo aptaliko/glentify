@@ -8,17 +8,10 @@ import { nativeApiFetch } from '@/lib/nativeApiFetch';
 import { apiUrl } from '@/lib/apiClient';
 import { getAuthToken } from '@/lib/authToken';
 
-interface Option {
-  id: number;
-  name: string;
-}
-
 export default function NewSongPage() {
   const router = useRouter();
-  const [genres, setGenres] = useState<Option[]>([]);
   const [title, setTitle] = useState('');
   const [lyrics, setLyrics] = useState('');
-  const [genreId, setGenreId] = useState('');
   const [notes, setNotes] = useState('');
   const [maleKey, setMaleKey] = useState('');
   const [femaleKey, setFemaleKey] = useState('');
@@ -26,8 +19,6 @@ export default function NewSongPage() {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [creatingGenre, setCreatingGenre] = useState(false);
-  const [newGenreName, setNewGenreName] = useState('');
 
   async function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -49,16 +40,11 @@ export default function NewSongPage() {
     }
   }
 
-  useEffect(() => {
-    nativeApiFetch('/api/genres').then((r) => r.json()).then(setGenres);
-  }, []);
-
   interface SuggestionSong {
     id: number;
     title: string;
     lyrics: string | null;
     notes: string | null;
-    genreId: number | null; // null when the suggested song's genre isn't visible to this user
     maleKey: string | null;
     femaleKey: string | null;
     axisValues: AxisValueEntry[];
@@ -82,26 +68,10 @@ export default function NewSongPage() {
   function applySuggestion(s: SuggestionSong) {
     setLyrics(s.lyrics ?? '');
     setNotes(s.notes ?? '');
-    if (s.genreId !== null) setGenreId(String(s.genreId));
     setMaleKey(s.maleKey ?? '');
     setFemaleKey(s.femaleKey ?? '');
     setAxisValues(s.axisValues);
     setSuggestions([]);
-  }
-
-  async function handleCreateGenre() {
-    if (!newGenreName.trim()) return;
-    const res = await nativeApiFetch('/api/genres', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: newGenreName.trim() }),
-    });
-    if (!res.ok) return;
-    const created: Option = await res.json();
-    setGenres((prev) => [...prev, created]);
-    setGenreId(String(created.id));
-    setCreatingGenre(false);
-    setNewGenreName('');
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -113,7 +83,6 @@ export default function NewSongPage() {
       body: JSON.stringify({
         title,
         lyrics: lyrics || null,
-        genreId: Number(genreId),
         notes: notes || null,
         maleKey: maleKey || null,
         femaleKey: femaleKey || null,
@@ -157,35 +126,6 @@ export default function NewSongPage() {
           placeholder="Στίχοι (προαιρετικό, μπορούν να προστεθούν αργότερα)"
           className="textarea textarea-bordered h-48"
         />
-        <select
-          value={creatingGenre ? '__new__' : genreId}
-          onChange={(e) => {
-            if (e.target.value === '__new__') {
-              setCreatingGenre(true);
-            } else {
-              setCreatingGenre(false);
-              setGenreId(e.target.value);
-            }
-          }}
-          className="select select-bordered"
-          required
-        >
-          <option value="">Είδος...</option>
-          {genres.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-          <option value="__new__">+ Νέο είδος...</option>
-        </select>
-        {creatingGenre && (
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={newGenreName}
-              onChange={(e) => setNewGenreName(e.target.value)}
-              placeholder="Όνομα νέου είδους"
-              className="input input-bordered flex-1"
-            />
-            <button type="button" onClick={handleCreateGenre} className="btn btn-secondary">Δημιουργία</button>
-          </div>
-        )}
         <div className="flex flex-col gap-2">
           <label className="label-text">Εικόνα παρτιτούρας (προαιρετικό, εναλλακτικά ή μαζί με τους στίχους)</label>
           <input type="file" accept="image/png,image/jpeg,image/webp" onChange={handleImageChange} className="file-input file-input-bordered" />

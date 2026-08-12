@@ -5,19 +5,12 @@ import { useParams, useRouter } from 'next/navigation';
 import { upload } from '@vercel/blob/client';
 import SongAxisEditor, { type AxisValueEntry } from '@/components/SongAxisEditor';
 
-interface Option {
-  id: number;
-  name: string;
-}
-
 export default function EditSongPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
-  const [genres, setGenres] = useState<Option[]>([]);
 
   const [title, setTitle] = useState('');
   const [lyrics, setLyrics] = useState('');
-  const [genreId, setGenreId] = useState('');
   const [notes, setNotes] = useState('');
   const [maleKey, setMaleKey] = useState('');
   const [femaleKey, setFemaleKey] = useState('');
@@ -25,8 +18,6 @@ export default function EditSongPage() {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [creatingGenre, setCreatingGenre] = useState(false);
-  const [newGenreName, setNewGenreName] = useState('');
 
   async function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -43,27 +34,10 @@ export default function EditSongPage() {
     }
   }
 
-  async function handleCreateGenre() {
-    if (!newGenreName.trim()) return;
-    const res = await fetch('/api/genres', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: newGenreName.trim() }),
-    });
-    if (!res.ok) return;
-    const created: Option = await res.json();
-    setGenres((prev) => [...prev, created]);
-    setGenreId(String(created.id));
-    setCreatingGenre(false);
-    setNewGenreName('');
-  }
-
   useEffect(() => {
-    fetch('/api/genres').then((r) => r.json()).then(setGenres);
     fetch(`/api/songs/${params.id}`).then((r) => r.json()).then((song) => {
       setTitle(song.title);
       setLyrics(song.lyrics ?? '');
-      setGenreId(String(song.genreId));
       setNotes(song.notes ?? '');
       setMaleKey(song.maleKey ?? '');
       setFemaleKey(song.femaleKey ?? '');
@@ -87,7 +61,6 @@ export default function EditSongPage() {
       body: JSON.stringify({
         title,
         lyrics: lyrics || null,
-        genreId: Number(genreId),
         notes: notes || null,
         maleKey: maleKey || null,
         femaleKey: femaleKey || null,
@@ -129,35 +102,6 @@ export default function EditSongPage() {
           placeholder="Στίχοι (προαιρετικό, μπορούν να προστεθούν αργότερα)"
           className="textarea textarea-bordered h-48"
         />
-        <select
-          value={creatingGenre ? '__new__' : genreId}
-          onChange={(e) => {
-            if (e.target.value === '__new__') {
-              setCreatingGenre(true);
-            } else {
-              setCreatingGenre(false);
-              setGenreId(e.target.value);
-            }
-          }}
-          className="select select-bordered"
-          required
-        >
-          <option value="">Είδος...</option>
-          {genres.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-          <option value="__new__">+ Νέο είδος...</option>
-        </select>
-        {creatingGenre && (
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={newGenreName}
-              onChange={(e) => setNewGenreName(e.target.value)}
-              placeholder="Όνομα νέου είδους"
-              className="input input-bordered flex-1"
-            />
-            <button type="button" onClick={handleCreateGenre} className="btn btn-secondary">Δημιουργία</button>
-          </div>
-        )}
         <div className="flex flex-col gap-2">
           <label className="label-text">Εικόνα παρτιτούρας (προαιρετικό, εναλλακτικά ή μαζί με τους στίχους)</label>
           <input type="file" accept="image/png,image/jpeg,image/webp" onChange={handleImageChange} className="file-input file-input-bordered" />
