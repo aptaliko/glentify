@@ -5,6 +5,8 @@ import SongPicker from '@/components/SongPicker';
 import type { SessionStore } from '@/lib/sessionStore';
 import type { SuggestionsResponsePayload, SuggestedSong } from '@/lib/suggestions';
 import type { SongPickerDataSource } from '@/lib/songPickerData';
+import { preferencesStore } from '@/lib/preferencesStore';
+import { getDefaultViewPreference, setDefaultViewPreference, type DefaultViewPreference } from '@/lib/suggestionViewPreference';
 
 function SongButton({ song, onPick }: { song: SuggestedSong; onPick: (songId: number) => void }) {
   return (
@@ -67,6 +69,12 @@ export default function LiveSessionView({
   const [data, setData] = useState<SuggestionsResponsePayload | null>(null);
   const [showPlayed, setShowPlayed] = useState(false);
   const [manualActiveAxisTypes, setManualActiveAxisTypes] = useState<string[] | null>(null);
+  const [defaultView, setDefaultView] = useState<DefaultViewPreference>({ type: 'none' });
+  const [showViewSettings, setShowViewSettings] = useState(false);
+
+  useEffect(() => {
+    getDefaultViewPreference(preferencesStore).then(setDefaultView);
+  }, []);
 
   const load = useCallback(async () => {
     setData(await store.load(showPlayed, manualActiveAxisTypes));
@@ -150,7 +158,33 @@ export default function LiveSessionView({
           <button onClick={handleEndSession} className="btn btn-sm btn-error">
             Λήξη session
           </button>
+          <button onClick={() => setShowViewSettings((v) => !v)} className="btn btn-sm btn-ghost">
+            ⚙ Προβολή
+          </button>
         </div>
+        {showViewSettings && (
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <span>Προεπιλεγμένη προβολή:</span>
+            <button
+              onClick={async () => {
+                await setDefaultViewPreference(preferencesStore, { type: 'none' });
+                setDefaultView({ type: 'none' });
+              }}
+              className={`btn btn-xs ${defaultView.type === 'none' ? 'btn-primary' : 'btn-outline'}`}
+            >
+              Καμία
+            </button>
+            <button
+              onClick={async () => {
+                await setDefaultViewPreference(preferencesStore, { type: 'groupByGenre' });
+                setDefaultView({ type: 'groupByGenre' });
+              }}
+              className={`btn btn-xs ${defaultView.type === 'groupByGenre' ? 'btn-primary' : 'btn-outline'}`}
+            >
+              Ομαδοποίηση ανά είδος
+            </button>
+          </div>
+        )}
         <h1 className="text-center text-xl font-bold sm:text-2xl">{currentSong.title}</h1>
       </header>
 
@@ -173,12 +207,17 @@ export default function LiveSessionView({
                 ) : (
                   data.candidates.map((s) => <SongButton key={s.id} song={s} onPick={handlePick} />)
                 ))}
-              {data.mode === 'ungrouped' &&
+              {data.mode === 'ungrouped' && defaultView.type !== 'groupByGenre' &&
                 (data.songs.length === 0 ? (
                   <p className="px-3 py-4 text-sm text-base-content/50">Κανένα τραγούδι</p>
                 ) : (
                   data.songs.map((s) => <SongButton key={s.id} song={s} onPick={handlePick} />)
                 ))}
+              {data.mode === 'ungrouped' && defaultView.type === 'groupByGenre' && (
+                <p className="px-3 py-4 text-sm text-base-content/50 italic">
+                  (Ομαδοποίηση ανά είδος — ενεργοποίησε το φίλτρο &quot;Είδος&quot; πάνω για να δεις μια συγκεκριμένη κατηγορία.)
+                </p>
+              )}
             </div>
           </div>
         </div>
