@@ -14,9 +14,21 @@ export interface SongFilters {
 export async function listSongs(ownerId: number, filters: SongFilters = {}): Promise<SongRow[]> {
   const conditions: SQL[] = [eq(songs.ownerId, ownerId)];
   if (filters.search) conditions.push(ilike(songs.title, `%${filters.search}%`));
-  if (filters.genreId) conditions.push(eq(songs.genreId, filters.genreId));
 
-  const results = await db.select().from(songs).where(and(...conditions));
+  let results = await db.select().from(songs).where(and(...conditions));
+
+  if (filters.genreId) {
+    const songIds = results.map((s) => s.id);
+    if (songIds.length === 0) return [];
+    const genreAxisRows = await db
+      .select()
+      .from(songAxisValues)
+      .where(and(eq(songAxisValues.axisType, 'genre'), inArray(songAxisValues.songId, songIds)));
+    const matchingSongIds = new Set(
+      genreAxisRows.filter((r) => r.refId === filters.genreId).map((r) => r.songId)
+    );
+    results = results.filter((s) => matchingSongIds.has(s.id));
+  }
 
   if (!filters.regionId) return results;
 
@@ -59,7 +71,6 @@ export interface SongInput {
   title: string;
   lyrics: string | null;
   imageUrl: string | null;
-  genreId: number;
   notes: string | null;
   maleKey: string | null;
   femaleKey: string | null;
@@ -74,7 +85,6 @@ export async function createSong(ownerId: number, data: SongInput): Promise<Song
       title: data.title,
       lyrics: data.lyrics,
       imageUrl: data.imageUrl,
-      genreId: data.genreId,
       notes: data.notes,
       maleKey: data.maleKey,
       femaleKey: data.femaleKey,
@@ -92,7 +102,6 @@ export async function updateSong(ownerId: number, id: number, data: SongInput): 
       title: data.title,
       lyrics: data.lyrics,
       imageUrl: data.imageUrl,
-      genreId: data.genreId,
       notes: data.notes,
       maleKey: data.maleKey,
       femaleKey: data.femaleKey,
