@@ -27,6 +27,8 @@ export interface SongPickerDataSource {
   listGenres(): Promise<SongPickerGenre[]>;
   listRegionsForGenre(genreId: number): Promise<SongPickerRegion[]>;
   listSongs(filters: SongPickerFilters): Promise<SongPickerSong[]>;
+  /** All songs, unfiltered — used by the new SongPicker's default paginated view. */
+  listAllSongs(): Promise<SongPickerSong[]>;
 }
 
 export const remoteSongPickerDataSource: SongPickerDataSource = {
@@ -44,6 +46,10 @@ export const remoteSongPickerDataSource: SongPickerDataSource = {
     if (filters.regionId) params.set('regionId', String(filters.regionId));
     if (filters.search) params.set('search', filters.search);
     const res = await fetch(`/api/songs?${params.toString()}`);
+    return res.json();
+  },
+  async listAllSongs() {
+    const res = await fetch('/api/songs');
     return res.json();
   },
 };
@@ -105,6 +111,9 @@ export function createLocalSongPickerDataSource(data: ReferenceData): SongPicker
     },
     async listSongs(filters: SongPickerFilters) {
       return filterSongsLocal(data, filters).map((s) => ({ id: s.id, title: s.title }));
+    },
+    async listAllSongs() {
+      return data.songs.map((s) => ({ id: s.id, title: s.title }));
     },
   };
 }
