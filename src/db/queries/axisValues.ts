@@ -1,5 +1,5 @@
 import { db } from '../client';
-import { songAxisValues, axisTypes, regions, rhythms, dromoi, composers, songs } from '../schema';
+import { songAxisValues, axisTypes, regions, rhythms, dromoi, composers, genres, songs } from '../schema';
 import { eq, inArray, or, isNull } from 'drizzle-orm';
 import type { SongAxisValueRow, AxisTypeRow } from '../schema';
 
@@ -52,16 +52,18 @@ export async function replaceSongAxisValues(songId: number, values: AxisValueInp
 }
 
 export async function getVisibleAxisRefIds(userId: number): Promise<Map<string, Set<number>>> {
-  const [regionRows, rhythmRows, dromosRows, composerRows] = await Promise.all([
+  const [regionRows, rhythmRows, dromosRows, composerRows, genreRows] = await Promise.all([
     db.select({ id: regions.id }).from(regions).where(or(isNull(regions.ownerId), eq(regions.ownerId, userId))),
     db.select({ id: rhythms.id }).from(rhythms).where(or(isNull(rhythms.ownerId), eq(rhythms.ownerId, userId))),
     db.select({ id: dromoi.id }).from(dromoi).where(or(isNull(dromoi.ownerId), eq(dromoi.ownerId, userId))),
     db.select({ id: composers.id }).from(composers).where(or(isNull(composers.ownerId), eq(composers.ownerId, userId))),
+    db.select({ id: genres.id }).from(genres).where(or(isNull(genres.ownerId), eq(genres.ownerId, userId))),
   ]);
   return new Map<string, Set<number>>([
     ['region', new Set(regionRows.map((r) => r.id))],
     ['rhythm', new Set(rhythmRows.map((r) => r.id))],
     ['dromos', new Set(dromosRows.map((r) => r.id))],
     ['composer', new Set(composerRows.map((r) => r.id))],
+    ['genre', new Set(genreRows.map((r) => r.id))],
   ]);
 }

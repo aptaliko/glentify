@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { searchSuggestionSongs } from '@/db/queries/songs';
 import { getAxisValuesForSongIds, getVisibleAxisRefIds } from '@/db/queries/axisValues';
-import { listGenres } from '@/db/queries/genres';
 import { getUserId } from '@/lib/requestUser';
 
 export async function GET(request: NextRequest) {
@@ -10,23 +9,16 @@ export async function GET(request: NextRequest) {
   if (!title) return NextResponse.json([]);
 
   const candidates = await searchSuggestionSongs(title);
-  const [axisRows, visible, visibleGenres] = await Promise.all([
+  const [axisRows, visible] = await Promise.all([
     getAxisValuesForSongIds(candidates.map((s) => s.id)),
     getVisibleAxisRefIds(userId),
-    listGenres(userId),
   ]);
-  const visibleGenreIds = new Set(visibleGenres.map((g) => g.id));
 
   const result = candidates.map((song) => ({
     id: song.id,
     title: song.title,
     lyrics: song.lyrics,
     notes: song.notes,
-    // genreId is a direct FK, not an axis value — filter it against the requester's visible
-    // genres the same way axis refs are filtered, so a genre the requester can't see never
-    // reaches the client (e.g. a personal genre owned by an admin who created it before an
-    // eventual promotion, or any future admin-role-management path).
-    genreId: visibleGenreIds.has(song.genreId) ? song.genreId : null,
     maleKey: song.maleKey,
     femaleKey: song.femaleKey,
     axisValues: axisRows
