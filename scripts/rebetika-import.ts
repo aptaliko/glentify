@@ -42,10 +42,13 @@ async function main() {
 
   const genreId = await findOrCreateGenre('Ρεμπέτικο');
 
-  const existing = await db
-    .select({ title: songs.title })
-    .from(songs)
-    .where(and(eq(songs.genreId, genreId), eq(songs.ownerId, admin.id)));
+  const ownerSongs = await db.select({ id: songs.id, title: songs.title }).from(songs).where(eq(songs.ownerId, admin.id));
+  const existingGenreAxisRows = await db
+    .select({ songId: songAxisValues.songId })
+    .from(songAxisValues)
+    .where(and(eq(songAxisValues.axisType, 'genre'), eq(songAxisValues.refId, genreId)));
+  const existingGenreSongIds = new Set(existingGenreAxisRows.map((r) => r.songId));
+  const existing = ownerSongs.filter((s) => existingGenreSongIds.has(s.id));
   const existingNorm = new Set(existing.map((s) => normalizeTitle(s.title)));
 
   let inserted = 0;
@@ -61,8 +64,9 @@ async function main() {
     try {
       const [song] = await db
         .insert(songs)
-        .values({ ownerId: admin.id, title: row.title, lyrics: row.lyrics, genreId })
+        .values({ ownerId: admin.id, title: row.title, lyrics: row.lyrics })
         .returning();
+      await db.insert(songAxisValues).values({ songId: song.id, axisType: 'genre', refId: genreId, yearValue: null });
 
       if (row.rhythm) {
         const rhythmId = await findOrCreateRhythm(row.rhythm);

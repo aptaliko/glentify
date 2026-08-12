@@ -11,7 +11,6 @@ function song(id: number, title: string): SongRow {
     title,
     lyrics: null,
     imageUrl: null,
-    genreId: 1,
     notes: null,
     maleKey: null,
     femaleKey: null,

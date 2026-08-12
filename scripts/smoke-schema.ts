@@ -20,7 +20,12 @@ async function main() {
 
   const [song] = await db
     .insert(schema.songs)
-    .values({ title: 'Smoke Song', lyrics: 'la la la', genreId: genre.id, ownerId: user.id })
+    .values({ title: 'Smoke Song', lyrics: 'la la la', ownerId: user.id })
+    .returning();
+
+  const [genreAxisValue] = await db
+    .insert(schema.songAxisValues)
+    .values({ songId: song.id, axisType: 'genre', refId: genre.id, yearValue: null })
     .returning();
 
   const [axisValue] = await db
@@ -34,13 +39,14 @@ async function main() {
     .returning();
   const [played] = await db.insert(schema.sessionPlayedSongs).values({ sessionId: session.id, songId: song.id }).returning();
 
-  if (!user.id || !genre.id || !composer.id || !axisType.id || !song.id || !axisValue.id || !session.id || !played.id) {
+  if (!user.id || !genre.id || !composer.id || !axisType.id || !song.id || !genreAxisValue.id || !axisValue.id || !session.id || !played.id) {
     throw new Error('One or more inserts did not return an id');
   }
 
   await db.delete(schema.sessionPlayedSongs).where(eq(schema.sessionPlayedSongs.id, played.id));
   await db.delete(schema.sessions).where(eq(schema.sessions.id, session.id));
   await db.delete(schema.songAxisValues).where(eq(schema.songAxisValues.id, axisValue.id));
+  await db.delete(schema.songAxisValues).where(eq(schema.songAxisValues.id, genreAxisValue.id));
   await db.delete(schema.songs).where(eq(schema.songs.id, song.id));
   await db.delete(schema.axisTypes).where(eq(schema.axisTypes.id, axisType.id));
   await db.delete(schema.composers).where(eq(schema.composers.id, composer.id));

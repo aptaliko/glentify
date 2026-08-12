@@ -3,8 +3,8 @@ import { getUsedTopLevelRegionsLocal, filterSongsLocal } from './songPickerData'
 import type { ReferenceData } from './referenceData';
 import type { SongRow, RegionRow } from '@/db/schema';
 
-function makeSong(id: number, title: string, genreId = 1): SongRow {
-  return { id, title, lyrics: null, genreId, notes: null, maleKey: null, femaleKey: null, createdAt: new Date(), updatedAt: new Date() } as SongRow;
+function makeSong(id: number, title: string): SongRow {
+  return { id, title, lyrics: null, notes: null, maleKey: null, femaleKey: null, createdAt: new Date(), updatedAt: new Date() } as SongRow;
 }
 
 // Νησιά(1) -> Νησιά Αιγαίου(2) -> Κυκλάδες(3) -> Νάξος(4)
@@ -17,9 +17,13 @@ const regions: RegionRow[] = [
 
 function referenceData(): ReferenceData {
   return {
-    songs: [makeSong(1, 'Τραγούδι Νάξου', 1), makeSong(2, 'Τραγούδι Άλλου Είδους', 2)],
+    songs: [makeSong(1, 'Τραγούδι Νάξου'), makeSong(2, 'Τραγούδι Άλλου Είδους')],
     sharedSongs: [],
-    axisValues: [{ id: 1, songId: 1, axisType: 'region', refId: 4, yearValue: null }],
+    axisValues: [
+      { id: 1, songId: 1, axisType: 'region', refId: 4, yearValue: null },
+      { id: 2, songId: 1, axisType: 'genre', refId: 1, yearValue: null },
+      { id: 3, songId: 2, axisType: 'genre', refId: 2, yearValue: null },
+    ],
     regions,
     rhythms: [],
     dromoi: [],
