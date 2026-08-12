@@ -150,7 +150,7 @@ describe('getSuggestions', () => {
   const current: SongWithAxes = { song: makeSong(1, 'Current'), axisValues: [av('rhythm', 10), av('region', 4)] };
   const match: SongWithAxes = { song: makeSong(2, 'Match'), axisValues: [av('rhythm', 10), av('region', 4), av('genre', 3)] };
   const otherGenre: SongWithAxes = { song: makeSong(3, 'Other genre song'), axisValues: [av('genre', 7)] };
-  const allSongs = [current, match, otherGenre];
+  const allSongs = [current, otherGenre, match];
 
   it('returns a filtered ranked list when at least one axis is active', () => {
     const result = getSuggestions({
@@ -226,5 +226,26 @@ describe('buildSuggestionsResponse', () => {
     ]);
     expect(result.candidates).toEqual([{ id: 2, title: 'Τραγούδι Β', played: false }]);
     expect(result.listTitle).toBe('Άλλα τραγούδια με τα ίδια: Περιοχή, Ρυθμός');
+  });
+
+  it('builds a populated ungrouped response when the current song has no active axis filters', () => {
+    const current = makeSong(1, 'Τραγούδι Α');
+    const other = makeSong(2, 'Τραγούδι Β');
+    const allSongs = [
+      { song: current, axisValues: [] },
+      { song: other, axisValues: [av('rhythm', 1)] },
+    ];
+    const result = buildSuggestionsResponse({
+      currentSongWithAxes: { id: 1, title: 'Τραγούδι Α', lyrics: null, imageUrl: null, maleKey: null, femaleKey: null, axisValues: [] },
+      allSongs,
+      playedSongIds: new Set(),
+      showPlayed: false,
+      requestedActive: null,
+      lookups,
+    });
+    expect(result.mode).toBe('ungrouped');
+    expect(result.songs).toEqual([{ id: 2, title: 'Τραγούδι Β', played: false }]);
+    expect(result.candidates).toEqual([]);
+    expect(result.listTitle).toBe('');
   });
 });
