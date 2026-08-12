@@ -117,24 +117,6 @@ export function rankBySharedAxes(
     .map((c) => c.song);
 }
 
-export interface GenreGroup {
-  genreId: number;
-  songs: SongRow[];
-}
-
-export function groupByGenre(songs: SongRow[]): GenreGroup[] {
-  const byGenre = new Map<number, SongRow[]>();
-  for (const song of songs) {
-    const list = byGenre.get(song.genreId) ?? [];
-    list.push(song);
-    byGenre.set(song.genreId, list);
-  }
-  return [...byGenre.entries()].map(([genreId, groupSongs]) => ({
-    genreId,
-    songs: [...groupSongs].sort((a, b) => a.title.localeCompare(b.title, 'el')),
-  }));
-}
-
 export interface SuggestionParams {
   currentSongId: number;
   currentAxisValues: AxisValue[];
@@ -147,7 +129,7 @@ export interface SuggestionParams {
 
 export type SuggestionResult =
   | { mode: 'filtered'; candidates: SongRow[] }
-  | { mode: 'grouped'; genreGroups: GenreGroup[] };
+  | { mode: 'ungrouped'; songs: SongRow[] };
 
 export function getSuggestions(params: SuggestionParams): SuggestionResult {
   const { currentSongId, currentAxisValues, activeAxisTypes, allSongs, regions, playedSongIds, showPlayed } = params;
@@ -156,8 +138,9 @@ export function getSuggestions(params: SuggestionParams): SuggestionResult {
     const visible = allSongs
       .filter(({ song }) => song.id !== currentSongId)
       .filter(({ song }) => showPlayed || !playedSongIds.has(song.id))
-      .map(({ song }) => song);
-    return { mode: 'grouped', genreGroups: groupByGenre(visible) };
+      .map(({ song }) => song)
+      .sort((a, b) => a.title.localeCompare(b.title, 'el'));
+    return { mode: 'ungrouped', songs: visible };
   }
 
   const filtered = getFilteredCandidates({
@@ -202,19 +185,13 @@ export interface SuggestedSong {
   played: boolean;
 }
 
-export interface GenreGroupPayload {
-  genreId: number;
-  genreName: string;
-  songs: SuggestedSong[];
-}
-
 export interface SuggestionsResponsePayload {
   currentSong: CurrentSongPayload | null;
   availableAxisTypes: AvailableAxis[];
   activeAxisTypes: string[];
-  mode: 'filtered' | 'grouped';
+  mode: 'filtered' | 'ungrouped';
   candidates: SuggestedSong[];
-  genreGroups: GenreGroupPayload[];
+  songs: SuggestedSong[];
   listTitle: string;
 }
 
@@ -231,7 +208,7 @@ export function buildSuggestionsResponse(input: BuildSuggestionsInput): Suggesti
   const { currentSongWithAxes, allSongs, playedSongIds, showPlayed, requestedActive, lookups } = input;
 
   if (!currentSongWithAxes) {
-    return { currentSong: null, availableAxisTypes: [], activeAxisTypes: [], mode: 'grouped', candidates: [], genreGroups: [], listTitle: '' };
+    return { currentSong: null, availableAxisTypes: [], activeAxisTypes: [], mode: 'ungrouped', candidates: [], songs: [], listTitle: '' };
   }
 
   const currentAxisValues = currentSongWithAxes.axisValues;
@@ -242,12 +219,12 @@ export function buildSuggestionsResponse(input: BuildSuggestionsInput): Suggesti
 
   const lookupNameById: Record<string, Map<number, string>> = {
     region: new Map(lookups.regions.map((r) => [r.id, r.name])),
+    genre: new Map(lookups.genres.map((g) => [g.id, g.name])),
     rhythm: new Map(lookups.rhythms.map((r) => [r.id, r.name])),
     dromos: new Map(lookups.dromoi.map((d) => [d.id, d.name])),
     composer: new Map(lookups.composers.map((c) => [c.id, c.name])),
   };
   const axisLabelByKey = new Map(lookups.axisTypes.map((t) => [t.key, t.label]));
-  const genreNameById = new Map(lookups.genres.map((g) => [g.id, g.name]));
 
   function labelForAxisValue(v: AxisValue): string {
     if (v.axisType === 'year') return String(v.yearValue);
@@ -282,20 +259,14 @@ export function buildSuggestionsResponse(input: BuildSuggestionsInput): Suggesti
     femaleKey: currentSongWithAxes.femaleKey,
   };
 
-  if (result.mode === 'grouped') {
+  if (result.mode === 'ungrouped') {
     return {
       currentSong,
       availableAxisTypes,
       activeAxisTypes: [...effectiveActive],
-      mode: 'grouped',
+      mode: 'ungrouped',
       candidates: [],
-      genreGroups: result.genreGroups
-        .map((g) => ({
-          genreId: g.genreId,
-          genreName: genreNameById.get(g.genreId) ?? '?',
-          songs: g.songs.map((s) => toSuggestion(s.id, s.title)),
-        }))
-        .sort((a, b) => a.genreName.localeCompare(b.genreName, 'el')),
+      songs: result.songs.map((s) => toSuggestion(s.id, s.title)),
       listTitle: '',
     };
   }
@@ -307,7 +278,7 @@ export function buildSuggestionsResponse(input: BuildSuggestionsInput): Suggesti
     activeAxisTypes: [...effectiveActive],
     mode: 'filtered',
     candidates: result.candidates.map((s) => toSuggestion(s.id, s.title)),
-    genreGroups: [],
+    songs: [],
     listTitle: `Άλλα τραγούδια με τα ίδια: ${activeLabels.join(', ')}`,
   };
 }
