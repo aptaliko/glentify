@@ -5,7 +5,6 @@ import {
   regionMatchesFilter,
   getFilteredCandidates,
   rankBySharedAxes,
-  groupByGenre,
   getSuggestions,
   buildSuggestionsResponse,
   type AxisValue,
@@ -13,12 +12,11 @@ import {
 } from './suggestions';
 import type { SongRow, RegionRow, RhythmRow, DromosRow, ComposerRow, AxisTypeRow, GenreRow } from '@/db/schema';
 
-function makeSong(id: number, title: string, genreId = 1): SongRow {
+function makeSong(id: number, title: string): SongRow {
   return {
     id,
     title,
     lyrics: 'lyrics',
-    genreId,
     notes: null,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -148,21 +146,10 @@ describe('rankBySharedAxes', () => {
   });
 });
 
-describe('groupByGenre', () => {
-  it('groups songs by genreId and sorts titles alphabetically within each group', () => {
-    const songs = [makeSong(1, 'Ζήτα', 5), makeSong(2, 'Άλφα', 5), makeSong(3, 'Βήτα', 9)];
-    const groups = groupByGenre(songs);
-    const genre5 = groups.find((g) => g.genreId === 5)!;
-    const genre9 = groups.find((g) => g.genreId === 9)!;
-    expect(genre5.songs.map((s) => s.title)).toEqual(['Άλφα', 'Ζήτα']);
-    expect(genre9.songs.map((s) => s.title)).toEqual(['Βήτα']);
-  });
-});
-
 describe('getSuggestions', () => {
   const current: SongWithAxes = { song: makeSong(1, 'Current'), axisValues: [av('rhythm', 10), av('region', 4)] };
-  const match: SongWithAxes = { song: makeSong(2, 'Match', 3), axisValues: [av('rhythm', 10), av('region', 4)] };
-  const otherGenre: SongWithAxes = { song: makeSong(3, 'Other genre song', 7), axisValues: [] };
+  const match: SongWithAxes = { song: makeSong(2, 'Match'), axisValues: [av('rhythm', 10), av('region', 4), av('genre', 3)] };
+  const otherGenre: SongWithAxes = { song: makeSong(3, 'Other genre song'), axisValues: [av('genre', 7)] };
   const allSongs = [current, match, otherGenre];
 
   it('returns a filtered ranked list when at least one axis is active', () => {
@@ -174,14 +161,14 @@ describe('getSuggestions', () => {
     if (result.mode === 'filtered') expect(result.candidates.map((s) => s.id)).toEqual([2]);
   });
 
-  it('falls back to genre-grouped when no axis is active', () => {
+  it('falls back to a plain alphabetical list when no axis is active', () => {
     const result = getSuggestions({
       currentSongId: 1, currentAxisValues: current.axisValues, activeAxisTypes: new Set(),
       allSongs, regions, playedSongIds: new Set(), showPlayed: false,
     });
-    expect(result.mode).toBe('grouped');
-    if (result.mode === 'grouped') {
-      expect(result.genreGroups.map((g) => g.genreId).sort()).toEqual([3, 7]);
+    expect(result.mode).toBe('ungrouped');
+    if (result.mode === 'ungrouped') {
+      expect(result.songs.map((s) => s.id)).toEqual([2, 3]);
     }
   });
 });
@@ -197,7 +184,7 @@ describe('buildSuggestionsResponse', () => {
   const genres: GenreRow[] = [{ id: 1, name: 'Παραδοσιακό', ownerId: null }];
   const lookups = { regions, rhythms, dromoi, composers, axisTypes, genres };
 
-  it('returns an empty grouped response when there is no current song', () => {
+  it('returns an empty ungrouped response when there is no current song', () => {
     const result = buildSuggestionsResponse({
       currentSongWithAxes: null,
       allSongs: [],
@@ -210,9 +197,9 @@ describe('buildSuggestionsResponse', () => {
       currentSong: null,
       availableAxisTypes: [],
       activeAxisTypes: [],
-      mode: 'grouped',
+      mode: 'ungrouped',
       candidates: [],
-      genreGroups: [],
+      songs: [],
       listTitle: '',
     });
   });
