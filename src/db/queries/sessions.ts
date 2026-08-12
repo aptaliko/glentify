@@ -12,7 +12,27 @@ export async function getActiveSession(ownerId: number): Promise<SessionRow | un
   return rows[0];
 }
 
+async function endAllActiveSessionsForOwner(ownerId: number): Promise<void> {
+  const openSessions = await db
+    .select({ id: sessions.id, currentSongId: sessions.currentSongId })
+    .from(sessions)
+    .where(and(isNull(sessions.endedAt), eq(sessions.ownerId, ownerId)));
+  for (const session of openSessions) {
+    await markCurrentAsPlayedIfAny(session.id, session.currentSongId);
+  }
+  await db
+    .update(sessions)
+    .set({ currentSongId: null, endedAt: new Date() })
+    .where(and(isNull(sessions.endedAt), eq(sessions.ownerId, ownerId)));
+}
+
 export async function createSession(ownerId: number, label: string | null, startingSongId: number): Promise<SessionRow> {
+  // Guarantee at most one active session per owner: starting a new one implicitly ends any
+  // previous one still open, so sessions never silently pile up. getActiveSession already
+  // assumes single-active-session semantics (it just returns the most recent open one), and
+  // the home page's "active session" banner only ever shows one — this keeps that assumption
+  // true in the data, not just in the UI.
+  await endAllActiveSessionsForOwner(ownerId);
   const rows = await db.insert(sessions).values({ ownerId, label, currentSongId: startingSongId }).returning();
   return rows[0];
 }
