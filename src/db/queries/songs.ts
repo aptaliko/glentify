@@ -9,6 +9,10 @@ export interface SongFilters {
   search?: string;
   genreId?: number;
   regionId?: number;
+  rhythmId?: number;
+  dromosId?: number;
+  composerId?: number;
+  year?: number;
 }
 
 export async function listSongs(ownerId: number, filters: SongFilters = {}): Promise<SongRow[]> {
@@ -26,6 +30,58 @@ export async function listSongs(ownerId: number, filters: SongFilters = {}): Pro
       .where(and(eq(songAxisValues.axisType, 'genre'), inArray(songAxisValues.songId, songIds)));
     const matchingSongIds = new Set(
       genreAxisRows.filter((r) => r.refId === filters.genreId).map((r) => r.songId)
+    );
+    results = results.filter((s) => matchingSongIds.has(s.id));
+  }
+
+  if (filters.rhythmId) {
+    const songIds = results.map((s) => s.id);
+    if (songIds.length === 0) return [];
+    const rhythmAxisRows = await db
+      .select()
+      .from(songAxisValues)
+      .where(and(eq(songAxisValues.axisType, 'rhythm'), inArray(songAxisValues.songId, songIds)));
+    const matchingSongIds = new Set(
+      rhythmAxisRows.filter((r) => r.refId === filters.rhythmId).map((r) => r.songId)
+    );
+    results = results.filter((s) => matchingSongIds.has(s.id));
+  }
+
+  if (filters.dromosId) {
+    const songIds = results.map((s) => s.id);
+    if (songIds.length === 0) return [];
+    const dromosAxisRows = await db
+      .select()
+      .from(songAxisValues)
+      .where(and(eq(songAxisValues.axisType, 'dromos'), inArray(songAxisValues.songId, songIds)));
+    const matchingSongIds = new Set(
+      dromosAxisRows.filter((r) => r.refId === filters.dromosId).map((r) => r.songId)
+    );
+    results = results.filter((s) => matchingSongIds.has(s.id));
+  }
+
+  if (filters.composerId) {
+    const songIds = results.map((s) => s.id);
+    if (songIds.length === 0) return [];
+    const composerAxisRows = await db
+      .select()
+      .from(songAxisValues)
+      .where(and(eq(songAxisValues.axisType, 'composer'), inArray(songAxisValues.songId, songIds)));
+    const matchingSongIds = new Set(
+      composerAxisRows.filter((r) => r.refId === filters.composerId).map((r) => r.songId)
+    );
+    results = results.filter((s) => matchingSongIds.has(s.id));
+  }
+
+  if (filters.year) {
+    const songIds = results.map((s) => s.id);
+    if (songIds.length === 0) return [];
+    const yearAxisRows = await db
+      .select()
+      .from(songAxisValues)
+      .where(and(eq(songAxisValues.axisType, 'year'), inArray(songAxisValues.songId, songIds)));
+    const matchingSongIds = new Set(
+      yearAxisRows.filter((r) => r.yearValue === filters.year).map((r) => r.songId)
     );
     results = results.filter((s) => matchingSongIds.has(s.id));
   }

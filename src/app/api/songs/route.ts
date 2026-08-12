@@ -26,6 +26,10 @@ export async function GET(request: NextRequest) {
     search: params.get('search') ?? undefined,
     genreId: params.get('genreId') ? Number(params.get('genreId')) : undefined,
     regionId: params.get('regionId') ? Number(params.get('regionId')) : undefined,
+    rhythmId: params.get('rhythmId') ? Number(params.get('rhythmId')) : undefined,
+    dromosId: params.get('dromosId') ? Number(params.get('dromosId')) : undefined,
+    composerId: params.get('composerId') ? Number(params.get('composerId')) : undefined,
+    year: params.get('year') ? Number(params.get('year')) : undefined,
   });
   return NextResponse.json(songs);
 }

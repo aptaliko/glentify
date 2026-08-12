@@ -1,6 +1,6 @@
 import { db } from '../client';
-import { regions, songAxisValues, songs } from '../schema';
-import { eq, and, or, isNull, inArray } from 'drizzle-orm';
+import { regions, songAxisValues } from '../schema';
+import { eq, and, or, isNull } from 'drizzle-orm';
 import type { RegionRow } from '../schema';
 
 export async function listRegions(userId: number): Promise<RegionRow[]> {
@@ -10,41 +10,6 @@ export async function listRegions(userId: number): Promise<RegionRow[]> {
 export async function getRegionById(id: number): Promise<RegionRow | undefined> {
   const rows = await db.select().from(regions).where(eq(regions.id, id));
   return rows[0];
-}
-
-function findTopLevelRegionId(regionId: number, byId: Map<number, RegionRow>): number {
-  let current = byId.get(regionId);
-  while (current && current.parentId !== null) {
-    current = byId.get(current.parentId);
-  }
-  return current ? current.id : regionId;
-}
-
-export async function getUsedTopLevelRegionsForGenre(ownerId: number, genreId: number): Promise<RegionRow[]> {
-  const ownerSongs = await db.select({ id: songs.id }).from(songs).where(eq(songs.ownerId, ownerId));
-  const ownerSongIds = new Set(ownerSongs.map((s) => s.id));
-  if (ownerSongIds.size === 0) return [];
-  const genreAxisRows = await db
-    .select({ songId: songAxisValues.songId })
-    .from(songAxisValues)
-    .where(and(eq(songAxisValues.axisType, 'genre'), eq(songAxisValues.refId, genreId)));
-  const songIds = genreAxisRows.map((r) => r.songId).filter((id) => ownerSongIds.has(id));
-  if (songIds.length === 0) return [];
-
-  const [allRegions, axisRows] = await Promise.all([
-    db.select().from(regions),
-    db
-      .select()
-      .from(songAxisValues)
-      .where(and(eq(songAxisValues.axisType, 'region'), inArray(songAxisValues.songId, songIds))),
-  ]);
-
-  const byId = new Map(allRegions.map((r) => [r.id, r]));
-  const topLevelIds = new Set<number>();
-  for (const row of axisRows) {
-    if (row.refId !== null) topLevelIds.add(findTopLevelRegionId(row.refId, byId));
-  }
-  return allRegions.filter((r) => topLevelIds.has(r.id) && (r.ownerId === null || r.ownerId === ownerId));
 }
 
 export async function createRegion(data: { name: string; parentId: number | null; ownerId: number | null }): Promise<RegionRow> {

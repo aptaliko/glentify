@@ -1,14 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { remoteSongPickerDataSource, type SongPickerDataSource } from '@/lib/songPickerData';
+import { remoteSongPickerDataSource, type SongPickerDataSource, type SongPickerFilters } from '@/lib/songPickerData';
 
-interface Genre {
-  id: number;
-  name: string;
-}
-
-interface Region {
+interface Option {
   id: number;
   name: string;
 }
@@ -27,54 +22,93 @@ export default function SongPicker({
   onSelect: (songId: number) => void;
   dataSource?: SongPickerDataSource;
 }) {
-  const [genres, setGenres] = useState<Genre[]>([]);
-  const [regionOptions, setRegionOptions] = useState<Region[]>([]);
-  const [selectedGenre, setSelectedGenre] = useState<Genre | null>(null);
-  const [selectedRegion, setSelectedRegion] = useState<Region | null>(null);
+  const [regions, setRegions] = useState<Option[]>([]);
+  const [genres, setGenres] = useState<Option[]>([]);
+  const [rhythms, setRhythms] = useState<Option[]>([]);
+  const [dromoi, setDromoi] = useState<Option[]>([]);
+  const [composers, setComposers] = useState<Option[]>([]);
+
+  const [regionId, setRegionId] = useState('');
+  const [genreId, setGenreId] = useState('');
+  const [rhythmId, setRhythmId] = useState('');
+  const [dromosId, setDromosId] = useState('');
+  const [composerId, setComposerId] = useState('');
+  const [year, setYear] = useState('');
   const [search, setSearch] = useState('');
+
   const [allSongs, setAllSongs] = useState<Song[]>([]);
   const [filteredResults, setFilteredResults] = useState<Song[]>([]);
   const [page, setPage] = useState(0);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    Promise.all([dataSource.listGenres(), dataSource.listAllSongs()]).then(([g, s]) => {
+    Promise.all([
+      dataSource.listRegions(),
+      dataSource.listGenres(),
+      dataSource.listRhythms(),
+      dataSource.listDromoi(),
+      dataSource.listComposers(),
+      dataSource.listAllSongs(),
+    ]).then(([r, g, rh, d, c, s]) => {
+      setRegions(r);
       setGenres(g);
+      setRhythms(rh);
+      setDromoi(d);
+      setComposers(c);
       setAllSongs(s);
       setLoaded(true);
     });
   }, [dataSource]);
 
-  const hasFilters = !!selectedGenre || !!selectedRegion || !!search;
+  const hasFilters = !!regionId || !!genreId || !!rhythmId || !!dromosId || !!composerId || !!year || !!search;
 
   useEffect(() => {
     if (!loaded || !hasFilters) return;
     let cancelled = false;
-    dataSource
-      .listSongs({ genreId: selectedGenre?.id, regionId: selectedRegion?.id, search: search || undefined })
-      .then((results) => {
-        if (!cancelled) setFilteredResults(results);
-      });
+    const filters: SongPickerFilters = {
+      regionId: regionId ? Number(regionId) : undefined,
+      genreId: genreId ? Number(genreId) : undefined,
+      rhythmId: rhythmId ? Number(rhythmId) : undefined,
+      dromosId: dromosId ? Number(dromosId) : undefined,
+      composerId: composerId ? Number(composerId) : undefined,
+      year: year ? Number(year) : undefined,
+      search: search || undefined,
+    };
+    dataSource.listSongs(filters).then((results) => {
+      if (!cancelled) setFilteredResults(results);
+    });
     return () => {
       cancelled = true;
     };
-  }, [dataSource, loaded, hasFilters, selectedGenre, selectedRegion, search]);
-
-  function handleGenreChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    const genre = genres.find((g) => g.id === Number(e.target.value)) ?? null;
-    setSelectedGenre(genre);
-    setSelectedRegion(null);
-    setPage(0);
-    if (genre) {
-      dataSource.listRegionsForGenre(genre.id).then(setRegionOptions);
-    } else {
-      setRegionOptions([]);
-    }
-  }
+  }, [dataSource, loaded, hasFilters, regionId, genreId, rhythmId, dromosId, composerId, year, search]);
 
   function handleRegionChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    const region = regionOptions.find((r) => r.id === Number(e.target.value)) ?? null;
-    setSelectedRegion(region);
+    setRegionId(e.target.value);
+    setPage(0);
+  }
+
+  function handleGenreChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    setGenreId(e.target.value);
+    setPage(0);
+  }
+
+  function handleRhythmChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    setRhythmId(e.target.value);
+    setPage(0);
+  }
+
+  function handleDromosChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    setDromosId(e.target.value);
+    setPage(0);
+  }
+
+  function handleComposerChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    setComposerId(e.target.value);
+    setPage(0);
+  }
+
+  function handleYearChange(e: React.ChangeEvent<HTMLInputElement>) {
+    setYear(e.target.value);
     setPage(0);
   }
 
@@ -103,28 +137,43 @@ export default function SongPicker({
         </form>
 
         <div className="flex flex-wrap gap-2">
-          <select
-            value={selectedGenre?.id ?? ''}
-            onChange={handleGenreChange}
-            className="select select-bordered select-sm"
-          >
+          <select value={regionId} onChange={handleRegionChange} className="select select-bordered select-sm">
+            <option value="">Όλες οι περιοχές</option>
+            {regions.map((r) => (
+              <option key={r.id} value={r.id}>{r.name}</option>
+            ))}
+          </select>
+          <select value={genreId} onChange={handleGenreChange} className="select select-bordered select-sm">
             <option value="">Όλα τα είδη</option>
             {genres.map((g) => (
               <option key={g.id} value={g.id}>{g.name}</option>
             ))}
           </select>
-          {regionOptions.length > 0 && (
-            <select
-              value={selectedRegion?.id ?? ''}
-              onChange={handleRegionChange}
-              className="select select-bordered select-sm"
-            >
-              <option value="">Όλες οι περιοχές</option>
-              {regionOptions.map((r) => (
-                <option key={r.id} value={r.id}>{r.name}</option>
-              ))}
-            </select>
-          )}
+          <select value={rhythmId} onChange={handleRhythmChange} className="select select-bordered select-sm">
+            <option value="">Όλοι οι ρυθμοί</option>
+            {rhythms.map((r) => (
+              <option key={r.id} value={r.id}>{r.name}</option>
+            ))}
+          </select>
+          <select value={dromosId} onChange={handleDromosChange} className="select select-bordered select-sm">
+            <option value="">Όλοι οι δρόμοι</option>
+            {dromoi.map((d) => (
+              <option key={d.id} value={d.id}>{d.name}</option>
+            ))}
+          </select>
+          <select value={composerId} onChange={handleComposerChange} className="select select-bordered select-sm">
+            <option value="">Όλοι οι συνθέτες</option>
+            {composers.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+          <input
+            type="number"
+            value={year}
+            onChange={handleYearChange}
+            placeholder="Έτος"
+            className="input input-bordered input-sm w-24"
+          />
         </div>
 
         <ul className="flex max-h-96 flex-col gap-1 overflow-y-auto">

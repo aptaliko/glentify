@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getUsedTopLevelRegionsLocal, filterSongsLocal } from './songPickerData';
+import { filterSongsLocal } from './songPickerData';
 import type { ReferenceData } from './referenceData';
 import type { SongRow, RegionRow } from '@/db/schema';
 
@@ -23,6 +23,10 @@ function referenceData(): ReferenceData {
       { id: 1, songId: 1, axisType: 'region', refId: 4, yearValue: null },
       { id: 2, songId: 1, axisType: 'genre', refId: 1, yearValue: null },
       { id: 3, songId: 2, axisType: 'genre', refId: 2, yearValue: null },
+      { id: 4, songId: 1, axisType: 'rhythm', refId: 10, yearValue: null },
+      { id: 5, songId: 2, axisType: 'rhythm', refId: 11, yearValue: null },
+      { id: 6, songId: 1, axisType: 'year', refId: null, yearValue: 1975 },
+      { id: 7, songId: 2, axisType: 'year', refId: null, yearValue: 1990 },
     ],
     regions,
     rhythms: [],
@@ -33,18 +37,6 @@ function referenceData(): ReferenceData {
     programs: [],
   };
 }
-
-describe('getUsedTopLevelRegionsLocal', () => {
-  it('returns the top-level ancestor of every region used by songs of the genre', () => {
-    const result = getUsedTopLevelRegionsLocal(1, referenceData());
-    expect(result.map((r) => r.id)).toEqual([1]);
-  });
-
-  it('returns an empty list for a genre with no songs', () => {
-    const result = getUsedTopLevelRegionsLocal(99, referenceData());
-    expect(result).toEqual([]);
-  });
-});
 
 describe('filterSongsLocal', () => {
   it('filters by genreId', () => {
@@ -59,6 +51,16 @@ describe('filterSongsLocal', () => {
 
   it('filters by region, including descendants', () => {
     const result = filterSongsLocal(referenceData(), { regionId: 2 });
+    expect(result.map((s) => s.id)).toEqual([1]);
+  });
+
+  it('filters by rhythmId', () => {
+    const result = filterSongsLocal(referenceData(), { rhythmId: 11 });
+    expect(result.map((s) => s.id)).toEqual([2]);
+  });
+
+  it('filters by year', () => {
+    const result = filterSongsLocal(referenceData(), { year: 1975 });
     expect(result.map((s) => s.id)).toEqual([1]);
   });
 });

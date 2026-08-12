@@ -1,4 +1,4 @@
-import type { RegionRow, SongRow } from '@/db/schema';
+import type { SongRow } from '@/db/schema';
 import { getRegionDescendantIds } from './suggestions';
 import type { ReferenceData } from './referenceData';
 
@@ -12,6 +12,21 @@ export interface SongPickerRegion {
   name: string;
 }
 
+export interface SongPickerRhythm {
+  id: number;
+  name: string;
+}
+
+export interface SongPickerDromos {
+  id: number;
+  name: string;
+}
+
+export interface SongPickerComposer {
+  id: number;
+  name: string;
+}
+
 export interface SongPickerSong {
   id: number;
   title: string;
@@ -20,12 +35,19 @@ export interface SongPickerSong {
 export interface SongPickerFilters {
   genreId?: number;
   regionId?: number;
+  rhythmId?: number;
+  dromosId?: number;
+  composerId?: number;
+  year?: number;
   search?: string;
 }
 
 export interface SongPickerDataSource {
   listGenres(): Promise<SongPickerGenre[]>;
-  listRegionsForGenre(genreId: number): Promise<SongPickerRegion[]>;
+  listRegions(): Promise<SongPickerRegion[]>;
+  listRhythms(): Promise<SongPickerRhythm[]>;
+  listDromoi(): Promise<SongPickerDromos[]>;
+  listComposers(): Promise<SongPickerComposer[]>;
   listSongs(filters: SongPickerFilters): Promise<SongPickerSong[]>;
   /** All songs, unfiltered — used by the new SongPicker's default paginated view. */
   listAllSongs(): Promise<SongPickerSong[]>;
@@ -36,14 +58,30 @@ export const remoteSongPickerDataSource: SongPickerDataSource = {
     const res = await fetch('/api/genres');
     return res.json();
   },
-  async listRegionsForGenre(genreId: number) {
-    const res = await fetch(`/api/genres/${genreId}/regions`);
+  async listRegions() {
+    const res = await fetch('/api/regions');
+    return res.json();
+  },
+  async listRhythms() {
+    const res = await fetch('/api/rhythms');
+    return res.json();
+  },
+  async listDromoi() {
+    const res = await fetch('/api/dromoi');
+    return res.json();
+  },
+  async listComposers() {
+    const res = await fetch('/api/composers');
     return res.json();
   },
   async listSongs(filters: SongPickerFilters) {
     const params = new URLSearchParams();
     if (filters.genreId) params.set('genreId', String(filters.genreId));
     if (filters.regionId) params.set('regionId', String(filters.regionId));
+    if (filters.rhythmId) params.set('rhythmId', String(filters.rhythmId));
+    if (filters.dromosId) params.set('dromosId', String(filters.dromosId));
+    if (filters.composerId) params.set('composerId', String(filters.composerId));
+    if (filters.year) params.set('year', String(filters.year));
     if (filters.search) params.set('search', filters.search);
     const res = await fetch(`/api/songs?${params.toString()}`);
     return res.json();
@@ -53,29 +91,6 @@ export const remoteSongPickerDataSource: SongPickerDataSource = {
     return res.json();
   },
 };
-
-function findTopLevelRegionId(regionId: number, byId: Map<number, RegionRow>): number {
-  let current = byId.get(regionId);
-  while (current && current.parentId !== null) {
-    current = byId.get(current.parentId);
-  }
-  return current ? current.id : regionId;
-}
-
-export function getUsedTopLevelRegionsLocal(genreId: number, data: ReferenceData): RegionRow[] {
-  const genreSongIds = new Set(
-    data.axisValues.filter((av) => av.axisType === 'genre' && av.refId === genreId).map((av) => av.songId)
-  );
-  if (genreSongIds.size === 0) return [];
-  const byId = new Map(data.regions.map((r) => [r.id, r]));
-  const topLevelIds = new Set<number>();
-  for (const av of data.axisValues) {
-    if (av.axisType === 'region' && genreSongIds.has(av.songId) && av.refId !== null) {
-      topLevelIds.add(findTopLevelRegionId(av.refId, byId));
-    }
-  }
-  return data.regions.filter((r) => topLevelIds.has(r.id));
-}
 
 export function filterSongsLocal(data: ReferenceData, filters: SongPickerFilters): SongRow[] {
   let results = data.songs;
@@ -88,6 +103,30 @@ export function filterSongsLocal(data: ReferenceData, filters: SongPickerFilters
       data.axisValues.filter((av) => av.axisType === 'genre' && av.refId === filters.genreId).map((av) => av.songId)
     );
     results = results.filter((s) => genreSongIds.has(s.id));
+  }
+  if (filters.rhythmId) {
+    const rhythmSongIds = new Set(
+      data.axisValues.filter((av) => av.axisType === 'rhythm' && av.refId === filters.rhythmId).map((av) => av.songId)
+    );
+    results = results.filter((s) => rhythmSongIds.has(s.id));
+  }
+  if (filters.dromosId) {
+    const dromosSongIds = new Set(
+      data.axisValues.filter((av) => av.axisType === 'dromos' && av.refId === filters.dromosId).map((av) => av.songId)
+    );
+    results = results.filter((s) => dromosSongIds.has(s.id));
+  }
+  if (filters.composerId) {
+    const composerSongIds = new Set(
+      data.axisValues.filter((av) => av.axisType === 'composer' && av.refId === filters.composerId).map((av) => av.songId)
+    );
+    results = results.filter((s) => composerSongIds.has(s.id));
+  }
+  if (filters.year) {
+    const yearSongIds = new Set(
+      data.axisValues.filter((av) => av.axisType === 'year' && av.yearValue === filters.year).map((av) => av.songId)
+    );
+    results = results.filter((s) => yearSongIds.has(s.id));
   }
   if (!filters.regionId) return results;
 
@@ -106,8 +145,17 @@ export function createLocalSongPickerDataSource(data: ReferenceData): SongPicker
     async listGenres() {
       return data.genres.map((g) => ({ id: g.id, name: g.name }));
     },
-    async listRegionsForGenre(genreId: number) {
-      return getUsedTopLevelRegionsLocal(genreId, data).map((r) => ({ id: r.id, name: r.name }));
+    async listRegions() {
+      return data.regions.map((r) => ({ id: r.id, name: r.name }));
+    },
+    async listRhythms() {
+      return data.rhythms.map((r) => ({ id: r.id, name: r.name }));
+    },
+    async listDromoi() {
+      return data.dromoi.map((d) => ({ id: d.id, name: d.name }));
+    },
+    async listComposers() {
+      return data.composers.map((c) => ({ id: c.id, name: c.name }));
     },
     async listSongs(filters: SongPickerFilters) {
       return filterSongsLocal(data, filters).map((s) => ({ id: s.id, title: s.title }));
