@@ -9,6 +9,7 @@ import { getAuthToken } from '@/lib/authToken';
 import { preferencesStore } from '@/lib/preferencesStore';
 import { getSelectedEditSongId, clearSelectedEditSongId } from '@/lib/adminEditStore';
 import SongAxisEditor, { type AxisValueEntry } from '@/components/SongAxisEditor';
+import PageNav from '@/components/PageNav';
 
 export default function LocalEditSongPage() {
   const router = useRouter();
@@ -109,7 +110,8 @@ export default function LocalEditSongPage() {
 
   if (!checked) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
+      <div className="flex min-h-screen flex-col items-center justify-center">
+        <PageNav backHref="/admin/songs" showHome={false} />
         <span className="loading loading-spinner loading-lg text-primary" />
       </div>
     );
@@ -118,14 +120,15 @@ export default function LocalEditSongPage() {
   if (songId === null) {
     return (
       <div className="flex flex-col items-center gap-4 p-4 text-center">
+        <PageNav backHref="/admin/songs" showHome={false} />
         <p className="text-lg">Δεν έχει επιλεγεί τραγούδι.</p>
-        <button onClick={() => router.push('/admin/songs')} className="btn btn-primary">← Πίσω στα τραγούδια</button>
       </div>
     );
   }
 
   return (
     <div className="flex flex-col gap-4">
+      <PageNav backHref="/admin/songs" showHome={false} />
       <h1 className="text-xl font-bold">Επεξεργασία τραγουδιού</h1>
       {error && (
         <div role="alert" className="alert alert-error max-w-2xl">

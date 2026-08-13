@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { nativeApiFetch } from '@/lib/nativeApiFetch';
 import { preferencesStore } from '@/lib/preferencesStore';
 import { getSelectedEditProgramId, clearSelectedEditProgramId } from '@/lib/adminEditStore';
+import PageNav from '@/components/PageNav';
 
 interface Sequence {
   id: number;
@@ -218,7 +219,8 @@ export default function LocalEditProgramPage() {
 
   if (!checked) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
+      <div className="flex min-h-screen flex-col items-center justify-center">
+        <PageNav backHref="/admin/programs" showHome={false} />
         <span className="loading loading-spinner loading-lg text-primary" />
       </div>
     );
@@ -227,14 +229,15 @@ export default function LocalEditProgramPage() {
   if (programId === null) {
     return (
       <div className="flex flex-col items-center gap-4 p-4 text-center">
+        <PageNav backHref="/admin/programs" showHome={false} />
         <p className="text-lg">Δεν έχει επιλεγεί πρόγραμμα.</p>
-        <button onClick={() => router.push('/admin/programs')} className="btn btn-primary">← Πίσω στα προγράμματα</button>
       </div>
     );
   }
 
   return (
     <div className="flex flex-col gap-4">
+      <PageNav backHref="/admin/programs" showHome={false} />
       <h1 className="text-xl font-bold">{title}</h1>
 
       {role && (
