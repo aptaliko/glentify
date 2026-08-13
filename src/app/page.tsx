@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { isNativeApp } from '@/lib/platform';
 import { getAuthToken, clearAuthToken } from '@/lib/authToken';
@@ -15,6 +16,7 @@ interface Session {
 }
 
 export default function HomePage() {
+  const router = useRouter();
   // Resolved during render (not in an effect) so server-prerender and client-hydration
   // agree on which branch to render, avoiding a flash of the wrong platform's UI. See
   // isNativeApp() and src/app/session/new/page.tsx for the same pattern.
@@ -39,10 +41,18 @@ export default function HomePage() {
 
   async function handleLogout() {
     if (native) {
+      // A hard `window.location.href` navigation doesn't resolve correctly against
+      // Capacitor's local static-asset server on Android — it falls back to reloading
+      // the current page instead of reaching /login, which re-fires this same handler
+      // in a loop. Every other native navigation in this app already goes through
+      // Next's client-side router (via <Link> or router.push), which doesn't hit that
+      // asset-resolution path at all — so route through it here too instead of doing a
+      // full reload.
       await clearAuthToken();
-    } else {
-      await fetch(apiUrl('/api/logout'), { method: 'POST' });
+      router.push('/login');
+      return;
     }
+    await fetch(apiUrl('/api/logout'), { method: 'POST' });
     window.location.href = '/login';
   }
 
