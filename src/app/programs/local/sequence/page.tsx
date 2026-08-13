@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useSwipeable } from 'react-swipeable';
 import PageNav from '@/components/PageNav';
 import { loadReferenceData } from '@/lib/offlineCache';
 import { preferencesStore } from '@/lib/preferencesStore';
@@ -71,8 +72,14 @@ export default function LocalSequencePage() {
   const hasPrevious = index > 0;
   const hasNext = index < songs.length - 1;
 
+  const swipeHandlers = useSwipeable({
+    onSwipedLeft: () => hasNext && setIndex((i) => i + 1),
+    onSwipedRight: () => hasPrevious && setIndex((i) => i - 1),
+    delta: 50,
+  });
+
   return (
-    <main className="flex min-h-screen flex-col bg-base-200">
+    <main className="flex min-h-screen flex-col bg-base-200" {...swipeHandlers}>
       <header className="sticky top-0 z-10 flex flex-col items-center gap-3 border-b border-base-300 bg-base-100 px-4 py-3 sm:px-6">
         <PageNav backHref="/programs/local/program" />
         <div className="flex flex-wrap items-center justify-center gap-2">
