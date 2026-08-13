@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import PageNav from '@/components/PageNav';
 import SongPicker from '@/components/SongPicker';
 import type { SessionStore } from '@/lib/sessionStore';
 import type { SuggestionsResponsePayload, SuggestedSong } from '@/lib/suggestions';
@@ -102,7 +103,8 @@ export default function LiveSessionView({
 
   if (!data) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-base-200">
+      <main className="flex min-h-screen flex-col items-center justify-center bg-base-200">
+        <PageNav backHref="/" />
         <span className="loading loading-spinner loading-lg text-primary" />
       </main>
     );
@@ -111,6 +113,7 @@ export default function LiveSessionView({
   if (!data.currentSong) {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center gap-6 bg-base-200 p-4">
+        <PageNav backHref="/" />
         <h1 className="text-2xl font-bold">Διάλεξε τραγούδι για να συνεχίσεις</h1>
         <SongPicker onSelect={handlePick} dataSource={songPickerDataSource} />
       </main>
@@ -121,6 +124,7 @@ export default function LiveSessionView({
 
   return (
     <main className="flex min-h-screen flex-col bg-base-200">
+      <PageNav backHref="/" />
       <header className="sticky top-0 z-10 flex flex-col items-center gap-3 border-b border-base-300 bg-base-100 px-4 py-3 sm:px-6">
         <div className="flex flex-wrap items-center justify-center gap-2">
           <label className="label cursor-pointer gap-2">
