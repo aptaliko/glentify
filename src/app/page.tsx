@@ -38,7 +38,11 @@ export default function HomePage() {
   }, [native]);
 
   async function handleLogout() {
-    await fetch(apiUrl('/api/logout'), { method: 'POST' });
+    if (native) {
+      await clearAuthToken();
+    } else {
+      await fetch(apiUrl('/api/logout'), { method: 'POST' });
+    }
     window.location.href = '/login';
   }
 
@@ -127,12 +131,10 @@ export default function HomePage() {
 
       {!native && <Link href="/admin/songs" className="link">Διαχείριση (admin)</Link>}
 
-      {!native && (
-        <div className="flex gap-4 text-sm">
-          <Link href="/account" className="link">Λογαριασμός</Link>
-          <button onClick={handleLogout} className="link">Αποσύνδεση</button>
-        </div>
-      )}
+      <div className="flex gap-4 text-sm">
+        <Link href="/account" className="link">Λογαριασμός</Link>
+        <button onClick={handleLogout} className="link">Αποσύνδεση</button>
+      </div>
     </main>
   );
 }

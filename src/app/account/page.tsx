@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { apiUrl } from '@/lib/apiClient';
+import { nativeApiFetch } from '@/lib/nativeApiFetch';
 import PageNav from '@/components/PageNav';
 
 export default function AccountPage() {
@@ -18,7 +18,7 @@ export default function AccountPage() {
 
   async function handleDelete() {
     setError(null);
-    const res = await fetch(apiUrl('/api/account'), { method: 'DELETE' });
+    const res = await nativeApiFetch('/api/account', { method: 'DELETE' });
     if (!res.ok) {
       const body = await res.json();
       setError(typeof body.error === 'string' ? body.error : 'Κάτι πήγε στραβά');
@@ -35,7 +35,7 @@ export default function AccountPage() {
       setPasswordError('Οι νέοι κωδικοί δεν ταιριάζουν');
       return;
     }
-    const res = await fetch(apiUrl('/api/account/change-password'), {
+    const res = await nativeApiFetch('/api/account/change-password', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ currentPassword, newPassword }),
