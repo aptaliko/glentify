@@ -31,15 +31,6 @@ export default function LocalSequencePage() {
       .finally(() => setChecked(true));
   }, []);
 
-  if (!checked) {
-    return (
-      <main className="flex min-h-screen flex-col items-center justify-center bg-base-200">
-        <PageNav backHref="/programs/local/program" />
-        <span className="loading loading-spinner loading-lg text-primary" />
-      </main>
-    );
-  }
-
   const program = referenceData?.programs.find((p) => p.id === programId) ?? null;
   const sequence = program?.sequences.find((s) => s.id === sequenceId) ?? null;
   const songsById = new Map<number, SongRow>(
@@ -48,6 +39,24 @@ export default function LocalSequencePage() {
   const songs = sequence
     ? sequence.songIds.map((id) => songsById.get(id)).filter((s): s is SongRow => s !== undefined)
     : [];
+
+  const hasPrevious = index > 0;
+  const hasNext = index < songs.length - 1;
+
+  const swipeHandlers = useSwipeable({
+    onSwipedLeft: () => hasNext && setIndex((i) => i + 1),
+    onSwipedRight: () => hasPrevious && setIndex((i) => i - 1),
+    delta: 50,
+  });
+
+  if (!checked) {
+    return (
+      <main className="flex min-h-screen flex-col items-center justify-center bg-base-200">
+        <PageNav backHref="/programs/local/program" />
+        <span className="loading loading-spinner loading-lg text-primary" />
+      </main>
+    );
+  }
 
   if (!referenceData || !program || !sequence) {
     return (
@@ -69,14 +78,6 @@ export default function LocalSequencePage() {
   }
 
   const current = songs[Math.min(index, songs.length - 1)];
-  const hasPrevious = index > 0;
-  const hasNext = index < songs.length - 1;
-
-  const swipeHandlers = useSwipeable({
-    onSwipedLeft: () => hasNext && setIndex((i) => i + 1),
-    onSwipedRight: () => hasPrevious && setIndex((i) => i - 1),
-    delta: 50,
-  });
 
   return (
     <main className="flex min-h-screen flex-col bg-base-200" {...swipeHandlers}>
