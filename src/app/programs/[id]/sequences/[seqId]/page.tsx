@@ -62,8 +62,8 @@ export default function SequencePlaybackPage() {
 
   return (
     <main className="flex min-h-screen flex-col bg-base-200">
-      <PageNav backHref={`/programs/${params.id}`} />
       <header className="sticky top-0 z-10 flex flex-col items-center gap-3 border-b border-base-300 bg-base-100 px-4 py-3 sm:px-6">
+        <PageNav backHref={`/programs/${params.id}`} />
         <div className="flex flex-wrap items-center justify-center gap-2">
           <span className="badge badge-neutral">{index + 1} / {sequence.songs.length}</span>
         </div>

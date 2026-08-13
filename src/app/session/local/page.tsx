@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import PageNav from '@/components/PageNav';
 import LiveSessionView from '@/components/LiveSessionView';
 import { LocalSessionStore } from '@/lib/sessionStore';
 import { preferencesStore } from '@/lib/preferencesStore';
@@ -23,7 +24,8 @@ export default function LocalSessionPage() {
 
   if (!checkedCache) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-base-200">
+      <main className="flex min-h-screen flex-col items-center justify-center bg-base-200">
+        <PageNav backHref="/" />
         <span className="loading loading-spinner loading-lg text-primary" />
       </main>
     );
@@ -32,6 +34,7 @@ export default function LocalSessionPage() {
   if (!referenceData) {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-base-200 p-4 text-center">
+        <PageNav backHref="/" />
         <p className="text-lg">Δεν υπάρχουν αποθηκευμένα τραγούδια στη συσκευή.</p>
         <Link href="/" className="btn btn-primary">
           Πήγαινε στην αρχική για συγχρονισμό
