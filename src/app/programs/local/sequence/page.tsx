@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
+import PageNav from '@/components/PageNav';
 import { loadReferenceData } from '@/lib/offlineCache';
 import { preferencesStore } from '@/lib/preferencesStore';
 import { getSelectedProgramId, getSelectedSequenceId } from '@/lib/localProgramsStore';
@@ -32,7 +32,8 @@ export default function LocalSequencePage() {
 
   if (!checked) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-base-200">
+      <main className="flex min-h-screen flex-col items-center justify-center bg-base-200">
+        <PageNav backHref="/programs/local/program" />
         <span className="loading loading-spinner loading-lg text-primary" />
       </main>
     );
@@ -50,8 +51,8 @@ export default function LocalSequencePage() {
   if (!referenceData || !program || !sequence) {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-base-200 p-4 text-center">
+        <PageNav backHref="/programs/local/program" />
         <p className="text-lg">Η σειρά δεν βρέθηκε.</p>
-        <Link href="/programs/local" className="btn btn-primary">← Όλα τα προγράμματα</Link>
       </main>
     );
   }
@@ -59,9 +60,9 @@ export default function LocalSequencePage() {
   if (songs.length === 0) {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center gap-6 bg-base-200 p-4">
+        <PageNav backHref="/programs/local/program" />
         <h1 className="text-2xl font-bold">{sequence.title}</h1>
         <p className="text-base-content/60">Δεν έχουν προστεθεί τραγούδια σε αυτή τη σειρά.</p>
-        <Link href="/programs/local/program" className="btn btn-outline">← Πίσω στις σειρές</Link>
       </main>
     );
   }
@@ -72,11 +73,9 @@ export default function LocalSequencePage() {
 
   return (
     <main className="flex min-h-screen flex-col bg-base-200">
+      <PageNav backHref="/programs/local/program" />
       <header className="sticky top-0 z-10 flex flex-col items-center gap-3 border-b border-base-300 bg-base-100 px-4 py-3 sm:px-6">
         <div className="flex flex-wrap items-center justify-center gap-2">
-          <Link href="/programs/local/program" className="btn btn-sm btn-outline">
-            ← Σειρές προγράμματος
-          </Link>
           <span className="badge badge-neutral">{index + 1} / {songs.length}</span>
         </div>
         <h1 className="text-center text-xl font-bold sm:text-2xl">{current.title}</h1>
