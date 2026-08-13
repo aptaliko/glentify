@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import Link from 'next/link';
+import PageNav from '@/components/PageNav';
 
 interface Song {
   id: number;
@@ -39,7 +39,8 @@ export default function SequencePlaybackPage() {
 
   if (!sequence) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-base-200">
+      <main className="flex min-h-screen flex-col items-center justify-center bg-base-200">
+        <PageNav backHref={`/programs/${params.id}`} />
         <span className="loading loading-spinner loading-lg text-primary" />
       </main>
     );
@@ -48,9 +49,9 @@ export default function SequencePlaybackPage() {
   if (sequence.songs.length === 0) {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center gap-6 bg-base-200 p-4">
+        <PageNav backHref={`/programs/${params.id}`} />
         <h1 className="text-2xl font-bold">{sequence.title}</h1>
         <p className="text-base-content/60">Δεν έχουν προστεθεί τραγούδια σε αυτή τη σειρά.</p>
-        <Link href={`/programs/${params.id}`} className="btn btn-outline">← Πίσω στις σειρές</Link>
       </main>
     );
   }
@@ -61,11 +62,9 @@ export default function SequencePlaybackPage() {
 
   return (
     <main className="flex min-h-screen flex-col bg-base-200">
+      <PageNav backHref={`/programs/${params.id}`} />
       <header className="sticky top-0 z-10 flex flex-col items-center gap-3 border-b border-base-300 bg-base-100 px-4 py-3 sm:px-6">
         <div className="flex flex-wrap items-center justify-center gap-2">
-          <Link href={`/programs/${params.id}`} className="btn btn-sm btn-outline">
-            ← Σειρές προγράμματος
-          </Link>
           <span className="badge badge-neutral">{index + 1} / {sequence.songs.length}</span>
         </div>
         <h1 className="text-center text-xl font-bold sm:text-2xl">{current.song.title}</h1>
