@@ -1,6 +1,6 @@
 # Authenticated Change-Password Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** A logged-in user can change their own password from `/account`, given their current password.
 
@@ -27,11 +27,11 @@
 - Consumes: `getUserId(request)` (`src/lib/requestUser.ts`, throws if missing), `getUserById(id)` (`src/db/queries/users.ts`, returns `UserRow | undefined` including `passwordHash`), `verifyPassword(password, storedHash)` / `hashPassword(password)` (`src/lib/passwordHash.ts`), `updateUserPassword(id, passwordHash)` (`src/db/queries/users.ts`).
 - Produces: `POST /api/account/change-password` — request body `{ currentPassword: string, newPassword: string }`, response `{ ok: true }` on success (200), `{ error: string }` on wrong current password (400) or validation failure (400), `{ error: 'Unauthorized' }` (401) if the session user no longer exists.
 
-- [ ] **Step 1: Read the existing sibling route first**
+- [x] **Step 1: Read the existing sibling route first**
 
 Read `src/app/api/account/route.ts` in full — this task's new route follows its exact auth pattern (`getUserId` → `getUserById` → 401 if missing), so confirm nothing has drifted from what's assumed below before writing the new file.
 
-- [ ] **Step 2: Write the route**
+- [x] **Step 2: Write the route**
 
 ```ts
 import { NextRequest, NextResponse } from 'next/server';
@@ -62,14 +62,14 @@ export async function POST(request: NextRequest) {
 }
 ```
 
-- [ ] **Step 3: Type-check**
+- [x] **Step 3: Type-check**
 
 ```bash
 npx tsc --noEmit
 ```
 Expected: no errors.
 
-- [ ] **Step 4: Manual verification against the real database**
+- [x] **Step 4: Manual verification against the real database**
 
 This app's local dev and production share the same live database — verify against your own real account rather than inventing test data. Two valid ways to do this, pick whichever fits how you're executing this plan:
 
@@ -78,7 +78,7 @@ This app's local dev and production share the same live database — verify agai
 
 If you change your own real password this way, remember what you changed it to (or change it back to something you'll remember) — there is no test account to throw away here, this is the real account.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/app/api/account/change-password/route.ts
@@ -95,11 +95,11 @@ git commit -m "Add POST /api/account/change-password"
 **Interfaces:**
 - Consumes: `POST /api/account/change-password` (Task 1) — request `{ currentPassword, newPassword }`, response `{ ok: true }` or `{ error: string }`.
 
-- [ ] **Step 1: Read the current file first**
+- [x] **Step 1: Read the current file first**
 
 Read `src/app/account/page.tsx` in full — confirm it matches the shape this step assumes (a single `error` state used only for the delete-account flow, a `confirming` toggle for the delete confirmation).
 
-- [ ] **Step 2: Add the change-password form**
+- [x] **Step 2: Add the change-password form**
 
 Replace the whole file:
 ```tsx
@@ -229,21 +229,21 @@ export default function AccountPage() {
 
 The change-password section uses its own `passwordError`/`passwordSuccess` state, separate from the pre-existing `error` state (which stays scoped to the delete-account flow only) — so a failed password change never displays inside the delete-account error slot or vice versa.
 
-- [ ] **Step 3: Type-check**
+- [x] **Step 3: Type-check**
 
 ```bash
 npx tsc --noEmit
 ```
 Expected: no errors.
 
-- [ ] **Step 4: Manual verification**
+- [x] **Step 4: Manual verification**
 
 ```bash
 npm run dev
 ```
 Log in as your real account, go to `/account`, use the new "Αλλαγή κωδικού" form with your real current password and a new one (8+ characters) — confirm the success message appears, then log out and log back in with the new password to confirm it actually took effect. Try it once with a deliberately wrong "τρέχων κωδικός" first and confirm you get "Ο τρέχων κωδικός δεν είναι σωστός" without your real password being changed.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/app/account/page.tsx
@@ -256,7 +256,7 @@ git commit -m "Add change-password form to the account page"
 
 No further code changes expected.
 
-- [ ] **Step 1: Type-check and build**
+- [x] **Step 1: Type-check and build**
 
 ```bash
 npx tsc --noEmit
@@ -264,7 +264,7 @@ npm run build 2>&1 | tail -30
 ```
 Expected: both clean, `/api/account/change-password` listed among the built routes (dynamic, `ƒ`).
 
-- [ ] **Step 2: Full manual round-trip**
+- [x] **Step 2: Full manual round-trip**
 
 If not already done as part of Task 2 Step 4: log in with the real account, change the password through the UI, log out, log back in with the new password, confirm the old password no longer works. Confirm `/account`'s existing "Διαγραφή λογαριασμού" flow still renders and behaves exactly as before (unaffected by this change).
 
