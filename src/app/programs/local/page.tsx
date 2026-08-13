@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import PageNav from '@/components/PageNav';
 import { loadReferenceData } from '@/lib/offlineCache';
 import { preferencesStore } from '@/lib/preferencesStore';
 import { setSelectedProgramId } from '@/lib/localProgramsStore';
@@ -26,7 +27,8 @@ export default function LocalProgramsPage() {
 
   if (!checkedCache) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-base-200">
+      <main className="flex min-h-screen flex-col items-center justify-center bg-base-200">
+        <PageNav backHref="/" />
         <span className="loading loading-spinner loading-lg text-primary" />
       </main>
     );
@@ -35,6 +37,7 @@ export default function LocalProgramsPage() {
   if (!referenceData) {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-base-200 p-4 text-center">
+        <PageNav backHref="/" />
         <p className="text-lg">Δεν υπάρχουν αποθηκευμένα τραγούδια στη συσκευή.</p>
         <Link href="/" className="btn btn-primary">
           Πήγαινε στην αρχική για συγχρονισμό
@@ -45,6 +48,7 @@ export default function LocalProgramsPage() {
 
   return (
     <main className="flex min-h-screen flex-col items-center gap-6 bg-base-200 p-4">
+      <PageNav backHref="/" />
       <h1 className="text-2xl font-bold">Σταθερά προγράμματα</h1>
       <div className="card w-full max-w-md bg-base-100 shadow">
         <div className="card-body gap-2">
@@ -62,7 +66,6 @@ export default function LocalProgramsPage() {
           </ul>
         </div>
       </div>
-      <Link href="/" className="link">Αρχική</Link>
     </main>
   );
 }

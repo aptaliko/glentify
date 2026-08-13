@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
+import PageNav from '@/components/PageNav';
 import { loadReferenceData } from '@/lib/offlineCache';
 import { preferencesStore } from '@/lib/preferencesStore';
 import { getSelectedProgramId, setSelectedSequenceId } from '@/lib/localProgramsStore';
@@ -34,7 +34,8 @@ export default function LocalProgramPage() {
 
   if (!checked) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-base-200">
+      <main className="flex min-h-screen flex-col items-center justify-center bg-base-200">
+        <PageNav backHref="/programs/local" />
         <span className="loading loading-spinner loading-lg text-primary" />
       </main>
     );
@@ -45,8 +46,8 @@ export default function LocalProgramPage() {
   if (!referenceData || !program) {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-base-200 p-4 text-center">
+        <PageNav backHref="/programs/local" />
         <p className="text-lg">Το πρόγραμμα δεν βρέθηκε.</p>
-        <Link href="/programs/local" className="btn btn-primary">← Όλα τα προγράμματα</Link>
       </main>
     );
   }
@@ -57,6 +58,7 @@ export default function LocalProgramPage() {
 
   return (
     <main className="flex min-h-screen flex-col items-center gap-6 bg-base-200 p-4">
+      <PageNav backHref="/programs/local" />
       <h1 className="text-2xl font-bold">{program.title}</h1>
       <div className="grid w-full max-w-3xl grid-cols-1 gap-4 md:grid-cols-2">
         {program.sequences.map((seq) => {
@@ -86,7 +88,6 @@ export default function LocalProgramPage() {
           <p className="col-span-full p-3 text-center text-sm text-base-content/50">Καμία σειρά ακόμη</p>
         )}
       </div>
-      <Link href="/programs/local" className="link">← Όλα τα προγράμματα</Link>
     </main>
   );
 }
