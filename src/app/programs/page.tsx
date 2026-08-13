@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { sharedBadgeText } from '@/lib/programBadge';
+import PageNav from '@/components/PageNav';
 
 interface Program {
   id: number;
@@ -20,6 +21,7 @@ export default function ProgramsPage() {
 
   return (
     <main className="flex min-h-screen flex-col items-center gap-6 bg-base-200 p-4">
+      <PageNav backHref="/" />
       <h1 className="text-2xl font-bold">Σταθερά προγράμματα</h1>
       <div className="card w-full max-w-md bg-base-100 shadow">
         <div className="card-body gap-2">
@@ -38,7 +40,6 @@ export default function ProgramsPage() {
           </ul>
         </div>
       </div>
-      <Link href="/" className="link">Αρχική</Link>
     </main>
   );
 }

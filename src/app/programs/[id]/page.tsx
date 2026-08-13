@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import PageNav from '@/components/PageNav';
 
 interface Sequence {
   id: number;
@@ -45,7 +46,8 @@ export default function ProgramSequencesPage() {
 
   if (!program) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-base-200">
+      <main className="flex min-h-screen flex-col items-center justify-center bg-base-200">
+        <PageNav backHref="/programs" />
         <span className="loading loading-spinner loading-lg text-primary" />
       </main>
     );
@@ -53,6 +55,7 @@ export default function ProgramSequencesPage() {
 
   return (
     <main className="flex min-h-screen flex-col items-center gap-6 bg-base-200 p-4">
+      <PageNav backHref="/programs" />
       <h1 className="text-2xl font-bold">{program.title}</h1>
       <div className="grid w-full max-w-3xl grid-cols-1 gap-4 md:grid-cols-2">
         {program.sequences.map((seq) => {
@@ -82,7 +85,6 @@ export default function ProgramSequencesPage() {
           <p className="col-span-full p-3 text-center text-sm text-base-content/50">Καμία σειρά ακόμη</p>
         )}
       </div>
-      <Link href="/programs" className="link">← Όλα τα προγράμματα</Link>
     </main>
   );
 }
