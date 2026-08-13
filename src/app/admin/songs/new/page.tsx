@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { upload } from '@vercel/blob/client';
+import PageNav from '@/components/PageNav';
 import SongAxisEditor, { type AxisValueEntry } from '@/components/SongAxisEditor';
 import { nativeApiFetch } from '@/lib/nativeApiFetch';
 import { apiUrl } from '@/lib/apiClient';
@@ -99,6 +100,7 @@ export default function NewSongPage() {
 
   return (
     <div className="flex flex-col gap-4">
+      <PageNav backHref="/admin/songs" showHome={false} />
       <h1 className="text-xl font-bold">Νέο τραγούδι</h1>
       {error && (
         <div role="alert" className="alert alert-error max-w-2xl">

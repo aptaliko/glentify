@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { upload } from '@vercel/blob/client';
+import PageNav from '@/components/PageNav';
 import SongAxisEditor, { type AxisValueEntry } from '@/components/SongAxisEditor';
 
 export default function EditSongPage() {
@@ -88,6 +89,7 @@ export default function EditSongPage() {
 
   return (
     <div className="flex flex-col gap-4">
+      <PageNav backHref="/admin/songs" showHome={false} />
       <h1 className="text-xl font-bold">Επεξεργασία τραγουδιού</h1>
       {error && (
         <div role="alert" className="alert alert-error max-w-2xl">
