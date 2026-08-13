@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import PageNav from '@/components/PageNav';
 
 interface Sequence {
   id: number;
@@ -203,6 +204,7 @@ export default function ProgramAdminPage() {
 
   return (
     <div className="flex flex-col gap-4">
+      <PageNav backHref="/admin/programs" showHome={false} />
       <h1 className="text-xl font-bold">{title}</h1>
 
       {role && (
