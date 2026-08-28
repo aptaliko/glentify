@@ -10,5 +10,5 @@ export default function LiveSessionPage() {
   const router = useRouter();
   const store = useMemo(() => new RemoteSessionStore(params.id), [params.id]);
 
-  return <LiveSessionView store={store} onEnded={() => router.push('/')} />;
+  return <LiveSessionView store={store} onEnded={() => router.push(`/session/${params.id}/save`)} />;
 }
