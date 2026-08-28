@@ -199,3 +199,25 @@ export async function listAccessiblePrograms(userId: number): Promise<Accessible
     ...collaborated.map((p) => summarize(p, 'collaborator' as const)),
   ]);
 }
+
+export async function appendSequencesToProgram(
+  programId: number,
+  groups: { title: string; songIds: number[] }[]
+): Promise<void> {
+  for (const group of groups) {
+    const sequence = await createSequence(programId, group.title);
+    for (const songId of group.songIds) {
+      await addSongToSequence(sequence.id, songId);
+    }
+  }
+}
+
+export async function createProgramFromGroups(
+  ownerId: number,
+  title: string,
+  groups: { title: string; songIds: number[] }[]
+): Promise<ProgramRow> {
+  const program = await createProgram(ownerId, title);
+  await appendSequencesToProgram(program.id, groups);
+  return program;
+}
