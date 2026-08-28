@@ -67,7 +67,7 @@ export default function NewSessionPage() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-6 bg-base-200 p-4">
       <PageNav backHref="/" />
-      <h1 className="text-2xl font-bold">Ξεκίνα γλέντι — διάλεξε πρώτο τραγούδι</h1>
+      <h1 className="text-2xl font-bold">Ξεκίνα Live — διάλεξε πρώτο τραγούδι</h1>
       <SongPicker onSelect={handleSelect} dataSource={native && referenceData ? createLocalSongPickerDataSource(referenceData) : undefined} />
     </main>
   );

@@ -118,7 +118,7 @@ export default function HomePage() {
       )}
 
       <Link href="/session/new" className="btn btn-success btn-lg text-xl">
-        Ξεκίνα γλέντι
+        Ξεκίνα Live
       </Link>
 
       {native && (
