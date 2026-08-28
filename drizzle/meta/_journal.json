@@ -71,6 +71,13 @@
       "when": 1786522135624,
       "tag": "0009_flowery_nicolaos",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1787933991768,
+      "tag": "0010_hesitant_spot",
+      "breakpoints": true
     }
   ]
 }

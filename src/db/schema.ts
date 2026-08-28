@@ -89,6 +89,7 @@ export const sessions = pgTable('sessions', {
   startedAt: timestamp('started_at').notNull().defaultNow(),
   endedAt: timestamp('ended_at'),
   currentSongId: integer('current_song_id').references(() => songs.id),
+  currentSequenceIndex: integer('current_sequence_index').notNull().default(0),
   ownerId: integer('owner_id').notNull().references(() => users.id),
 });
 
@@ -96,6 +97,7 @@ export const sessionPlayedSongs = pgTable('session_played_songs', {
   id: serial('id').primaryKey(),
   sessionId: integer('session_id').notNull().references(() => sessions.id),
   songId: integer('song_id').notNull().references(() => songs.id),
+  sequenceIndex: integer('sequence_index').notNull().default(0),
   playedAt: timestamp('played_at').notNull().defaultNow(),
 });
 

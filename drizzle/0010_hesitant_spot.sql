@@ -1,0 +1,2 @@
+ALTER TABLE "session_played_songs" ADD COLUMN "sequence_index" integer DEFAULT 0 NOT NULL;--> statement-breakpoint
+ALTER TABLE "sessions" ADD COLUMN "current_sequence_index" integer DEFAULT 0 NOT NULL;
