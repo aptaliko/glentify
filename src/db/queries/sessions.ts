@@ -1,7 +1,8 @@
 import { db } from '../client';
-import { sessions, sessionPlayedSongs } from '../schema';
-import { eq, isNull, desc, and } from 'drizzle-orm';
+import { sessions, sessionPlayedSongs, songs } from '../schema';
+import { eq, isNull, desc, and, asc } from 'drizzle-orm';
 import type { SessionRow } from '../schema';
+import { groupBySequenceIndex } from '@/lib/sessionGrouping';
 
 export async function getActiveSession(ownerId: number): Promise<SessionRow | undefined> {
   const rows = await db
@@ -14,11 +15,11 @@ export async function getActiveSession(ownerId: number): Promise<SessionRow | un
 
 async function endAllActiveSessionsForOwner(ownerId: number): Promise<void> {
   const openSessions = await db
-    .select({ id: sessions.id, currentSongId: sessions.currentSongId })
+    .select({ id: sessions.id, currentSongId: sessions.currentSongId, currentSequenceIndex: sessions.currentSequenceIndex })
     .from(sessions)
     .where(and(isNull(sessions.endedAt), eq(sessions.ownerId, ownerId)));
   for (const session of openSessions) {
-    await markCurrentAsPlayedIfAny(session.id, session.currentSongId);
+    await markCurrentAsPlayedIfAny(session.id, session.currentSongId, session.currentSequenceIndex);
   }
   await db
     .update(sessions)
@@ -50,15 +51,30 @@ export async function getPlayedSongIds(sessionId: number): Promise<number[]> {
   return rows.map((r) => r.songId);
 }
 
-async function markCurrentAsPlayedIfAny(sessionId: number, currentSongId: number | null): Promise<void> {
+// Returns played songs grouped by the on-stage σειρά they belonged to (each Τέλος σειράς press
+// during the session), ordered by play order within each group. A σειρά with zero songs played
+// (e.g. Τέλος σειράς pressed twice in a row) never inserts a row and so is skipped automatically —
+// groupBySequenceIndex only ever sees rows that exist.
+export async function getPlayedSongsGrouped(sessionId: number): Promise<{ id: number; title: string }[][]> {
+  const rows = await db
+    .select({ id: songs.id, title: songs.title, sequenceIndex: sessionPlayedSongs.sequenceIndex })
+    .from(sessionPlayedSongs)
+    .innerJoin(songs, eq(sessionPlayedSongs.songId, songs.id))
+    .where(eq(sessionPlayedSongs.sessionId, sessionId))
+    .orderBy(asc(sessionPlayedSongs.id));
+  return groupBySequenceIndex(rows).map((group) => group.map(({ id, title }) => ({ id, title })));
+}
+
+async function markCurrentAsPlayedIfAny(sessionId: number, currentSongId: number | null, sequenceIndex: number): Promise<void> {
   if (currentSongId !== null) {
-    await db.insert(sessionPlayedSongs).values({ sessionId, songId: currentSongId });
+    await db.insert(sessionPlayedSongs).values({ sessionId, songId: currentSongId, sequenceIndex });
   }
 }
 
 // Unscoped internal lookup: callers of advanceToSong/endSequence/endSession are expected to have
 // already verified ownership via the exported, owner-scoped getSessionById (see route handlers),
-// so these helpers only need the row's currentSongId and must not duplicate that check.
+// so these helpers only need the row's currentSongId/currentSequenceIndex and must not duplicate
+// that check.
 async function getSessionByIdUnscoped(id: number): Promise<SessionRow | undefined> {
   const rows = await db.select().from(sessions).where(eq(sessions.id, id));
   return rows[0];
@@ -67,20 +83,23 @@ async function getSessionByIdUnscoped(id: number): Promise<SessionRow | undefine
 export async function advanceToSong(sessionId: number, nextSongId: number): Promise<void> {
   const session = await getSessionByIdUnscoped(sessionId);
   if (!session) throw new Error(`Session ${sessionId} not found`);
-  await markCurrentAsPlayedIfAny(sessionId, session.currentSongId);
+  await markCurrentAsPlayedIfAny(sessionId, session.currentSongId, session.currentSequenceIndex);
   await db.update(sessions).set({ currentSongId: nextSongId }).where(eq(sessions.id, sessionId));
 }
 
 export async function endSequence(sessionId: number): Promise<void> {
   const session = await getSessionByIdUnscoped(sessionId);
   if (!session) throw new Error(`Session ${sessionId} not found`);
-  await markCurrentAsPlayedIfAny(sessionId, session.currentSongId);
-  await db.update(sessions).set({ currentSongId: null }).where(eq(sessions.id, sessionId));
+  await markCurrentAsPlayedIfAny(sessionId, session.currentSongId, session.currentSequenceIndex);
+  await db
+    .update(sessions)
+    .set({ currentSongId: null, currentSequenceIndex: session.currentSequenceIndex + 1 })
+    .where(eq(sessions.id, sessionId));
 }
 
 export async function endSession(sessionId: number): Promise<void> {
   const session = await getSessionByIdUnscoped(sessionId);
   if (!session) throw new Error(`Session ${sessionId} not found`);
-  await markCurrentAsPlayedIfAny(sessionId, session.currentSongId);
+  await markCurrentAsPlayedIfAny(sessionId, session.currentSongId, session.currentSequenceIndex);
   await db.update(sessions).set({ currentSongId: null, endedAt: new Date() }).where(eq(sessions.id, sessionId));
 }
