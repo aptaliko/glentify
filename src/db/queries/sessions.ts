@@ -61,7 +61,7 @@ export async function getPlayedSongsGrouped(sessionId: number): Promise<{ id: nu
     .from(sessionPlayedSongs)
     .innerJoin(songs, eq(sessionPlayedSongs.songId, songs.id))
     .where(eq(sessionPlayedSongs.sessionId, sessionId))
-    .orderBy(asc(sessionPlayedSongs.id));
+    .orderBy(asc(sessionPlayedSongs.sequenceIndex), asc(sessionPlayedSongs.id));
   return groupBySequenceIndex(rows).map((group) => group.map(({ id, title }) => ({ id, title })));
 }
 

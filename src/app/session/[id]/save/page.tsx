@@ -68,6 +68,8 @@ export default function SaveSessionPage() {
     setTitles((prev) => prev.map((t, i) => (i === index ? value : t)));
   }
 
+  const hasBlankTitle = titles.some((t) => !t.trim()) || (destination === 'new' && !newTitle.trim());
+
   async function handleSave() {
     if (!sequences) return;
     if (destination === 'existing' && selectedProgramId === null) return;
@@ -87,7 +89,7 @@ export default function SaveSessionPage() {
       setError('Κάτι πήγε στραβά κατά την αποθήκευση.');
       return;
     }
-    router.push('/');
+    router.replace('/');
   }
 
   if (!sequences) {
@@ -126,13 +128,13 @@ export default function SaveSessionPage() {
               className={`btn btn-sm flex-1 ${destination === 'new' ? 'btn-primary' : 'btn-outline'}`}
               onClick={() => setDestination('new')}
             >
-              Νέο πρόγραμμα
+              Νέο Σταθερό Πρόγραμμα
             </button>
             <button
               className={`btn btn-sm flex-1 ${destination === 'existing' ? 'btn-primary' : 'btn-outline'}`}
               onClick={() => setDestination('existing')}
             >
-              Υπάρχον πρόγραμμα
+              Πρόσθεση σε υπάρχον πρόγραμμα
             </button>
           </div>
 
@@ -159,7 +161,7 @@ export default function SaveSessionPage() {
 
           <button
             className="btn btn-primary w-full"
-            disabled={saving || (destination === 'existing' && selectedProgramId === null)}
+            disabled={saving || (destination === 'existing' && selectedProgramId === null) || hasBlankTitle}
             onClick={handleSave}
           >
             Αποθήκευση

@@ -15,6 +15,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const sessionId = Number(id);
   const session = await getSessionById(userId, sessionId);
   if (!session) return NextResponse.json({ error: 'Δεν βρέθηκε session' }, { status: 404 });
+  if (session.endedAt === null) {
+    return NextResponse.json({ error: 'Το session δεν έχει λήξει ακόμα' }, { status: 400 });
+  }
 
   const parsed = schema.safeParse(await request.json());
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
