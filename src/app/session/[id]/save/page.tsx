@@ -59,6 +59,7 @@ export default function SaveSessionPage() {
   useEffect(() => {
     if (!sequences) return;
     const today = todayLabel();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setTitles(sequences.map((_, i) => (destination === 'existing' ? `${today} — Σειρά ${i + 1}` : `Σειρά ${i + 1}`)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [destination]);
