@@ -48,7 +48,7 @@ export default function LocalSessionPage() {
   return (
     <LiveSessionView
       store={store}
-      onEnded={() => router.push('/')}
+      onEnded={() => router.push('/session/local/save')}
       songPickerDataSource={createLocalSongPickerDataSource(referenceData)}
     />
   );
