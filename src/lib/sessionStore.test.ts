@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { LocalSessionStore, hasLocalSession } from './sessionStore';
+import { LocalSessionStore, hasLocalSession, getLastEndedSession, clearLastEndedSession } from './sessionStore';
 import type { KeyValueStore } from './preferencesStore';
 import type { ReferenceData } from './referenceData';
 import type { SongRow, RegionRow, GenreRow } from '@/db/schema';
@@ -148,5 +148,67 @@ describe('hasLocalSession', () => {
     const store = await LocalSessionStore.start(1, referenceData(), storage);
     await store.endSequence();
     expect(await hasLocalSession(storage)).toBe(true);
+  });
+});
+
+describe('LocalSessionStore sequence tracking', () => {
+  it('stamps played songs with the current sequence index, incrementing on endSequence', async () => {
+    const storage = inMemoryStore();
+    const ref = referenceDataWithThreeSongs();
+    const store = await LocalSessionStore.start(1, ref, storage);
+    await store.pickSong(2); // song 1 played at sequenceIndex 0
+    await store.endSequence(); // song 2 played at sequenceIndex 0, index becomes 1
+    await store.pickSong(3); // (no-op mark, current was null)
+    await store.endSession(); // song 3 played at sequenceIndex 1
+
+    const lastEnded = await getLastEndedSession(storage);
+    expect(lastEnded).toEqual({
+      sequences: [{ songIds: [1, 2] }, { songIds: [3] }],
+    });
+  });
+
+  it('marks the final current song as played on endSession (a pre-existing gap this fixes)', async () => {
+    const storage = inMemoryStore();
+    const ref = referenceData();
+    const store = await LocalSessionStore.start(1, ref, storage);
+    await store.endSession(); // song 1 was never explicitly "played" via pickSong/endSequence
+
+    const lastEnded = await getLastEndedSession(storage);
+    expect(lastEnded).toEqual({ sequences: [{ songIds: [1] }] });
+  });
+
+  it('still fully clears local session state on endSession (existing behavior preserved)', async () => {
+    const storage = inMemoryStore();
+    const ref = referenceDataWithThreeSongs();
+    const store = await LocalSessionStore.start(1, ref, storage);
+    await store.pickSong(2);
+    await store.endSession();
+    expect(await hasLocalSession(storage)).toBe(false);
+  });
+});
+
+describe('getLastEndedSession / clearLastEndedSession', () => {
+  it('is null before any session has ended', async () => {
+    const storage = inMemoryStore();
+    expect(await getLastEndedSession(storage)).toBeNull();
+  });
+
+  it('is a non-destructive read — calling it twice returns the same data', async () => {
+    const storage = inMemoryStore();
+    const store = await LocalSessionStore.start(1, referenceData(), storage);
+    await store.endSession();
+
+    const first = await getLastEndedSession(storage);
+    const second = await getLastEndedSession(storage);
+    expect(first).toEqual(second);
+    expect(first).not.toBeNull();
+  });
+
+  it('clearLastEndedSession removes it', async () => {
+    const storage = inMemoryStore();
+    const store = await LocalSessionStore.start(1, referenceData(), storage);
+    await store.endSession();
+    await clearLastEndedSession(storage);
+    expect(await getLastEndedSession(storage)).toBeNull();
   });
 });

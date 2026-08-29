@@ -1,4 +1,6 @@
+// src/lib/sessionStore.ts
 import { buildSuggestionsResponse, type AxisValue, type SongWithAxes, type SuggestionsResponsePayload } from './suggestions';
+import { groupBySequenceIndex } from './sessionGrouping';
 import type { ReferenceData } from './referenceData';
 import type { KeyValueStore } from './preferencesStore';
 
@@ -36,24 +38,45 @@ export class RemoteSessionStore implements SessionStore {
   }
 }
 
+interface PlayedEntry {
+  songId: number;
+  sequenceIndex: number;
+}
+
 interface LocalSessionState {
   currentSongId: number | null;
-  playedSongIds: number[];
+  currentSequenceIndex: number;
+  playedEntries: PlayedEntry[];
+}
+
+export interface LastEndedSessionSequence {
+  songIds: number[];
+}
+
+export interface LastEndedSession {
+  sequences: LastEndedSessionSequence[];
 }
 
 const SESSION_STATE_KEY = 'glentify:local-session';
+const LAST_ENDED_SESSION_KEY = 'glentify:local-session-last-ended';
 
 export class LocalSessionStore implements SessionStore {
   constructor(private referenceData: ReferenceData, private storage: KeyValueStore) {}
 
   static async start(startingSongId: number, referenceData: ReferenceData, storage: KeyValueStore): Promise<LocalSessionStore> {
-    const state: LocalSessionState = { currentSongId: startingSongId, playedSongIds: [] };
+    const state: LocalSessionState = { currentSongId: startingSongId, currentSequenceIndex: 0, playedEntries: [] };
     await storage.set(SESSION_STATE_KEY, state);
     return new LocalSessionStore(referenceData, storage);
   }
 
   private async getState(): Promise<LocalSessionState> {
-    return (await this.storage.get<LocalSessionState>(SESSION_STATE_KEY)) ?? { currentSongId: null, playedSongIds: [] };
+    return (
+      (await this.storage.get<LocalSessionState>(SESSION_STATE_KEY)) ?? {
+        currentSongId: null,
+        currentSequenceIndex: 0,
+        playedEntries: [],
+      }
+    );
   }
 
   private songsWithAxes(): SongWithAxes[] {
@@ -66,11 +89,11 @@ export class LocalSessionStore implements SessionStore {
     return this.referenceData.songs.map((song) => ({ song, axisValues: axisValuesBySong.get(song.id) ?? [] }));
   }
 
-  private markCurrentPlayed(state: LocalSessionState): number[] {
-    if (state.currentSongId !== null && !state.playedSongIds.includes(state.currentSongId)) {
-      return [...state.playedSongIds, state.currentSongId];
+  private markCurrentPlayed(state: LocalSessionState): PlayedEntry[] {
+    if (state.currentSongId !== null && !state.playedEntries.some((e) => e.songId === state.currentSongId)) {
+      return [...state.playedEntries, { songId: state.currentSongId, sequenceIndex: state.currentSequenceIndex }];
     }
-    return state.playedSongIds;
+    return state.playedEntries;
   }
 
   async load(showPlayed: boolean, activeAxisTypes: string[] | null): Promise<SuggestionsResponsePayload> {
@@ -91,7 +114,7 @@ export class LocalSessionStore implements SessionStore {
           }
         : null,
       allSongs,
-      playedSongIds: new Set(state.playedSongIds),
+      playedSongIds: new Set(state.playedEntries.map((e) => e.songId)),
       showPlayed,
       requestedActive: activeAxisTypes !== null ? new Set(activeAxisTypes) : null,
       lookups: {
@@ -107,17 +130,37 @@ export class LocalSessionStore implements SessionStore {
 
   async pickSong(songId: number): Promise<void> {
     const state = await this.getState();
-    await this.storage.set(SESSION_STATE_KEY, { currentSongId: songId, playedSongIds: this.markCurrentPlayed(state) });
+    await this.storage.set(SESSION_STATE_KEY, {
+      currentSongId: songId,
+      currentSequenceIndex: state.currentSequenceIndex,
+      playedEntries: this.markCurrentPlayed(state),
+    });
   }
 
   async endSequence(): Promise<void> {
     const state = await this.getState();
-    await this.storage.set(SESSION_STATE_KEY, { currentSongId: null, playedSongIds: this.markCurrentPlayed(state) });
+    await this.storage.set(SESSION_STATE_KEY, {
+      currentSongId: null,
+      currentSequenceIndex: state.currentSequenceIndex + 1,
+      playedEntries: this.markCurrentPlayed(state),
+    });
   }
 
   async endSession(): Promise<void> {
+    const state = await this.getState();
+    const finalEntries = this.markCurrentPlayed(state);
+    const groups = groupBySequenceIndex(finalEntries).map((group) => ({ songIds: group.map((e) => e.songId) }));
+    await this.storage.set<LastEndedSession>(LAST_ENDED_SESSION_KEY, { sequences: groups });
     await this.storage.set<LocalSessionState>(SESSION_STATE_KEY, null);
   }
+}
+
+export async function getLastEndedSession(storage: KeyValueStore): Promise<LastEndedSession | null> {
+  return storage.get<LastEndedSession>(LAST_ENDED_SESSION_KEY);
+}
+
+export async function clearLastEndedSession(storage: KeyValueStore): Promise<void> {
+  await storage.set<LastEndedSession>(LAST_ENDED_SESSION_KEY, null);
 }
 
 export async function hasLocalSession(storage: KeyValueStore): Promise<boolean> {
