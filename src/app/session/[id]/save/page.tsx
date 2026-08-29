@@ -75,11 +75,12 @@ export default function SaveSessionPage() {
     if (destination === 'existing' && selectedProgramId === null) return;
     setSaving(true);
     setError(null);
+    const sequencePayload = sequences.map((seq, i) => ({ title: titles[i], songIds: seq.songs.map((s) => s.id) }));
     const body =
       destination === 'new'
-        ? { destination: 'new' as const, title: newTitle, sequenceTitles: titles }
-        : { destination: 'existing' as const, programId: selectedProgramId as number, sequenceTitles: titles };
-    const res = await fetch(`/api/sessions/${params.id}/save-as-program`, {
+        ? { destination: 'new' as const, title: newTitle, sequences: sequencePayload }
+        : { destination: 'existing' as const, programId: selectedProgramId as number, sequences: sequencePayload };
+    const res = await fetch('/api/programs/save-sequences', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
