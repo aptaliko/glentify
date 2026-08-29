@@ -37,6 +37,7 @@ export default function SyncQueueProvider({ children }: { children: ReactNode })
   useEffect(() => {
     if (!isNativeApp()) return;
     initSyncHandlers();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     refresh();
     const listenerPromise = Network.addListener('networkStatusChange', (status) => {
       if (status.connected) refresh();
