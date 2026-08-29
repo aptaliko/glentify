@@ -1,12 +1,20 @@
 import PDFDocument from 'pdfkit';
+import path from 'path';
 
 // pdfkit's built-in standard-14 PDF fonts (Helvetica, Times, etc.) only support
 // WinAnsi/Latin-1 encoding and cannot render Greek characters — every string this module
 // renders is Greek, so a Unicode-capable TrueType font must be embedded explicitly.
-// dejavu-fonts-ttf ships the actual .ttf files; require.resolve gives an absolute path that
-// works regardless of the server's working directory (needed for Vercel Functions).
-const FONT_REGULAR = require.resolve('dejavu-fonts-ttf/ttf/DejaVuSans.ttf');
-const FONT_BOLD = require.resolve('dejavu-fonts-ttf/ttf/DejaVuSans-Bold.ttf');
+// dejavu-fonts-ttf ships the actual .ttf files. Deliberately NOT using require.resolve()
+// here: Turbopack statically intercepts require.resolve() calls and tries to bundle the
+// target as a module, which breaks the build for a .ttf file ("Unknown module type") and,
+// even when routed through a resolvable .json file first, still substitutes the call with
+// an internal bundler reference that crashes at request time. Building the path via plain
+// runtime string concatenation is invisible to Turbopack's static analysis and works
+// correctly both at build time and at request time. process.cwd() is the deployment root
+// for a Vercel Function (same guarantee require.resolve was meant to provide here).
+const FONT_PACKAGE_ROOT = path.join(process.cwd(), 'node_modules', 'dejavu-fonts-ttf');
+const FONT_REGULAR = path.join(FONT_PACKAGE_ROOT, 'ttf', 'DejaVuSans.ttf');
+const FONT_BOLD = path.join(FONT_PACKAGE_ROOT, 'ttf', 'DejaVuSans-Bold.ttf');
 
 export interface ProgramPdfSequence {
   title: string;
