@@ -1,4 +1,3 @@
-// src/app/session/local/save/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -99,6 +98,8 @@ export default function LocalSaveSessionPage() {
     router.replace('/');
   }
 
+  const hasBlankTitle = titles.some((t) => !t.trim()) || (destination === 'new' && !newTitle.trim());
+
   if (!sequences) {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center bg-base-200">
@@ -168,7 +169,7 @@ export default function LocalSaveSessionPage() {
 
           <button
             className="btn btn-primary w-full"
-            disabled={destination === 'existing' && selectedProgramId === null}
+            disabled={destination === 'existing' && selectedProgramId === null || hasBlankTitle}
             onClick={handleSave}
           >
             Αποθήκευση (θα σταλεί μόλις υπάρξει σύνδεση)
