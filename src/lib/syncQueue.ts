@@ -54,7 +54,19 @@ export async function processQueueWith(storage: QueueStorage, handlers: Map<stri
     const handler = handlers.get(action.type);
     if (!handler) continue; // no handler registered (yet) — leave it, try again next call
 
-    const outcome = await handler(action.payload);
+    // A handler that throws or whose Promise rejects (most commonly: a real handler's
+    // fetch() rejecting because the device is offline) is treated exactly like an explicit
+    // 'systemic-error' return — from this loop's point of view, both mean "this handler
+    // could not proceed," and both get the same stop-everything-untouched response. Without
+    // this, a rejected fetch would propagate out of this function uncaught, defeating the
+    // whole point of the systemic-error contract for the single most common real-world case
+    // (no connectivity) this queue exists to handle.
+    let outcome: SyncOutcome;
+    try {
+      outcome = await handler(action.payload);
+    } catch {
+      outcome = 'systemic-error';
+    }
 
     if (outcome === 'success') {
       current = current.filter((a) => a.id !== action.id);

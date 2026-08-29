@@ -135,4 +135,25 @@ describe('processQueueWith', () => {
     expect(remaining[0].payload).toBe('A');
     expect(result).toEqual({ processed: 1, remaining: 1, needsAttention: 0, blocked: false });
   });
+
+  it('treats a handler that throws/rejects the same as an explicit systemic-error', async () => {
+    const storage = inMemoryQueueStorage();
+    await enqueueTo(storage, 'throws', 'A');
+    await enqueueTo(storage, 'never-reached', 'B');
+    const throwingHandler: SyncHandler = vi.fn().mockRejectedValue(new Error('network down'));
+    const neverCalledHandler: SyncHandler = vi.fn().mockResolvedValue('success');
+    const handlers = new Map<string, SyncHandler>([
+      ['throws', throwingHandler],
+      ['never-reached', neverCalledHandler],
+    ]);
+
+    const result = await processQueueWith(storage, handlers);
+
+    expect(throwingHandler).toHaveBeenCalledTimes(1);
+    expect(neverCalledHandler).not.toHaveBeenCalled();
+    const remaining = await storage.get();
+    expect(remaining).toHaveLength(2); // both items still present, neither mutated
+    expect(remaining[0].attempts).toBe(0);
+    expect(result).toEqual({ processed: 0, remaining: 2, needsAttention: 0, blocked: true });
+  });
 });
