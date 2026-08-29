@@ -87,3 +87,19 @@ export async function processQueueWith(storage: QueueStorage, handlers: Map<stri
     blocked: false,
   };
 }
+
+import { indexedDbQueueStorage } from './syncQueueStorage';
+
+const handlerRegistry = new Map<string, SyncHandler>();
+
+export function registerHandler(type: string, handler: SyncHandler): void {
+  handlerRegistry.set(type, handler);
+}
+
+export async function enqueue(type: string, payload: unknown): Promise<void> {
+  return enqueueTo(indexedDbQueueStorage, type, payload);
+}
+
+export async function processQueue(): Promise<ProcessResult> {
+  return processQueueWith(indexedDbQueueStorage, handlerRegistry);
+}
