@@ -70,13 +70,15 @@ export class LocalSessionStore implements SessionStore {
   }
 
   private async getState(): Promise<LocalSessionState> {
-    return (
-      (await this.storage.get<LocalSessionState>(SESSION_STATE_KEY)) ?? {
-        currentSongId: null,
-        currentSequenceIndex: 0,
-        playedEntries: [],
-      }
-    );
+    const defaultState: LocalSessionState = { currentSongId: null, currentSequenceIndex: 0, playedEntries: [] };
+    const stored = await this.storage.get<LocalSessionState>(SESSION_STATE_KEY);
+    // Defensive guard against a legacy-shaped record (from before playedEntries/currentSequenceIndex
+    // existed) surviving an app update on a device with an in-flight local session. There's no
+    // sequenceIndex to backfill for old play history, so there's nothing meaningful to recover —
+    // treating it as "no session" (same as storage.get returning null) is safe: the user just
+    // starts a new local session, rather than the app crashing on every subsequent read.
+    if (stored && !Array.isArray(stored.playedEntries)) return defaultState;
+    return stored ?? defaultState;
   }
 
   private songsWithAxes(): SongWithAxes[] {

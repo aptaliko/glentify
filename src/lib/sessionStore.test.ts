@@ -185,6 +185,20 @@ describe('LocalSessionStore sequence tracking', () => {
     await store.endSession();
     expect(await hasLocalSession(storage)).toBe(false);
   });
+
+  it('treats a legacy-shaped persisted record (missing playedEntries) as no session, instead of crashing', async () => {
+    const storage = inMemoryStore();
+    // Simulate a record written by the pre-this-update app version.
+    await storage.set('glentify:local-session', { currentSongId: 1, playedSongIds: [] });
+    const store = new LocalSessionStore(referenceData(), storage);
+
+    const data = await store.load(false, null);
+    expect(data.currentSong).toBeNull();
+
+    // Confirm it also doesn't crash on the write paths.
+    await store.pickSong(1);
+    await store.endSession();
+  });
 });
 
 describe('getLastEndedSession / clearLastEndedSession', () => {
