@@ -1,6 +1,6 @@
 // src/lib/syncQueue.test.ts
 import { describe, it, expect, vi } from 'vitest';
-import { enqueueTo, processQueueWith } from './syncQueue';
+import { enqueueTo, processQueueWith, serialize } from './syncQueue';
 import type { QueuedAction, QueueStorage, SyncHandler } from './syncQueue';
 
 function inMemoryQueueStorage(): QueueStorage {
@@ -155,5 +155,30 @@ describe('processQueueWith', () => {
     expect(remaining).toHaveLength(2); // both items still present, neither mutated
     expect(remaining[0].attempts).toBe(0);
     expect(result).toEqual({ processed: 0, remaining: 2, needsAttention: 0, blocked: true });
+  });
+});
+
+describe('serialize', () => {
+  it('runs concurrent operations one at a time, in call order, never overlapping', async () => {
+    const events: string[] = [];
+
+    function op(name: string, delayMs: number) {
+      return serialize(async () => {
+        events.push(`${name}-start`);
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+        events.push(`${name}-end`);
+        return name;
+      });
+    }
+
+    // Start both "concurrently" (no await between them) — without serialization, B would
+    // start before A finishes, interleaving their start/end markers.
+    const [resultA, resultB] = await Promise.all([op('A', 20), op('B', 5)]);
+
+    expect(resultA).toBe('A');
+    expect(resultB).toBe('B');
+    // A must fully complete (both its start AND end) before B's start appears — proving
+    // no interleaving occurred, regardless of each operation's own internal delay.
+    expect(events).toEqual(['A-start', 'A-end', 'B-start', 'B-end']);
   });
 });

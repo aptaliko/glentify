@@ -40,27 +40,30 @@ export default function LocalSaveSessionPage() {
   const [programs, setPrograms] = useState<OfflineProgram[]>([]);
   const [selectedProgramId, setSelectedProgramId] = useState<number | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    Promise.all([getLastEndedSession(preferencesStore), loadReferenceData()]).then(([lastEnded, referenceData]) => {
-      if (!lastEnded || lastEnded.sequences.length === 0 || !referenceData) {
-        router.replace('/');
-        return;
-      }
-      const songsById = new Map<number, SongRow>(
-        mergeReferencedSongs(referenceData.songs, referenceData.sharedSongs).map((s) => [s.id, s])
-      );
-      const resolved: SequenceGroup[] = lastEnded.sequences.map((seq) => ({
-        songs: seq.songIds
-          .map((id) => songsById.get(id))
-          .filter((s): s is SongRow => s !== undefined)
-          .map((s) => ({ id: s.id, title: s.title })),
-      }));
-      setSequences(resolved);
-      setTitles(resolved.map((_, i) => `Σειρά ${i + 1}`));
-      setNewTitle(`Γλέντι ${todayLabel()}`);
-      setPrograms(referenceData.programs);
-    });
+    Promise.all([getLastEndedSession(preferencesStore), loadReferenceData()])
+      .then(([lastEnded, referenceData]) => {
+        if (!lastEnded || lastEnded.sequences.length === 0 || !referenceData) {
+          router.replace('/');
+          return;
+        }
+        const songsById = new Map<number, SongRow>(
+          mergeReferencedSongs(referenceData.songs, referenceData.sharedSongs).map((s) => [s.id, s])
+        );
+        const resolved: SequenceGroup[] = lastEnded.sequences.map((seq) => ({
+          songs: seq.songIds
+            .map((id) => songsById.get(id))
+            .filter((s): s is SongRow => s !== undefined)
+            .map((s) => ({ id: s.id, title: s.title })),
+        }));
+        setSequences(resolved);
+        setTitles(resolved.map((_, i) => `Σειρά ${i + 1}`));
+        setNewTitle(`Γλέντι ${todayLabel()}`);
+        setPrograms(referenceData.programs);
+      })
+      .catch(() => router.replace('/'));
   }, [router]);
 
   useEffect(() => {
@@ -78,6 +81,8 @@ export default function LocalSaveSessionPage() {
   async function handleSave() {
     if (!sequences) return;
     if (destination === 'existing' && selectedProgramId === null) return;
+    setSaving(true);
+    setSaveError(null);
     const sequencePayload = sequences.map((seq, i) => ({ title: titles[i], songIds: seq.songs.map((s) => s.id) }));
     const payload =
       destination === 'new'
@@ -89,6 +94,7 @@ export default function LocalSaveSessionPage() {
       notifyQueueChanged();
       router.replace('/');
     } catch {
+      setSaving(false);
       setSaveError('Κάτι πήγε στραβά κατά την αποθήκευση.');
     }
   }
@@ -169,10 +175,10 @@ export default function LocalSaveSessionPage() {
 
           <button
             className="btn btn-primary w-full"
-            disabled={destination === 'existing' && selectedProgramId === null || hasBlankTitle}
+            disabled={(destination === 'existing' && selectedProgramId === null) || hasBlankTitle || saving}
             onClick={handleSave}
           >
-            Αποθήκευση (θα σταλεί μόλις υπάρξει σύνδεση)
+            {saving ? 'Αποθήκευση...' : 'Αποθήκευση (θα σταλεί μόλις υπάρξει σύνδεση)'}
           </button>
           <button className="btn btn-ghost w-full" onClick={handleSkip}>
             Παράλειψη

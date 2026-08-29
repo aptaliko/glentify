@@ -104,14 +104,29 @@ import { indexedDbQueueStorage } from './syncQueueStorage';
 
 const handlerRegistry = new Map<string, SyncHandler>();
 
+// Serializes every call to enqueue()/processQueue() so overlapping triggers (app-mount,
+// networkStatusChange, a page's manual notifyQueueChanged() after enqueueing) never race
+// on the underlying IndexedDB read-modify-write cycle — each call waits for the previous
+// one to fully finish (success or failure) before starting, in call order.
+let queueOperationChain: Promise<unknown> = Promise.resolve();
+
+export function serialize<T>(operation: () => Promise<T>): Promise<T> {
+  const result = queueOperationChain.then(operation, operation);
+  queueOperationChain = result.then(
+    () => undefined,
+    () => undefined
+  );
+  return result;
+}
+
 export function registerHandler(type: string, handler: SyncHandler): void {
   handlerRegistry.set(type, handler);
 }
 
 export async function enqueue(type: string, payload: unknown): Promise<void> {
-  return enqueueTo(indexedDbQueueStorage, type, payload);
+  return serialize(() => enqueueTo(indexedDbQueueStorage, type, payload));
 }
 
 export async function processQueue(): Promise<ProcessResult> {
-  return processQueueWith(indexedDbQueueStorage, handlerRegistry);
+  return serialize(() => processQueueWith(indexedDbQueueStorage, handlerRegistry));
 }

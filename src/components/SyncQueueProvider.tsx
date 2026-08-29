@@ -10,12 +10,14 @@ import { initSyncHandlers } from '@/lib/syncHandlers';
 interface SyncQueueContextValue {
   pendingCount: number;
   needsAttentionCount: number;
+  blocked: boolean;
   notifyQueueChanged: () => void;
 }
 
 const SyncQueueContext = createContext<SyncQueueContextValue>({
   pendingCount: 0,
   needsAttentionCount: 0,
+  blocked: false,
   notifyQueueChanged: () => {},
 });
 
@@ -26,12 +28,14 @@ export function useSyncQueue(): SyncQueueContextValue {
 export default function SyncQueueProvider({ children }: { children: ReactNode }) {
   const [pendingCount, setPendingCount] = useState(0);
   const [needsAttentionCount, setNeedsAttentionCount] = useState(0);
+  const [blocked, setBlocked] = useState(false);
 
   const refresh = useCallback(async () => {
     if (!isNativeApp()) return;
     const result = await processQueue();
     setPendingCount(result.remaining);
     setNeedsAttentionCount(result.needsAttention);
+    setBlocked(result.blocked);
   }, []);
 
   useEffect(() => {
@@ -48,15 +52,23 @@ export default function SyncQueueProvider({ children }: { children: ReactNode })
   }, [refresh]);
 
   return (
-    <SyncQueueContext.Provider value={{ pendingCount, needsAttentionCount, notifyQueueChanged: refresh }}>
+    <SyncQueueContext.Provider value={{ pendingCount, needsAttentionCount, blocked, notifyQueueChanged: refresh }}>
       {children}
       {isNativeApp() && pendingCount > 0 && (
         <div
           className={`fixed bottom-4 right-4 z-50 rounded-full px-3 py-1 text-sm shadow ${
-            needsAttentionCount > 0 ? 'bg-error text-error-content' : 'bg-info text-info-content'
+            needsAttentionCount > 0
+              ? 'bg-error text-error-content'
+              : blocked
+                ? 'bg-warning text-warning-content'
+                : 'bg-info text-info-content'
           }`}
         >
-          {needsAttentionCount > 0 ? `${needsAttentionCount} χρειάζεται προσοχή` : `${pendingCount} εκκρεμεί συγχρονισμός`}
+          {needsAttentionCount > 0
+            ? `${needsAttentionCount} χρειάζεται προσοχή`
+            : blocked
+              ? 'Ο συγχρονισμός σταμάτησε προσωρινά'
+              : `${pendingCount} εκκρεμεί συγχρονισμός`}
         </div>
       )}
     </SyncQueueContext.Provider>
