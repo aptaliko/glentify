@@ -6,7 +6,10 @@ const nextConfig: NextConfig = {
   // path (process.cwd() + ...) rather than a require()/import() call that Next's automatic
   // file-tracing (@vercel/nft) could detect on its own.
   outputFileTracingIncludes: {
-    '/api/programs/*/pdf': ['node_modules/dejavu-fonts-ttf/ttf/**/*'],
+    '/api/programs/*/pdf': [
+      'node_modules/dejavu-fonts-ttf/ttf/DejaVuSans.ttf',
+      'node_modules/dejavu-fonts-ttf/ttf/DejaVuSans-Bold.ttf',
+    ],
   },
 };
 

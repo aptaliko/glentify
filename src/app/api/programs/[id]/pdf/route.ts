@@ -3,6 +3,7 @@ import { getProgramById, getProgramAccess, listSequencesForProgram, listSongsFor
 import { getUserId } from '@/lib/requestUser';
 import { generateProgramPdf, type ProgramPdfSequence } from '@/lib/programPdf';
 import { sanitizeFilename } from '@/lib/pdfFilename';
+import { contentDispositionValue } from '@/lib/contentDisposition';
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const userId = getUserId(request);
@@ -29,7 +30,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   return new NextResponse(new Uint8Array(pdfBuffer), {
     headers: {
       'Content-Type': 'application/pdf',
-      'Content-Disposition': `attachment; filename="${filename}"`,
+      'Content-Disposition': contentDispositionValue(filename),
     },
   });
 }
