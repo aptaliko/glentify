@@ -124,4 +124,29 @@ describe('nativeApiFetch', () => {
     vi.doUnmock('./platform');
     vi.resetModules();
   });
+
+  it('does not clear the token or redirect on a 401 when redirectOn401 is false, even natively', async () => {
+    delete process.env.NEXT_PUBLIC_API_BASE_URL;
+    const mockFetch = vi.fn().mockResolvedValue(new Response('{"error":"Unauthorized"}', { status: 401 }));
+    global.fetch = mockFetch;
+    const clearToken = vi.fn().mockResolvedValue(undefined);
+    const location = { href: '' };
+    vi.stubGlobal('window', { location });
+
+    vi.doMock('./authToken', () => ({ getAuthToken: async () => 'stale-token', clearAuthToken: clearToken }));
+    vi.doMock('./platform', () => ({ isNativeApp: () => true }));
+    vi.resetModules();
+    const { nativeApiFetch: freshNativeApiFetch } = await import('./nativeApiFetch');
+
+    const res = await freshNativeApiFetch('/api/regions', undefined, undefined, { redirectOn401: false });
+
+    expect(res.status).toBe(401);
+    expect(clearToken).not.toHaveBeenCalled();
+    expect(location.href).toBe('');
+
+    vi.unstubAllGlobals();
+    vi.doUnmock('./authToken');
+    vi.doUnmock('./platform');
+    vi.resetModules();
+  });
 });

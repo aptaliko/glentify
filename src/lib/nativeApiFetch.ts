@@ -17,17 +17,24 @@ import { isNativeApp } from './platform';
  * as real data. Clearing the token and sending the user back to /login here,
  * once, in the one wrapper every admin call already goes through, covers
  * every caller instead of needing a check at each of the nine call sites.
+ *
+ * A background caller that must not trigger an unannounced navigation (e.g. a
+ * silent sync-queue retry) passes `{ redirectOn401: false }`; the default
+ * (`true`) preserves today's behavior for every existing caller, none of
+ * which pass this option.
  */
 export async function nativeApiFetch(
   path: string,
   init?: RequestInit,
-  getToken: () => Promise<string | null> = getAuthToken
+  getToken: () => Promise<string | null> = getAuthToken,
+  options?: { redirectOn401?: boolean }
 ): Promise<Response> {
   const token = await getToken();
   const headers = new Headers(init?.headers);
   if (token) headers.set('Authorization', `Bearer ${token}`);
   const response = await fetch(apiUrl(path), { ...init, headers });
-  if (response.status === 401 && isNativeApp()) {
+  const redirectOn401 = options?.redirectOn401 ?? true;
+  if (response.status === 401 && isNativeApp() && redirectOn401) {
     await clearAuthToken();
     window.location.href = '/login';
   }
