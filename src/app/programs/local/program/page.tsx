@@ -2,21 +2,41 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Filesystem, Directory } from '@capacitor/filesystem';
+import { Share } from '@capacitor/share';
 import PageNav from '@/components/PageNav';
 import { loadReferenceData } from '@/lib/offlineCache';
 import { preferencesStore } from '@/lib/preferencesStore';
 import { getSelectedProgramId, setSelectedSequenceId } from '@/lib/localProgramsStore';
 import { mergeReferencedSongs } from '@/lib/referenceData';
+import { nativeApiFetch } from '@/lib/nativeApiFetch';
+import { sanitizeFilename } from '@/lib/pdfFilename';
 import type { ReferenceData, OfflineSequence } from '@/lib/referenceData';
 import type { SongRow } from '@/db/schema';
 
 const PREVIEW_COUNT = 7;
+
+// Filesystem.writeFile takes base64 data, not a raw Blob — this is the standard
+// browser-side conversion.
+function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const result = reader.result as string; // "data:application/pdf;base64,XXXX"
+      resolve(result.split(',')[1] ?? '');
+    };
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+}
 
 export default function LocalProgramPage() {
   const router = useRouter();
   const [referenceData, setReferenceData] = useState<ReferenceData | null>(null);
   const [programId, setProgramId] = useState<number | null>(null);
   const [checked, setChecked] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   useEffect(() => {
     Promise.all([loadReferenceData(), getSelectedProgramId(preferencesStore)])
@@ -30,6 +50,25 @@ export default function LocalProgramPage() {
   async function handleSelectSequence(sequence: OfflineSequence) {
     await setSelectedSequenceId(preferencesStore, sequence.id);
     router.push('/programs/local/sequence');
+  }
+
+  async function handleExportPdf(title: string, id: number) {
+    setExporting(true);
+    setExportError(null);
+    try {
+      const res = await nativeApiFetch(`/api/programs/${id}/pdf`);
+      if (!res.ok) throw new Error('PDF request failed');
+      const blob = await res.blob();
+      const base64 = await blobToBase64(blob);
+      const filename = sanitizeFilename(title);
+      await Filesystem.writeFile({ path: filename, data: base64, directory: Directory.Cache });
+      const { uri } = await Filesystem.getUri({ path: filename, directory: Directory.Cache });
+      await Share.share({ url: uri, title });
+    } catch {
+      setExportError('Η εξαγωγή απέτυχε.');
+    } finally {
+      setExporting(false);
+    }
   }
 
   if (!checked) {
@@ -59,7 +98,17 @@ export default function LocalProgramPage() {
   return (
     <main className="flex min-h-screen flex-col items-center gap-6 bg-base-200 p-4">
       <PageNav backHref="/programs/local" />
-      <h1 className="text-2xl font-bold">{program.title}</h1>
+      <div className="flex flex-col items-center gap-2">
+        <h1 className="text-2xl font-bold">{program.title}</h1>
+        <button
+          onClick={() => handleExportPdf(program.title, program.id)}
+          disabled={exporting}
+          className="btn btn-outline btn-sm"
+        >
+          {exporting ? 'Εξαγωγή...' : 'Εξαγωγή PDF'}
+        </button>
+        {exportError && <p className="text-sm text-error">{exportError}</p>}
+      </div>
       <div className="grid w-full max-w-3xl grid-cols-1 gap-4 md:grid-cols-2">
         {program.sequences.map((seq) => {
           const songs = seq.songIds.map((id) => songsById.get(id)).filter((s): s is SongRow => s !== undefined);
