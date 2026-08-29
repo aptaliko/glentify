@@ -56,7 +56,12 @@ export default function ProgramSequencesPage() {
   return (
     <main className="flex min-h-screen flex-col items-center gap-6 bg-base-200 p-4">
       <PageNav backHref="/programs" />
-      <h1 className="text-2xl font-bold">{program.title}</h1>
+      <div className="flex flex-col items-center gap-2">
+        <h1 className="text-2xl font-bold">{program.title}</h1>
+        <a href={`/api/programs/${program.id}/pdf`} download className="btn btn-outline btn-sm">
+          Εξαγωγή PDF
+        </a>
+      </div>
       <div className="grid w-full max-w-3xl grid-cols-1 gap-4 md:grid-cols-2">
         {program.sequences.map((seq) => {
           const songs = songsBySequence[seq.id] ?? [];
