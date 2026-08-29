@@ -129,14 +129,20 @@ No test for this task — this function's correctness is about `pdfkit`'s render
 ```ts
 // src/lib/programPdf.ts
 import PDFDocument from 'pdfkit';
+import path from 'path';
 
 // pdfkit's built-in standard-14 PDF fonts (Helvetica, Times, etc.) only support
 // WinAnsi/Latin-1 encoding and cannot render Greek characters — every string this module
 // renders is Greek, so a Unicode-capable TrueType font must be embedded explicitly.
-// dejavu-fonts-ttf ships the actual .ttf files; require.resolve gives an absolute path that
-// works regardless of the server's working directory (needed for Vercel Functions).
-const FONT_REGULAR = require.resolve('dejavu-fonts-ttf/ttf/DejaVuSans.ttf');
-const FONT_BOLD = require.resolve('dejavu-fonts-ttf/ttf/DejaVuSans-Bold.ttf');
+// dejavu-fonts-ttf ships the actual .ttf files. Deliberately NOT using require.resolve()
+// here: Turbopack statically intercepts require.resolve() calls and either fails outright
+// on unrecognized module types, or — even when routed through a resolvable .json file
+// first — substitutes the call with an internal bundler reference that crashes at request
+// time. A plain runtime-built path via path.join(process.cwd(), ...) is invisible to
+// Turbopack's static analysis and works correctly.
+const FONT_PACKAGE_ROOT = path.join(process.cwd(), 'node_modules', 'dejavu-fonts-ttf');
+const FONT_REGULAR = path.join(FONT_PACKAGE_ROOT, 'ttf', 'DejaVuSans.ttf');
+const FONT_BOLD = path.join(FONT_PACKAGE_ROOT, 'ttf', 'DejaVuSans-Bold.ttf');
 
 export interface ProgramPdfSequence {
   title: string;
@@ -206,6 +212,10 @@ import { getProgramById, getProgramAccess, listSequencesForProgram, listSongsFor
 import { getUserId } from '@/lib/requestUser';
 import { generateProgramPdf, type ProgramPdfSequence } from '@/lib/programPdf';
 import { sanitizeFilename } from '@/lib/pdfFilename';
+// filename (from sanitizeFilename) may contain Greek characters, which raw HTTP headers
+// can't carry as-is (ByteString-only). contentDispositionValue (added in the
+// post-implementation fix round) handles the RFC 5987/6266 encoding.
+import { contentDispositionValue } from '@/lib/contentDisposition';
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const userId = getUserId(request);
@@ -232,7 +242,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   return new NextResponse(pdfBuffer, {
     headers: {
       'Content-Type': 'application/pdf',
-      'Content-Disposition': `attachment; filename="${filename}"`,
+      'Content-Disposition': contentDispositionValue(filename),
     },
   });
 }
@@ -515,4 +525,15 @@ Expected: succeeds — confirms the new native page compiles into the Android bu
 No browser or Android device/emulator is assumed available during implementation. Two checks are flagged for the first real pass, same treatment as past mobile-only work in this project:
 
 1. **Web, low-risk:** open a program's detail page, click "Εξαγωγή PDF," confirm a PDF downloads and that Greek text renders correctly (not as boxes/missing glyphs — this is exactly what the DejaVu Sans font requirement exists to prevent).
-2. **Android, genuinely new ground:** this is the first time this app has ever written a file to the device's filesystem or invoked a native share intent. On a real device or emulator: tap "Εξαγωγή PDF" on a program's local page, confirm the Android share sheet opens, and confirm the shared/saved PDF is valid and correctly formatted. Also worth confirming during this pass: that the font file was correctly included in the **deployed** Vercel function (not just the local dev server) — Next.js's build-time file tracing should pick up the `require.resolve('dejavu-fonts-ttf/...')` calls automatically since they're static string literals, but this has never been exercised in this codebase before and is worth a direct confirmation against the production deployment rather than assuming.
+2. **Android, genuinely new ground:** this is the first time this app has ever written a file to the device's filesystem or invoked a native share intent. On a real device or emulator: tap "Εξαγωγή PDF" on a program's local page, confirm the Android share sheet opens, and confirm the shared/saved PDF is valid and correctly formatted. Also worth confirming during this pass: that the font files were correctly included in the **deployed** Vercel function (not just the local dev server). The font path is built at runtime via `path.join(process.cwd(), ...)`, which Next's automatic file-tracing (`@vercel/nft`) cannot resolve to a specific file by static analysis alone — an explicit `outputFileTracingIncludes` entry in `next.config.ts` is a belt-and-braces guarantee that the two DejaVu font files this route needs make it into the deployed function. (In practice, a local production build shows `@vercel/nft` conservatively tracing the *entire* `dejavu-fonts-ttf` package regardless of that entry — confirmed by inspecting `.next/server/app/api/programs/[id]/pdf/route.js.nft.json`, which lists both `DejaVuSans.ttf` and `DejaVuSans-Bold.ttf` with or without the explicit include. Whether that same automatic behavior holds on an actual Vercel deployment has only been checked locally, never against production, so it's still worth confirming directly rather than assuming.)
+
+---
+
+### Task 7: Post-plan fix round (applied after Task 6 verification)
+
+Two gaps in this plan as originally written were discovered during/after Task 6 verification and fixed in the code, with this document updated to match:
+
+1. **`require.resolve()` doesn't work under Turbopack.** The plan as originally written (Task 2) had the font paths resolved via `require.resolve('dejavu-fonts-ttf/ttf/DejaVuSans.ttf')`. This fails the build under Turbopack, which statically intercepts `require.resolve()` calls. The shipped code instead builds the font paths at runtime via `path.join(process.cwd(), 'node_modules', 'dejavu-fonts-ttf', ...)`. This document's Task 2 and Task 6 code/text have been corrected to describe the shipped approach instead of the abandoned one.
+2. **Content-Disposition ByteString crash for Greek filenames.** The plan as originally written (Task 3) set the header directly to `` `attachment; filename="${filename}"` ``. Since `sanitizeFilename` deliberately preserves Greek characters, and HTTP header values must be ByteStrings (Latin-1 only), this threw for every real program title in the app — the feature was 100% non-functional on both web and native. The fix adds a small pure helper, `contentDispositionValue` (`src/lib/contentDisposition.ts`, with `src/lib/contentDisposition.test.ts`), which carries the real filename via the RFC 5987/6266 `filename*` parameter instead. This document's Task 3 has been corrected to match.
+
+Both fixes have shipped commits on `main`; this plan document was not re-run, only corrected to match reality so a future re-run wouldn't reintroduce either bug.
