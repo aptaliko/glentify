@@ -40,6 +40,13 @@ if [ -d ".mobile-build/src/app/admin/songs/[id]" ] || [ -d ".mobile-build/src/ap
   exit 1
 fi
 
+# Offline PDF export (src/lib/programPdfLocal.ts) fetches these at runtime from the app's own
+# local static-asset origin — not committed as static files so they don't also bloat the web
+# bundle (the web PDF route reads the same font package directly from node_modules instead).
+mkdir -p .mobile-build/public/fonts
+cp node_modules/dejavu-fonts-ttf/ttf/DejaVuSans.ttf .mobile-build/public/fonts/
+cp node_modules/dejavu-fonts-ttf/ttf/DejaVuSans-Bold.ttf .mobile-build/public/fonts/
+
 cat > .mobile-build/next.config.ts <<'CONFIG'
 import type { NextConfig } from "next";
 

@@ -9,8 +9,8 @@ import { loadReferenceData } from '@/lib/offlineCache';
 import { preferencesStore } from '@/lib/preferencesStore';
 import { getSelectedProgramId, setSelectedSequenceId } from '@/lib/localProgramsStore';
 import { mergeReferencedSongs } from '@/lib/referenceData';
-import { nativeApiFetch } from '@/lib/nativeApiFetch';
 import { sanitizeFilename } from '@/lib/pdfFilename';
+import { generateProgramPdfLocal } from '@/lib/programPdfLocal';
 import type { ReferenceData, OfflineSequence } from '@/lib/referenceData';
 import type { SongRow } from '@/db/schema';
 
@@ -52,13 +52,11 @@ export default function LocalProgramPage() {
     router.push('/programs/local/sequence');
   }
 
-  async function handleExportPdf(title: string, id: number) {
+  async function handleExportPdf(title: string, sequences: { title: string; songs: string[] }[]) {
     setExporting(true);
     setExportError(null);
     try {
-      const res = await nativeApiFetch(`/api/programs/${id}/pdf`);
-      if (!res.ok) throw new Error('PDF request failed');
-      const blob = await res.blob();
+      const blob = await generateProgramPdfLocal(title, sequences);
       const base64 = await blobToBase64(blob);
       const filename = sanitizeFilename(title);
       await Filesystem.writeFile({ path: filename, data: base64, directory: Directory.Cache });
@@ -95,13 +93,21 @@ export default function LocalProgramPage() {
     mergeReferencedSongs(referenceData.songs, referenceData.sharedSongs).map((s) => [s.id, s])
   );
 
+  const pdfSequences = program.sequences.map((seq) => ({
+    title: seq.title,
+    songs: seq.songIds
+      .map((id) => songsById.get(id))
+      .filter((s): s is SongRow => s !== undefined)
+      .map((s) => s.title),
+  }));
+
   return (
     <main className="flex min-h-screen flex-col items-center gap-6 bg-base-200 p-4">
       <PageNav backHref="/programs/local" />
       <div className="flex flex-col items-center gap-2">
         <h1 className="text-2xl font-bold">{program.title}</h1>
         <button
-          onClick={() => handleExportPdf(program.title, program.id)}
+          onClick={() => handleExportPdf(program.title, pdfSequences)}
           disabled={exporting}
           className="btn btn-outline btn-sm"
         >
