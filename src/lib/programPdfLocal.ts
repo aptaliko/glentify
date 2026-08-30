@@ -7,6 +7,13 @@ export type { ProgramPdfSequence };
 
 async function loadFontBytes(path: string): Promise<Uint8Array> {
   const res = await fetch(path);
+  if (!res.ok) {
+    // Should never happen — the font ships in the same bundle as the JS that fetches it — but
+    // if it ever does, fail with a message that names the missing asset instead of letting the
+    // opaque bytes reach fontkit, which would otherwise throw a generic
+    // "Not a supported font format" error with no indication of which file or why.
+    throw new Error(`font fetch failed: ${path} (${res.status})`);
+  }
   return new Uint8Array(await res.arrayBuffer());
 }
 
