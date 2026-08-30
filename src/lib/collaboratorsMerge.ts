@@ -17,6 +17,19 @@ export interface DisplayCollaborator {
   status: 'active' | 'pending-add' | 'needs-attention-add' | 'needs-attention-remove';
 }
 
+// Shared predicate so the merge loop below and any external consumer that needs to know
+// "does this queued action belong to this program's collaborator list" (e.g. the edit
+// page's pending-actions effect, which needs to detect when this program's own pending
+// add/remove actions have all cleared) filter identically and can't silently drift apart.
+// Also doubles as the runtime guard for the payload casts below: a malformed payload
+// (e.g. null, restored from IndexedDB) is skipped rather than thrown on, since this
+// function runs during render.
+export function isCollaboratorQueueActionForProgram(action: QueuedAction, programId: number): boolean {
+  if (action.type !== 'program-add-collaborator' && action.type !== 'program-remove-collaborator') return false;
+  if (typeof action.payload !== 'object' || action.payload === null) return false;
+  return (action.payload as { programId?: unknown }).programId === programId;
+}
+
 // Pure — no I/O. Takes the last-known base list (from state or cache) and the full
 // sync-queue snapshot, filters to this program's add/remove actions, and produces the
 // list to render: pending removes are dropped from the base list (optimistic hide, no
@@ -33,12 +46,13 @@ export function mergeCollaboratorsWithPending(
   const adds: { email: string; needsAttention: boolean }[] = [];
 
   for (const action of allQueuedActions) {
+    if (!isCollaboratorQueueActionForProgram(action, programId)) continue;
     if (action.type === 'program-remove-collaborator') {
       const payload = action.payload as RemoveCollaboratorPayload;
-      if (payload.programId === programId) removals.set(payload.userId, action.needsAttention);
-    } else if (action.type === 'program-add-collaborator') {
+      removals.set(payload.userId, action.needsAttention);
+    } else {
       const payload = action.payload as AddCollaboratorPayload;
-      if (payload.programId === programId) adds.push({ email: payload.email, needsAttention: action.needsAttention });
+      adds.push({ email: payload.email, needsAttention: action.needsAttention });
     }
   }
 

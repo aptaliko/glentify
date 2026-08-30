@@ -27,7 +27,7 @@ async function handleSessionSaveSync(payload: unknown): Promise<SyncOutcome> {
 async function handleAddCollaboratorSync(payload: unknown): Promise<SyncOutcome> {
   const { programId, email } = payload as AddCollaboratorPayload;
   const res = await nativeApiFetch(
-    `/api/programs/${programId}/collaborators`,
+    `/api/programs/${encodeURIComponent(programId)}/collaborators`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -47,7 +47,7 @@ async function handleAddCollaboratorSync(payload: unknown): Promise<SyncOutcome>
 async function handleRemoveCollaboratorSync(payload: unknown): Promise<SyncOutcome> {
   const { programId, userId } = payload as RemoveCollaboratorPayload;
   const res = await nativeApiFetch(
-    `/api/programs/${programId}/collaborators/${userId}`,
+    `/api/programs/${encodeURIComponent(programId)}/collaborators/${encodeURIComponent(userId)}`,
     { method: 'DELETE' },
     undefined,
     { redirectOn401: false }

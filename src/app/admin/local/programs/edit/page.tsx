@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { nativeApiFetch } from '@/lib/nativeApiFetch';
 import { preferencesStore } from '@/lib/preferencesStore';
@@ -9,7 +9,7 @@ import { enqueue, getQueuedActions } from '@/lib/syncQueue';
 import type { QueuedAction } from '@/lib/syncQueue';
 import { useSyncQueue } from '@/components/SyncQueueProvider';
 import { saveCollaboratorsCache, loadCollaboratorsCache } from '@/lib/collaboratorsCache';
-import { mergeCollaboratorsWithPending } from '@/lib/collaboratorsMerge';
+import { mergeCollaboratorsWithPending, isCollaboratorQueueActionForProgram } from '@/lib/collaboratorsMerge';
 import PageNav from '@/components/PageNav';
 
 interface Sequence {
@@ -116,17 +116,22 @@ export default function LocalEditProgramPage() {
       setOfflineCollaborators(false);
       setCollaboratorsUnavailable(false);
       if (roleForCache && userForCache) {
-        await saveCollaboratorsCache({
-          programId: id,
-          role: roleForCache,
-          creator: data.creator,
-          collaborators: data.collaborators,
-          currentUser: userForCache,
-          cachedAt: new Date().toISOString(),
-        });
+        try {
+          await saveCollaboratorsCache({
+            programId: id,
+            role: roleForCache,
+            creator: data.creator,
+            collaborators: data.collaborators,
+            currentUser: userForCache,
+            cachedAt: new Date().toISOString(),
+          });
+        } catch {
+          // A cache-write failure must not affect the already-successful state above,
+          // nor trigger the outer catch's offline-UI logic — the fetch just succeeded.
+        }
       }
     } catch {
-      const cached = await loadCollaboratorsCache(id);
+      const cached = await loadCollaboratorsCache(id).catch(() => null);
       if (cached) {
         setRole(cached.role);
         setCreator(cached.creator);
@@ -152,10 +157,31 @@ export default function LocalEditProgramPage() {
     })();
   }, [programId]);
 
+  // Tracks this program's own count of queued add/remove-collaborator actions across
+  // renders, so we can detect the >0 -> 0 transition (this program's last queued action
+  // just synced) and refresh the base list from the server — otherwise a just-synced add
+  // leaves no active row in its place, and a just-synced remove leaves the removed person
+  // showing as an active row with a live (404-bound) remove button. Keyed by programId so
+  // switching programs doesn't spuriously read the previous program's last-known count.
+  const prevPendingCollaboratorInfoRef = useRef<{ programId: number; count: number } | null>(null);
+
   useEffect(() => {
     if (programId === null) return;
-    getQueuedActions().then(setPendingActions);
-  }, [programId, pendingCount]);
+    getQueuedActions()
+      .then((actions) => {
+        setPendingActions(actions);
+        const thisProgramCount = actions.filter((a) =>
+          isCollaboratorQueueActionForProgram(a, programId)
+        ).length;
+        const prevInfo = prevPendingCollaboratorInfoRef.current;
+        const prevCount = prevInfo && prevInfo.programId === programId ? prevInfo.count : null;
+        prevPendingCollaboratorInfoRef.current = { programId, count: thisProgramCount };
+        if (prevCount !== null && prevCount > 0 && thisProgramCount === 0) {
+          loadCollaborators(programId, role, currentUser);
+        }
+      })
+      .catch(() => {});
+  }, [programId, pendingCount, role, currentUser]);
 
   async function refreshSequenceSongs(seqId: number) {
     if (programId === null) return;
@@ -267,7 +293,12 @@ export default function LocalEditProgramPage() {
       setNewCollaboratorEmail('');
       await loadCollaborators(programId, role, currentUser);
     } catch {
-      await enqueue('program-add-collaborator', { programId, email });
+      try {
+        await enqueue('program-add-collaborator', { programId, email });
+      } catch {
+        setCollaboratorError('Αποτυχία αποθήκευσης. Δοκίμασε ξανά.');
+        return;
+      }
       setNewCollaboratorEmail('');
       setCollaboratorNotice('Θα προστεθεί μόλις υπάρξει σύνδεση.');
       notifyQueueChanged();
@@ -292,7 +323,12 @@ export default function LocalEditProgramPage() {
       }
       await loadCollaborators(programId, role, currentUser);
     } catch {
-      await enqueue('program-remove-collaborator', { programId, userId });
+      try {
+        await enqueue('program-remove-collaborator', { programId, userId });
+      } catch {
+        setCollaboratorError('Αποτυχία αποθήκευσης. Δοκίμασε ξανά.');
+        return;
+      }
       notifyQueueChanged();
       if (userId === currentUser?.id) {
         await clearSelectedEditProgramId(preferencesStore);

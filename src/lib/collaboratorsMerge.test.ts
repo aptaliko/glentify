@@ -89,6 +89,32 @@ describe('mergeCollaboratorsWithPending', () => {
     ]);
   });
 
+  it('does not add a phantom row for a needs-attention remove whose userId has no match in base', () => {
+    const actions = [
+      makeAction({
+        type: 'program-remove-collaborator',
+        payload: { programId: 100, userId: 999 },
+        needsAttention: true,
+        attempts: 3,
+      }),
+    ];
+    expect(mergeCollaboratorsWithPending(base, actions, 100)).toEqual([
+      { id: 1, email: 'a@example.com', status: 'active' },
+      { id: 2, email: 'b@example.com', status: 'active' },
+    ]);
+  });
+
+  it('shows both the active row and a pending-add row when a pending add duplicates an existing email', () => {
+    const actions = [
+      makeAction({ type: 'program-add-collaborator', payload: { programId: 100, email: 'a@example.com' } }),
+    ];
+    expect(mergeCollaboratorsWithPending(base, actions, 100)).toEqual([
+      { id: 1, email: 'a@example.com', status: 'active' },
+      { id: 2, email: 'b@example.com', status: 'active' },
+      { id: null, email: 'a@example.com', status: 'pending-add' },
+    ]);
+  });
+
   it('ignores queued actions of unrelated types', () => {
     const actions = [
       makeAction({ type: 'session-save', payload: { destination: 'new', title: 'x', sequences: [] } }),
