@@ -130,3 +130,11 @@ export async function enqueue(type: string, payload: unknown): Promise<void> {
 export async function processQueue(): Promise<ProcessResult> {
   return serialize(() => processQueueWith(indexedDbQueueStorage, handlerRegistry));
 }
+
+// Read-only introspection for consumers that need to render pending/failed items
+// (e.g. an offline collaborators list overlaying its program's own queued actions).
+// A direct passthrough to storage — no new engine logic, no serialization needed
+// since this never mutates the queue.
+export async function getQueuedActions(): Promise<QueuedAction[]> {
+  return indexedDbQueueStorage.get();
+}
