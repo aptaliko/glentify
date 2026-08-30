@@ -1,5 +1,10 @@
 import PDFDocument from 'pdfkit';
 import path from 'path';
+import { readFileSync } from 'fs';
+import { drawProgramPdf } from './programPdfCore';
+import type { ProgramPdfSequence, ProgramPdfFonts } from './programPdfCore';
+
+export type { ProgramPdfSequence };
 
 // pdfkit's built-in standard-14 PDF fonts (Helvetica, Times, etc.) only support
 // WinAnsi/Latin-1 encoding and cannot render Greek characters — every string this module
@@ -16,11 +21,6 @@ const FONT_PACKAGE_ROOT = path.join(process.cwd(), 'node_modules', 'dejavu-fonts
 const FONT_REGULAR = path.join(FONT_PACKAGE_ROOT, 'ttf', 'DejaVuSans.ttf');
 const FONT_BOLD = path.join(FONT_PACKAGE_ROOT, 'ttf', 'DejaVuSans-Bold.ttf');
 
-export interface ProgramPdfSequence {
-  title: string;
-  songs: string[];
-}
-
 export function generateProgramPdf(programTitle: string, sequences: ProgramPdfSequence[]): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ margin: 50 });
@@ -29,18 +29,11 @@ export function generateProgramPdf(programTitle: string, sequences: ProgramPdfSe
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
 
-    doc.font(FONT_BOLD).fontSize(20).text(programTitle, { align: 'center' });
-    doc.moveDown();
-
-    for (const sequence of sequences) {
-      doc.font(FONT_BOLD).fontSize(14).text(sequence.title);
-      doc.moveDown(0.5);
-      doc.font(FONT_REGULAR).fontSize(11);
-      sequence.songs.forEach((title, i) => {
-        doc.text(`${i + 1}. ${title}`);
-      });
-      doc.moveDown();
-    }
+    const fonts: ProgramPdfFonts = {
+      regular: readFileSync(FONT_REGULAR),
+      bold: readFileSync(FONT_BOLD),
+    };
+    drawProgramPdf(doc, programTitle, sequences, fonts);
 
     doc.end();
   });
