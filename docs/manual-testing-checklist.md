@@ -168,6 +168,45 @@ was caught and fixed during its final review — so this section matters most.
 
 ---
 
+## 7. Related-song suggestions on fixed program playback
+
+New (2026-08-31), not yet exercised on a device or in a real browser. Covers both platforms —
+`programs/[id]/sequences/[seqId]` (web) and `programs/local/sequence` (native).
+
+- [ ] **Sidebar renders.** Open any sequence with at least one song. Confirm a "Προτάσεις" card
+      appears next to "Λίστα σειράς" (not replacing it), showing songs sharing characteristics
+      with the currently-displayed song — with toggle chips for each characteristic
+      (Περιοχή/Είδος/etc.), same as Ξεκίνα Live.
+- [ ] **No overlap with the sequence's own list.** Confirm no song already in "Λίστα σειράς"
+      ever appears in "Προτάσεις", even when toggling chips.
+- [ ] **Sidebar updates on navigation.** Page through the sequence with ← Προηγούμενο /
+      Επόμενο → (or tap a row in "Λίστα σειράς") and confirm "Προτάσεις" recomputes for the new
+      current song each time, with axis toggles reset to their defaults.
+- [ ] **Enter exploration mode.** Tap a suggestion. Confirm the page switches to a full
+      Live-style view (lyrics + suggestions + axis toggles + Δείξε τα ειπωμένα + Τέλος σειράς)
+      seeded at that song.
+- [ ] **Drill through suggestions.** From exploration mode, tap another suggestion — confirm it
+      moves deeper (new current song, previous one now dims as "ειπωμένο" if Δείξε τα ειπωμένα
+      is on).
+- [ ] **Τέλος σειράς inside exploration.** Tap it, confirm it opens the song picker (search
+      across the whole library) rather than getting stuck — pick any song and confirm
+      exploration continues from there.
+- [ ] **Exit via the red button.** Tap "Πίσω στο πρόγραμμα" — confirm you land back on the
+      standard program view, at the exact sequence position you left (same song, same index),
+      with "Λίστα σειράς" unchanged.
+- [ ] **Exit via the back arrow, including from the song-picker screen.** From exploration mode
+      (both the normal view and the "Τέλος σειράς → pick a song" screen), tap the header's
+      "← Πίσω" arrow. Confirm it also returns you to the standard program view — this was a
+      real bug caught in review (a same-URL Link that did nothing, stranding you on the picker
+      screen with no way out) and must actually work, not just look present.
+- [ ] **Shared program edge case (if you have a second test account/collaborator).** Open a
+      sequence from a program you're a *collaborator* on, not the owner, where the current song
+      belongs to the other user. Confirm "Προτάσεις" shows "Καμία πρόταση"/"Κανένα τραγούδι"
+      gracefully instead of erroring — you have no visibility into another user's song
+      characteristics by design.
+
+---
+
 ## Cross-cutting notes
 
 - **Sync badge states** appear bottom-right whenever anything is queued: a plain count
