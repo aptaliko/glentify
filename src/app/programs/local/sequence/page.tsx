@@ -1,12 +1,16 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSwipeable } from 'react-swipeable';
 import PageNav from '@/components/PageNav';
+import LiveSessionView from '@/components/LiveSessionView';
+import SequenceSuggestionsCard from '@/components/SequenceSuggestionsCard';
 import { loadReferenceData } from '@/lib/offlineCache';
 import { preferencesStore } from '@/lib/preferencesStore';
 import { getSelectedProgramId, getSelectedSequenceId } from '@/lib/localProgramsStore';
 import { mergeReferencedSongs } from '@/lib/referenceData';
+import { getSequenceSuggestions, ExplorationSessionStore } from '@/lib/sessionStore';
+import { createLocalSongPickerDataSource } from '@/lib/songPickerData';
 import type { ReferenceData } from '@/lib/referenceData';
 import type { SongRow } from '@/db/schema';
 
@@ -16,6 +20,8 @@ export default function LocalSequencePage() {
   const [sequenceId, setSequenceId] = useState<number | null>(null);
   const [checked, setChecked] = useState(false);
   const [index, setIndex] = useState(0);
+  const [activeAxisTypes, setActiveAxisTypes] = useState<string[] | null>(null);
+  const [exploringSongId, setExploringSongId] = useState<number | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -43,11 +49,39 @@ export default function LocalSequencePage() {
   const hasPrevious = index > 0;
   const hasNext = index < songs.length - 1;
 
+  // A new current song starts its suggestions fresh, same as picking a song resets the axis
+  // toggles in Live — reset happens alongside the index change itself, not via a separate
+  // effect watching for it.
+  function goToIndex(i: number) {
+    setIndex(i);
+    setActiveAxisTypes(null);
+  }
+
   const swipeHandlers = useSwipeable({
-    onSwipedLeft: () => hasNext && setIndex((i) => i + 1),
-    onSwipedRight: () => hasPrevious && setIndex((i) => i - 1),
+    onSwipedLeft: () => hasNext && goToIndex(index + 1),
+    onSwipedRight: () => hasPrevious && goToIndex(index - 1),
     delta: 50,
   });
+
+  // Stable across re-renders while exploring — only recreated when a *different* suggestion is
+  // tapped (a new starting song) — so its in-memory played-tracking survives drilling through
+  // several suggestions without resetting on every render.
+  const explorationStore = useMemo(
+    () => (referenceData && exploringSongId !== null ? new ExplorationSessionStore(referenceData, exploringSongId) : null),
+    [referenceData, exploringSongId]
+  );
+
+  if (explorationStore) {
+    return (
+      <LiveSessionView
+        store={explorationStore}
+        onEnded={() => setExploringSongId(null)}
+        sameRouteExit
+        endSessionLabel="Πίσω στο πρόγραμμα"
+        songPickerDataSource={createLocalSongPickerDataSource(referenceData!)}
+      />
+    );
+  }
 
   if (!checked) {
     return (
@@ -78,6 +112,12 @@ export default function LocalSequencePage() {
   }
 
   const current = songs[Math.min(index, songs.length - 1)];
+  const suggestions = getSequenceSuggestions(referenceData, current.id, new Set(sequence.songIds), activeAxisTypes);
+
+  function toggleSuggestionAxis(key: string) {
+    const currentlyActive = activeAxisTypes ?? suggestions.activeAxisTypes;
+    setActiveAxisTypes(currentlyActive.includes(key) ? currentlyActive.filter((k) => k !== key) : [...currentlyActive, key]);
+  }
 
   return (
     <main className="flex min-h-screen flex-col bg-base-200" {...swipeHandlers}>
@@ -109,12 +149,12 @@ export default function LocalSequencePage() {
 
           <div className="flex w-full gap-3">
             {hasPrevious && (
-              <button onClick={() => setIndex((i) => i - 1)} className="btn btn-lg flex-1">
+              <button onClick={() => goToIndex(index - 1)} className="btn btn-lg flex-1">
                 ← Προηγούμενο
               </button>
             )}
             {hasNext && (
-              <button onClick={() => setIndex((i) => i + 1)} className="btn btn-primary btn-lg flex-1">
+              <button onClick={() => goToIndex(index + 1)} className="btn btn-primary btn-lg flex-1">
                 Επόμενο →
               </button>
             )}
@@ -128,7 +168,7 @@ export default function LocalSequencePage() {
               {songs.map((s, i) => (
                 <li key={i}>
                   <button
-                    onClick={() => setIndex(i)}
+                    onClick={() => goToIndex(i)}
                     className={`btn btn-ghost btn-sm w-full justify-start text-left ${i === index ? 'btn-active' : ''}`}
                   >
                     <span className="badge badge-neutral badge-sm">{i + 1}</span>
@@ -139,6 +179,8 @@ export default function LocalSequencePage() {
             </ul>
           </div>
         </div>
+
+        <SequenceSuggestionsCard data={suggestions} onToggleAxis={toggleSuggestionAxis} onPick={setExploringSongId} />
       </div>
     </main>
   );

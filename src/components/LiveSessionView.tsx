@@ -60,10 +60,22 @@ export default function LiveSessionView({
   store,
   onEnded,
   songPickerDataSource,
+  endSessionLabel = 'Λήξη session',
+  sameRouteExit = false,
 }: {
   store: SessionStore;
   onEnded: () => void;
   songPickerDataSource?: SongPickerDataSource;
+  /** Label for the header's end-of-session button. Defaults to "Λήξη session"; a fixed-program
+   * exploration overrides this to "Πίσω στο πρόγραμμα" since there's no real session to end
+   * there — `onEnded` still fires exactly the same either way. */
+  endSessionLabel?: string;
+  /** True when this view is rendered inline at the caller's own route (e.g. a fixed program's
+   * "explore from a suggestion" mode) rather than a dedicated session page — there is no
+   * different route to go "back" to. Makes the header's back arrow act exactly like the
+   * end-session button instead of a Link to "/", which would be a no-op at the same URL and
+   * could otherwise strand the user with no way out once `data.currentSong` is null. */
+  sameRouteExit?: boolean;
 }) {
   const [data, setData] = useState<SuggestionsResponsePayload | null>(null);
   const [showPlayed, setShowPlayed] = useState(false);
@@ -104,7 +116,7 @@ export default function LiveSessionView({
   if (!data) {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center bg-base-200">
-        <PageNav backHref="/" />
+        <PageNav backHref="/" onBack={sameRouteExit ? handleEndSession : undefined} />
         <span className="loading loading-spinner loading-lg text-primary" />
       </main>
     );
@@ -113,7 +125,7 @@ export default function LiveSessionView({
   if (!data.currentSong) {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center gap-6 bg-base-200 p-4">
-        <PageNav backHref="/" />
+        <PageNav backHref="/" onBack={sameRouteExit ? handleEndSession : undefined} />
         <h1 className="text-2xl font-bold">Διάλεξε τραγούδι για να συνεχίσεις</h1>
         <SongPicker onSelect={handlePick} dataSource={songPickerDataSource} />
       </main>
@@ -125,7 +137,7 @@ export default function LiveSessionView({
   return (
     <main className="flex min-h-screen flex-col bg-base-200">
       <header className="sticky top-0 z-10 flex flex-col items-center gap-3 border-b border-base-300 bg-base-100 px-4 py-3 sm:px-6">
-        <PageNav backHref="/" />
+        <PageNav backHref="/" onBack={sameRouteExit ? handleEndSession : undefined} />
         <div className="flex flex-wrap items-center justify-center gap-2">
           <label className="label cursor-pointer gap-2">
             <input
@@ -152,7 +164,7 @@ export default function LiveSessionView({
             Τέλος σειράς
           </button>
           <button onClick={handleEndSession} className="btn btn-sm btn-error">
-            Λήξη session
+            {endSessionLabel}
           </button>
         </div>
         <h1 className="text-center text-xl font-bold sm:text-2xl">{currentSong.title}</h1>

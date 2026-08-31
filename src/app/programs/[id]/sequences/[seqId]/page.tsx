@@ -1,8 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import PageNav from '@/components/PageNav';
+import LiveSessionView from '@/components/LiveSessionView';
+import SequenceSuggestionsCard from '@/components/SequenceSuggestionsCard';
+import { getSequenceSuggestions, ExplorationSessionStore } from '@/lib/sessionStore';
+import { createLocalSongPickerDataSource } from '@/lib/songPickerData';
+import type { ReferenceData } from '@/lib/referenceData';
 
 interface Song {
   id: number;
@@ -27,6 +32,18 @@ export default function SequencePlaybackPage() {
   const params = useParams<{ id: string; seqId: string }>();
   const [sequence, setSequence] = useState<SequenceWithSongs | null>(null);
   const [index, setIndex] = useState(0);
+  // Loaded separately from the sequence itself, purely to power the suggestions sidebar and
+  // exploration mode below — a fetch failure here degrades to "no suggestions" rather than
+  // blocking the page's actual content (the sequence fetch above is unaffected either way).
+  // Deliberately reuses the same endpoint the native app uses for its full offline sync
+  // (whole song library + axis values + programs) rather than a narrower dedicated route: one
+  // shared, already-tested code path computing suggestions identically on both platforms was
+  // judged worth its heavier one-time query cost on this page over a second, more targeted but
+  // duplicated suggestions endpoint. Non-blocking (see above), so it doesn't delay the page's
+  // main content even on a slow connection.
+  const [referenceData, setReferenceData] = useState<ReferenceData | null>(null);
+  const [activeAxisTypes, setActiveAxisTypes] = useState<string[] | null>(null);
+  const [exploringSongId, setExploringSongId] = useState<number | null>(null);
 
   useEffect(() => {
     fetch(`/api/programs/${params.id}/sequences/${params.seqId}`)
@@ -34,8 +51,37 @@ export default function SequencePlaybackPage() {
       .then((data) => {
         setSequence(data);
         setIndex(0);
+        // A different sequence is a different "current song" for suggestion purposes too —
+        // reset the same way every other index change does (see goToIndex below), and drop
+        // any in-progress exploration from the sequence we're navigating away from.
+        setActiveAxisTypes(null);
+        setExploringSongId(null);
       });
   }, [params.id, params.seqId]);
+
+  useEffect(() => {
+    fetch('/api/reference-data')
+      .then((r) => (r.ok ? r.json() : null))
+      .then(setReferenceData)
+      .catch(() => setReferenceData(null));
+  }, []);
+
+  const explorationStore = useMemo(
+    () => (referenceData && exploringSongId !== null ? new ExplorationSessionStore(referenceData, exploringSongId) : null),
+    [referenceData, exploringSongId]
+  );
+
+  if (explorationStore) {
+    return (
+      <LiveSessionView
+        store={explorationStore}
+        onEnded={() => setExploringSongId(null)}
+        sameRouteExit
+        endSessionLabel="Πίσω στο πρόγραμμα"
+        songPickerDataSource={createLocalSongPickerDataSource(referenceData!)}
+      />
+    );
+  }
 
   if (!sequence) {
     return (
@@ -59,6 +105,24 @@ export default function SequencePlaybackPage() {
   const current = sequence.songs[index];
   const hasPrevious = index > 0;
   const hasNext = index < sequence.songs.length - 1;
+  const excludeSongIds = new Set(sequence.songs.map((entry) => entry.song.id));
+
+  // A new current song starts its suggestions fresh, same as picking a song resets the axis
+  // toggles in Live — reset happens alongside the index change itself, not via a separate
+  // effect watching for it.
+  function goToIndex(i: number) {
+    setIndex(i);
+    setActiveAxisTypes(null);
+  }
+  const suggestions = referenceData
+    ? getSequenceSuggestions(referenceData, current.song.id, excludeSongIds, activeAxisTypes)
+    : null;
+
+  function toggleSuggestionAxis(key: string) {
+    if (!suggestions) return;
+    const currentlyActive = activeAxisTypes ?? suggestions.activeAxisTypes;
+    setActiveAxisTypes(currentlyActive.includes(key) ? currentlyActive.filter((k) => k !== key) : [...currentlyActive, key]);
+  }
 
   return (
     <main className="flex min-h-screen flex-col bg-base-200">
@@ -90,12 +154,12 @@ export default function SequencePlaybackPage() {
 
           <div className="flex w-full gap-3">
             {hasPrevious && (
-              <button onClick={() => setIndex((i) => i - 1)} className="btn btn-lg flex-1">
+              <button onClick={() => goToIndex(index - 1)} className="btn btn-lg flex-1">
                 ← Προηγούμενο
               </button>
             )}
             {hasNext && (
-              <button onClick={() => setIndex((i) => i + 1)} className="btn btn-primary btn-lg flex-1">
+              <button onClick={() => goToIndex(index + 1)} className="btn btn-primary btn-lg flex-1">
                 Επόμενο →
               </button>
             )}
@@ -109,7 +173,7 @@ export default function SequencePlaybackPage() {
               {sequence.songs.map((entry, i) => (
                 <li key={entry.sequenceSongId}>
                   <button
-                    onClick={() => setIndex(i)}
+                    onClick={() => goToIndex(i)}
                     className={`btn btn-ghost btn-sm w-full justify-start text-left ${i === index ? 'btn-active' : ''}`}
                   >
                     <span className="badge badge-neutral badge-sm">{i + 1}</span>
@@ -120,6 +184,10 @@ export default function SequencePlaybackPage() {
             </ul>
           </div>
         </div>
+
+        {suggestions && (
+          <SequenceSuggestionsCard data={suggestions} onToggleAxis={toggleSuggestionAxis} onPick={setExploringSongId} />
+        )}
       </div>
     </main>
   );

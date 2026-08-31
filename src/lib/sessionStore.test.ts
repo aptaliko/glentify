@@ -1,8 +1,16 @@
 import { describe, it, expect } from 'vitest';
-import { LocalSessionStore, hasLocalSession, getLastEndedSession, clearLastEndedSession } from './sessionStore';
+import {
+  LocalSessionStore,
+  hasLocalSession,
+  getLastEndedSession,
+  clearLastEndedSession,
+  getSequenceSuggestions,
+  ExplorationSessionStore,
+} from './sessionStore';
 import type { KeyValueStore } from './preferencesStore';
 import type { ReferenceData } from './referenceData';
 import type { SongRow, RegionRow, GenreRow } from '@/db/schema';
+import type { SongAxisValueRow } from '@/db/schema';
 
 function makeSong(id: number, title: string): SongRow {
   return { id, title, lyrics: null, notes: null, maleKey: null, femaleKey: null, createdAt: new Date(), updatedAt: new Date() } as SongRow;
@@ -224,5 +232,100 @@ describe('getLastEndedSession / clearLastEndedSession', () => {
     await store.endSession();
     await clearLastEndedSession(storage);
     expect(await getLastEndedSession(storage)).toBeNull();
+  });
+});
+
+function axisValue(songId: number, axisType: string, refId: number | null): SongAxisValueRow {
+  return { id: songId * 100 + refId!, songId, axisType, refId, yearValue: null };
+}
+
+function referenceDataWithGenreAxes(): ReferenceData {
+  // Song 1 and 2 share genre 1; song 3 has genre 2. Songs 4/5 are unused by most tests but
+  // give getSequenceSuggestions something realistic to exclude via a "current sequence".
+  return {
+    songs: [makeSong(1, 'Τραγούδι Α'), makeSong(2, 'Τραγούδι Β'), makeSong(3, 'Τραγούδι Γ'), makeSong(4, 'Τραγούδι Δ')],
+    sharedSongs: [makeSong(99, 'Ξένο Τραγούδι')],
+    axisValues: [
+      axisValue(1, 'genre', 1),
+      axisValue(2, 'genre', 1),
+      axisValue(3, 'genre', 2),
+      axisValue(4, 'genre', 1),
+    ],
+    regions: [],
+    rhythms: [],
+    dromoi: [],
+    composers: [],
+    axisTypes: [],
+    genres: [{ id: 1, name: 'Παραδοσιακό', ownerId: null } as GenreRow, { id: 2, name: 'Λαϊκό', ownerId: null } as GenreRow],
+    programs: [],
+  };
+}
+
+describe('getSequenceSuggestions', () => {
+  it('excludes the current song and the given sequence song ids, ranking by shared genre', () => {
+    const data = referenceDataWithGenreAxes();
+    // Current song is 1 (genre 1). Song 4 also shares genre 1 but is excluded because it's
+    // already in "this sequence" — only song 2 (also genre 1) should remain as a suggestion,
+    // ahead of song 3 (different genre) if song 3 weren't filtered out entirely by the active
+    // genre axis.
+    const result = getSequenceSuggestions(data, 1, new Set([4]), null);
+    expect(result.mode).toBe('filtered');
+    expect(result.candidates.map((c) => c.id)).toEqual([2]);
+  });
+
+  it('returns the empty/no-suggestions payload when the current song has no owner-scoped axis data (e.g. a shared program song)', () => {
+    const data = referenceDataWithGenreAxes();
+    // Song 99 only exists in sharedSongs, never in the owner-scoped songs/axisValues used to
+    // build the candidate pool — mirrors a collaborator viewing another user's song, where no
+    // axis data is visible to the caller at all.
+    const result = getSequenceSuggestions(data, 99, new Set(), null);
+    expect(result.currentSong).toBeNull();
+    expect(result.mode).toBe('ungrouped');
+    expect(result.candidates).toEqual([]);
+    expect(result.songs).toEqual([]);
+  });
+
+  it('respects an explicit activeAxisTypes override, same as the underlying engine', () => {
+    const data = referenceDataWithGenreAxes();
+    // An empty activeAxisTypes set means "no active filter" to the underlying engine (same as
+    // Live) — falls back to its ungrouped mode, listing every song except the excluded sequence
+    // song (4), regardless of genre.
+    const result = getSequenceSuggestions(data, 1, new Set([4]), []);
+    expect(result.mode).toBe('ungrouped');
+    expect(result.songs.map((s) => s.id).sort()).toEqual([2, 3]);
+  });
+});
+
+describe('ExplorationSessionStore', () => {
+  it('starts at the given song with no played history', async () => {
+    const store = new ExplorationSessionStore(referenceDataWithThreeSongs(), 1);
+    const data = await store.load(false, null);
+    expect(data.currentSong?.id).toBe(1);
+    expect(data.songs.map((s) => s.id).sort()).toEqual([2, 3]);
+  });
+
+  it('marks the current song played and advances on pickSong, entirely in memory', async () => {
+    const store = new ExplorationSessionStore(referenceDataWithThreeSongs(), 1);
+    await store.pickSong(2);
+    const data = await store.load(true, null);
+    expect(data.currentSong?.id).toBe(2);
+    expect(data.songs.find((s) => s.id === 1)?.played).toBe(true);
+  });
+
+  it('clears the current song on endSequence, keeping played history', async () => {
+    const store = new ExplorationSessionStore(referenceDataWithThreeSongs(), 1);
+    await store.pickSong(2);
+    await store.endSequence();
+    const data = await store.load(false, null);
+    expect(data.currentSong).toBeNull();
+  });
+
+  it('endSession is a no-op — state is left exactly as it was for the caller to discard', async () => {
+    const store = new ExplorationSessionStore(referenceDataWithThreeSongs(), 1);
+    await store.pickSong(2);
+    await store.endSession();
+    const data = await store.load(true, null);
+    expect(data.currentSong?.id).toBe(2);
+    expect(data.songs.find((s) => s.id === 1)?.played).toBe(true);
   });
 });
