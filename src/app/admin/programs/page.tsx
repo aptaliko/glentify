@@ -88,6 +88,21 @@ export default function ProgramsAdminPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingCount]);
 
+  // Explicit post-enqueue refresh for this page's own three handlers. notifyQueueChanged()
+  // drains the queue synchronously when the network is up, which means the pendingCount
+  // used by the effect above can go N -> N (e.g. 0 -> 0 for a create with nothing else
+  // queued) and never re-fire. Each handler below awaits this directly instead of relying
+  // on that effect, which stays in place for the reconnect-later case (queue draining on
+  // its own, after this page's handler already returned).
+  async function refreshAfterProgramSync() {
+    await notifyQueueChanged();
+    const actions = await getQueuedActions();
+    setPendingActions(actions);
+    const n = actions.filter(isProgramQueueAction).length;
+    prevPendingProgramCountRef.current = n;
+    if (n === 0) await load();
+  }
+
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -112,7 +127,7 @@ export default function ProgramsAdminPage() {
       return;
     }
     setTitle('');
-    notifyQueueChanged();
+    await refreshAfterProgramSync();
   }
 
   async function handleDelete(id: number) {
@@ -128,7 +143,7 @@ export default function ProgramsAdminPage() {
       setError('Αποτυχία αποθήκευσης. Δοκίμασε ξανά.');
       return;
     }
-    notifyQueueChanged();
+    await refreshAfterProgramSync();
   }
 
   function startEditing(p: { id: number; title: string }) {
@@ -156,7 +171,7 @@ export default function ProgramsAdminPage() {
       return;
     }
     setEditingId(null);
-    notifyQueueChanged();
+    await refreshAfterProgramSync();
   }
 
   async function handleOpenProgram(id: number) {

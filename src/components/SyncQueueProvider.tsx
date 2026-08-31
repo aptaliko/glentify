@@ -11,14 +11,14 @@ interface SyncQueueContextValue {
   pendingCount: number;
   needsAttentionCount: number;
   blocked: boolean;
-  notifyQueueChanged: () => void;
+  notifyQueueChanged: () => Promise<void>;
 }
 
 const SyncQueueContext = createContext<SyncQueueContextValue>({
   pendingCount: 0,
   needsAttentionCount: 0,
   blocked: false,
-  notifyQueueChanged: () => {},
+  notifyQueueChanged: async () => {},
 });
 
 export function useSyncQueue(): SyncQueueContextValue {

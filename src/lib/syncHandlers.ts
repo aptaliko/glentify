@@ -41,6 +41,11 @@ async function handleAddCollaboratorSync(payload: unknown): Promise<SyncOutcome>
   // Already a collaborator by the time this synced (added by someone else, or by the
   // same offline actor twice) — the intent was already satisfied, nothing to retry.
   if (res.status === 409) return 'success';
+  // The program (or the user's access to it) is already gone — e.g. a queued
+  // program-delete for the same program synced first — so there's nothing left for this
+  // queued add to accomplish, matching handleDeleteProgramSync's and
+  // handleRemoveCollaboratorSync's 404-as-success precedent.
+  if (res.status === 404) return 'success';
   if (res.status === 401 || res.status >= 500) return 'systemic-error';
   return 'item-error';
 }
