@@ -7,21 +7,44 @@ import type { CreateProgramPayload, RenameProgramPayload, DeleteProgramPayload }
 
 export type SessionSavePayload =
   | { destination: 'new'; title: string; sequences: { title: string; songIds: number[] }[] }
-  | { destination: 'existing'; programId: number; sequences: { title: string; songIds: number[] }[] };
+  | { destination: 'existing'; programId: number; fallbackTitle: string; sequences: { title: string; songIds: number[] }[] };
 
 async function handleSessionSaveSync(payload: unknown): Promise<SyncOutcome> {
+  const data = payload as SessionSavePayload;
   const res = await nativeApiFetch(
     '/api/programs/save-sequences',
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(data),
     },
     undefined,
     { redirectOn401: false }
   );
   if (res.ok) return 'success';
   if (res.status === 401 || res.status >= 500) return 'systemic-error';
+  // The target program is gone by the time this synced (deleted, or the user's access to
+  // it was revoked — e.g. a queued program-delete for the same program synced first). The
+  // desired end state can't be reached as originally requested, but unlike a collaborator
+  // add/remove (where "nothing left to accomplish" makes 404-as-success correct), the
+  // user's actual session content is real data that would otherwise be silently lost
+  // forever in a permanently-stuck needsAttention item with no v1 recovery UI. Fall back
+  // to creating a brand-new program with the same content instead of losing it.
+  if (data.destination === 'existing' && res.status === 404) {
+    const fallbackRes = await nativeApiFetch(
+      '/api/programs/save-sequences',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ destination: 'new', title: data.fallbackTitle, sequences: data.sequences }),
+      },
+      undefined,
+      { redirectOn401: false }
+    );
+    if (fallbackRes.ok) return 'success';
+    if (fallbackRes.status === 401 || fallbackRes.status >= 500) return 'systemic-error';
+    return 'item-error';
+  }
   return 'item-error';
 }
 

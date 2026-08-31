@@ -87,7 +87,16 @@ export default function LocalSaveSessionPage() {
     const payload =
       destination === 'new'
         ? { destination: 'new' as const, title: newTitle, sequences: sequencePayload }
-        : { destination: 'existing' as const, programId: selectedProgramId as number, sequences: sequencePayload };
+        : {
+            destination: 'existing' as const,
+            programId: selectedProgramId as number,
+            // Used only if the target program is gone by the time this syncs (see
+            // handleSessionSaveSync) — falls back to `newTitle` if the user set one while
+            // briefly on "Νέο Σταθερό Πρόγραμμα", otherwise today's date, same as the 'new'
+            // destination's own default. Never sent to the server on this first attempt.
+            fallbackTitle: newTitle.trim() || `Γλέντι ${todayLabel()}`,
+            sequences: sequencePayload,
+          };
     try {
       await enqueue('session-save', payload);
       await clearLastEndedSession(preferencesStore);
