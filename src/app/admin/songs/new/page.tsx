@@ -8,9 +8,14 @@ import SongAxisEditor, { type AxisValueEntry } from '@/components/SongAxisEditor
 import { nativeApiFetch } from '@/lib/nativeApiFetch';
 import { apiUrl } from '@/lib/apiClient';
 import { getAuthToken } from '@/lib/authToken';
+import { isNativeApp } from '@/lib/platform';
+import { enqueue } from '@/lib/syncQueue';
+import { useSyncQueue } from '@/components/SyncQueueProvider';
 
 export default function NewSongPage() {
   const router = useRouter();
+  const native = isNativeApp();
+  const { notifyQueueChanged } = useSyncQueue();
   const [title, setTitle] = useState('');
   const [lyrics, setLyrics] = useState('');
   const [notes, setNotes] = useState('');
@@ -78,18 +83,32 @@ export default function NewSongPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    const body = {
+      title,
+      lyrics: lyrics || null,
+      notes: notes || null,
+      maleKey: maleKey || null,
+      femaleKey: femaleKey || null,
+      axisValues,
+      // Phase 1 never lets native pick a new image (see the disabled file input below) —
+      // always null there, regardless of what web's upload flow may have set.
+      imageUrl: native ? null : imageUrl,
+    };
+    if (native) {
+      try {
+        await enqueue('song-create', body);
+      } catch {
+        setError('Αποτυχία αποθήκευσης. Δοκίμασε ξανά.');
+        return;
+      }
+      await notifyQueueChanged();
+      router.push('/admin/songs');
+      return;
+    }
     const res = await nativeApiFetch('/api/songs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        title,
-        lyrics: lyrics || null,
-        notes: notes || null,
-        maleKey: maleKey || null,
-        femaleKey: femaleKey || null,
-        axisValues,
-        imageUrl,
-      }),
+      body: JSON.stringify(body),
     });
     if (!res.ok) {
       setError('Αποτυχία δημιουργίας τραγουδιού');
@@ -130,7 +149,8 @@ export default function NewSongPage() {
         />
         <div className="flex flex-col gap-2">
           <label className="label-text">Εικόνα παρτιτούρας (προαιρετικό, εναλλακτικά ή μαζί με τους στίχους)</label>
-          <input type="file" accept="image/png,image/jpeg,image/webp" onChange={handleImageChange} className="file-input file-input-bordered" />
+          <input type="file" accept="image/png,image/jpeg,image/webp" onChange={handleImageChange} disabled={native} className="file-input file-input-bordered" />
+          {native && <span className="text-xs text-base-content/50">Η προσθήκη εικόνας από τη native εφαρμογή δεν υποστηρίζεται ακόμη — χρησιμοποίησε την ιστοσελίδα διαχείρισης.</span>}
           {uploading && <span className="loading loading-spinner loading-sm" />}
           {imageUrl && <img src={imageUrl} alt="Προεπισκόπηση παρτιτούρας" className="max-h-64 rounded-box object-contain" />}
         </div>
