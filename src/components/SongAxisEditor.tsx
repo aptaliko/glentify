@@ -2,25 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import { nativeApiFetch } from '@/lib/nativeApiFetch';
+import { isNativeApp } from '@/lib/platform';
+import { loadReferenceData } from '@/lib/offlineCache';
+import { resolveAxisEditorData } from '@/lib/axisEditorData';
+import type { AxisType, Option, AxisValueEntry } from '@/lib/axisEditorData';
 
-interface AxisType {
-  id: number;
-  key: string;
-  label: string;
-  lookupTable: string | null;
-  hierarchical: boolean;
-}
-
-interface Option {
-  id: number;
-  name: string;
-}
-
-export interface AxisValueEntry {
-  axisType: string;
-  refId: number | null;
-  yearValue: number | null;
-}
+export type { AxisValueEntry };
 
 const LOOKUP_ENDPOINTS: Record<string, string> = {
   regions: '/api/regions',
@@ -39,6 +26,7 @@ export default function SongAxisEditor({
 }) {
   const [axisTypes, setAxisTypes] = useState<AxisType[]>([]);
   const [optionsByAxis, setOptionsByAxis] = useState<Record<string, Option[]>>({});
+  const [referenceDataMissing, setReferenceDataMissing] = useState(false);
   const [newAxisType, setNewAxisType] = useState('');
   const [newRefId, setNewRefId] = useState('');
   const [newYear, setNewYear] = useState('');
@@ -46,6 +34,24 @@ export default function SongAxisEditor({
   const [newValueName, setNewValueName] = useState('');
 
   useEffect(() => {
+    if (isNativeApp()) {
+      // Offline-safe: reads the already-cached ReferenceData blob instead of the five
+      // live fetches below, so this renders correctly with no network at all — the fix
+      // for "Κανένας άξονας ακόμη" swallowing the whole "+ Πρόσθεσε άξονα" UI offline.
+      loadReferenceData().then((data) => {
+        if (!data) {
+          setAxisTypes([]);
+          setOptionsByAxis({});
+          setReferenceDataMissing(true);
+          return;
+        }
+        const { axisTypes: types, optionsByAxis: options } = resolveAxisEditorData(data);
+        setAxisTypes(types);
+        setOptionsByAxis(options);
+        setReferenceDataMissing(false);
+      });
+      return;
+    }
     nativeApiFetch('/api/axis-types')
       .then((r) => r.json())
       .then(async (types: AxisType[]) => {
@@ -131,7 +137,7 @@ export default function SongAxisEditor({
           ))}
           {value.length === 0 && <span className="text-sm text-base-content/40">Κανένας άξονας ακόμη</span>}
         </div>
-        {availableAxisTypes.length > 0 && (
+        {availableAxisTypes.length > 0 ? (
           <div className="flex flex-wrap items-center gap-2 pt-2">
             <select
               value={newAxisType}
@@ -177,8 +183,11 @@ export default function SongAxisEditor({
                   {(optionsByAxis[selectedType.key] ?? []).map((o) => (
                     <option key={o.id} value={o.id}>{o.name}</option>
                   ))}
-                  <option value="__new__">+ Νέα τιμή...</option>
+                  <option value="__new__" disabled={isNativeApp()}>+ Νέα τιμή...</option>
                 </select>
+                {isNativeApp() && (
+                  <span className="text-xs text-base-content/50">Νέες τιμές μόνο από την ιστοσελίδα διαχείρισης προς το παρόν.</span>
+                )}
                 {creatingValue && (
                   <>
                     <input
@@ -199,7 +208,9 @@ export default function SongAxisEditor({
               </button>
             )}
           </div>
-        )}
+        ) : referenceDataMissing ? (
+          <span className="text-sm text-warning">Δεν υπάρχουν ακόμη αποθηκευμένα δεδομένα αξόνων — συνδέσου μία φορά για να συγχρονιστούν.</span>
+        ) : null}
       </div>
     </div>
   );
