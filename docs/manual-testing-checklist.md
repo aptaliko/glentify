@@ -30,34 +30,34 @@ The base thin-client admin tool has never had a full on-device pass. Do this sec
 several later sections (programs, collaborators) need programs/songs that only exist once
 this section's data is created.
 
-- [ ] **Home → Διαχείριση.** Tap it from the home screen. Confirm it lands on the songs list
+- [χ] **Home → Διαχείριση.** Tap it from the home screen. Confirm it lands on the songs list
       with the admin navbar visible (Τραγούδια, Προγράμματα, Περιοχές, Ρυθμοί, Δρόμοι,
       Συνθέτες, Είδη, Αρχική).
-- [ ] **Taxonomy sections (×5).** For each of Περιοχές, Ρυθμοί, Δρόμοι, Συνθέτες, Είδη:
+- [χ] **Taxonomy sections (×5).** For each of Περιοχές, Ρυθμοί, Δρόμοι, Συνθέτες, Είδη:
       create one entry, confirm it appears in the list, delete it, confirm it's gone.
-- [ ] **Songs — create with image upload.** Create a new song with an image upload (the
+- [χ] **Songs — create with image upload.** Create a new song with an image upload (the
       full flow — this exercises both the native file picker, the first this app has ever
       shipped to a device, and the cross-origin PUT to Vercel Blob storage, neither of
       which has ever actually run on a device). Add at least one axis value. Confirm the
       upload succeeds and the image shows.
-- [ ] **Songs — edit and delete.** From the list, open the song you just created — confirm
+- [χ] **Songs — edit and delete.** From the list, open the song you just created — confirm
       it lands on `admin/local/songs/edit` with data pre-filled. Change the title, save,
       confirm the list reflects it. Delete it, confirm it's gone.
-- [ ] **Programs — create, sequences, songs.** Create a new program. Open it — confirm it
+- [χ] **Programs — create, sequences, songs.** Create a new program. Open it — confirm it
       lands on `admin/local/programs/edit`. Add a sequence, search for and add a song to
       it, reorder it, remove it. Rename the sequence, delete it. **Keep this program** — later
       sections (collaborators, offline program CRUD) reuse it.
-- [ ] **Programs — collaborators ("Συνεργάτες").** Add a collaborator by email, confirm they
+- [χ] **Programs — collaborators ("Συνεργάτες").** Add a collaborator by email, confirm they
       appear in the list. If a second test account is available, log in as it and confirm
       the program is visible and editable there too. Remove the collaborator, confirm.
-- [ ] **Expired-token handling.** Manually expire or clear the native session token (or wait
+- [χ] **Expired-token handling.** Manually expire or clear the native session token (or wait
       out the 30-day expiry if that's ever practical) and confirm hitting any admin page
       redirects to `/login` instead of blank-screen-crashing.
-- [ ] **Back button / Preferences persistence.** On `admin/local/songs/edit` and
+- [χ] **Back button / Preferences persistence.** On `admin/local/songs/edit` and
       `admin/local/programs/edit`, use the Android back button and confirm it behaves
       sanely (doesn't strand you or lose the selected item). Background the app and return
       — confirm state survives as expected.
-- [ ] **Confirm web is unaffected.** In a regular browser, visit `/admin/songs`,
+- [χ] **Confirm web is unaffected.** In a regular browser, visit `/admin/songs`,
       `/admin/programs`, and one taxonomy page. Confirm every create/edit/delete flow still
       works exactly as before — the dynamic routes (`admin/songs/[id]`,
       `admin/programs/[id]`) are untouched for web.
@@ -68,24 +68,24 @@ this section's data is created.
 
 This is a **web** test — no device needed, just a browser and the real dev/prod database.
 
-- [ ] Start a session (Ξεκίνα Live), play at least one song, press **Τέλος σειράς**, play at
+- [χ] Start a session (Ξεκίνα Live), play at least one song, press **Τέλος σειράς**, play at
       least one more song, press **Τέλος σειράς** again, then end the session.
-- [ ] On the save screen, confirm there are **two separate σειρές** shown (one per
+- [χ] On the save screen, confirm there are **two separate σειρές** shown (one per
       Τέλος σειράς press), each with the correct songs.
-- [ ] Save as a **new** program — confirm it's created with both sequences intact.
-- [ ] Repeat the session flow, this time save into an **existing** program — confirm the new
+- [χ] Save as a **new** program — confirm it's created with both sequences intact.
+- [χ] Repeat the session flow, this time save into an **existing** program — confirm the new
       sequences are appended without disturbing the program's existing sequences.
 
 ---
 
 ## 3. Offline sync foundation + native session-save
 
-- [ ] Put the device in **airplane mode**. Start a local (native) session, play at least two
+- [χ] Put the device in **airplane mode**. Start a local (native) session, play at least two
       songs across two **Τέλος σειράς** presses, end the session.
-- [ ] On the save screen, confirm it renders the correct σειρές entirely from cache (watch
+- [χ] On the save screen, confirm it renders the correct σειρές entirely from cache (watch
       for any network-loading spinner — there should be none).
-- [ ] Save it. Confirm the sync badge shows **"1 εκκρεμεί συγχρονισμός"**.
-- [ ] Re-enable connectivity. Confirm the badge disappears automatically within moments (no
+- [χ] Save it. Confirm the sync badge shows **"1 εκκρεμεί συγχρονισμός"**.
+- [χ] Re-enable connectivity. Confirm the badge disappears automatically within moments (no
       manual action needed), and that the resulting program/sequences are correct via the
       admin UI (either web or the admin tool from Section 1).
 
@@ -93,23 +93,31 @@ This is a **web** test — no device needed, just a browser and the real dev/pro
 
 ## 4. PDF export
 
-### 4a. Original export (web + native, online)
+### 4a. Web export
 
-- [ ] Web: export a program's PDF from a regular browser, confirm it downloads correctly
+- [χ] Web: export a program's PDF from a regular browser, confirm it downloads correctly
       with correct Greek text.
-- [ ] Native, **online**: export the same via the Android share sheet. Confirm the share
-      sheet opens with the correct file and Greek text renders correctly.
 
-### 4b. Offline export variant (native only)
+### 4b. Native export (correction, 2026-09-01: this is ONE code path, not two)
 
-- [ ] Put the device in **airplane mode**. Open a program's local page (one you've already
-      viewed while online, so it's cached). Tap **"Εξαγωγή PDF."**
-- [ ] Confirm the share sheet opens with **no network activity and no delay** waiting on a
-      timed-out request.
-- [ ] Confirm the resulting PDF is valid and — this is the specific risk this variant
-      carries that the original doesn't — **Greek glyphs render correctly** (font embedding
-      via the bundled DejaVu Sans TTFs happening entirely on-device is the one thing never
-      actually executed before this check).
+This section originally split "native online" from "native offline (airplane mode)" as if
+they were different code paths — they aren't. The offline PDF export sub-project fully
+*replaced* the old server-fetch approach; native export is identical regardless of
+connectivity, always generated entirely on-device.
+
+**First attempt (χ, 2026-09-01) failed** with "Η εξαγωγή απέτυχε" — root-caused live via
+`adb logcat`: pdfkit's browser bundle doesn't auto-register standard fonts the way the web
+export's Node build does, so `PDFDocument`'s constructor threw immediately trying to default
+to "Helvetica". **Fixed in commit `e734015`** (`font: null` to skip pdfkit's eager default).
+Verified via the same logcat method (clean run, successful share-sheet completion, no error)
+but not yet visually confirmed on-screen — re-check the actual PDF content below.
+
+- [ ] Open a program's local page. Tap **"Εξαγωγή PDF."** Confirm the share sheet opens with
+      the correct file and **Greek glyphs render correctly** (font embedding via the bundled
+      DejaVu Sans TTFs happening entirely on-device was the specific, now-fixed risk here).
+- [ ] Repeat in **airplane mode** (on a program you've already viewed once online, so it's
+      cached). Confirm **no network activity and no delay** waiting on a timed-out request —
+      should behave identically to the online case above.
 
 ---
 
