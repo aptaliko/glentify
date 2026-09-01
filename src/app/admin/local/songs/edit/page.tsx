@@ -2,19 +2,24 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { upload } from '@vercel/blob/client';
-import { nativeApiFetch } from '@/lib/nativeApiFetch';
-import { apiUrl } from '@/lib/apiClient';
-import { getAuthToken } from '@/lib/authToken';
 import { preferencesStore } from '@/lib/preferencesStore';
 import { getSelectedEditSongId, clearSelectedEditSongId } from '@/lib/adminEditStore';
+import { loadReferenceData } from '@/lib/offlineCache';
+import { loadSongsListCache } from '@/lib/songsListCache';
+import { getQueuedActions, enqueue } from '@/lib/syncQueue';
+import { resolveSongForEdit } from '@/lib/songsMerge';
+import { useSyncQueue } from '@/components/SyncQueueProvider';
 import SongAxisEditor, { type AxisValueEntry } from '@/components/SongAxisEditor';
 import PageNav from '@/components/PageNav';
 
 export default function LocalEditSongPage() {
   const router = useRouter();
+  const { notifyQueueChanged } = useSyncQueue();
   const [songId, setSongId] = useState<number | null>(null);
   const [checked, setChecked] = useState(false);
+  const [resolved, setResolved] = useState(false);
+  const [notFound, setNotFound] = useState(false);
+  const [hasPendingEdit, setHasPendingEdit] = useState(false);
 
   const [title, setTitle] = useState('');
   const [lyrics, setLyrics] = useState('');
@@ -23,7 +28,6 @@ export default function LocalEditSongPage() {
   const [femaleKey, setFemaleKey] = useState('');
   const [axisValues, setAxisValues] = useState<AxisValueEntry[]>([]);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -32,83 +36,71 @@ export default function LocalEditSongPage() {
       .finally(() => setChecked(true));
   }, []);
 
-  async function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploading(true);
-    setError(null);
-    try {
-      const token = await getAuthToken();
-      const blob = await upload(file.name, file, {
-        access: 'public',
-        handleUploadUrl: apiUrl('/api/songs/image-upload'),
-        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-      });
-      setImageUrl(blob.url);
-    } catch {
-      setError('Αποτυχία μεταφόρτωσης εικόνας');
-    } finally {
-      setUploading(false);
-    }
-  }
-
   useEffect(() => {
     if (songId === null) return;
-    nativeApiFetch(`/api/songs/${songId}`).then((r) => r.json()).then((song) => {
-      setTitle(song.title);
-      setLyrics(song.lyrics ?? '');
-      setNotes(song.notes ?? '');
-      setMaleKey(song.maleKey ?? '');
-      setFemaleKey(song.femaleKey ?? '');
-      setImageUrl(song.imageUrl ?? null);
-      setAxisValues(
-        song.axisValues.map((v: { axisType: string; refId: number | null; yearValue: number | null }) => ({
-          axisType: v.axisType,
-          refId: v.refId,
-          yearValue: v.yearValue,
-        }))
-      );
-    });
+    Promise.all([loadSongsListCache(), loadReferenceData(), getQueuedActions()]).then(
+      ([cachedSongs, referenceData, actions]) => {
+        const base = cachedSongs?.find((s) => s.id === songId) ?? null;
+        const baseAxisValues: AxisValueEntry[] = (referenceData?.axisValues ?? [])
+          .filter((v) => v.songId === songId)
+          .map((v) => ({ axisType: v.axisType, refId: v.refId, yearValue: v.yearValue }));
+        const result = resolveSongForEdit(songId, base, baseAxisValues, actions);
+        setHasPendingEdit(result.hasPendingEdit);
+        if (result.song) {
+          setTitle(result.song.title);
+          setLyrics(result.song.lyrics ?? '');
+          setNotes(result.song.notes ?? '');
+          setMaleKey(result.song.maleKey ?? '');
+          setFemaleKey(result.song.femaleKey ?? '');
+          setImageUrl(result.song.imageUrl);
+          setAxisValues(result.song.axisValues);
+          setNotFound(false);
+        } else {
+          setNotFound(true);
+        }
+        setResolved(true);
+      }
+    );
   }, [songId]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (songId === null) return;
     setError(null);
-    const res = await nativeApiFetch(`/api/songs/${songId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    try {
+      await enqueue('song-update', {
+        songId,
         title,
         lyrics: lyrics || null,
         notes: notes || null,
         maleKey: maleKey || null,
         femaleKey: femaleKey || null,
         axisValues,
-        imageUrl,
-      }),
-    });
-    if (!res.ok) {
-      setError('Αποτυχία ενημέρωσης τραγουδιού');
+        imageUrl, // read-only in Phase 1 — carried through unchanged, never re-picked here
+      });
+    } catch {
+      setError('Αποτυχία αποθήκευσης. Δοκίμασε ξανά.');
       return;
     }
+    await notifyQueueChanged();
     router.push('/admin/songs');
   }
 
   async function handleDelete() {
     if (songId === null) return;
     setError(null);
-    const res = await nativeApiFetch(`/api/songs/${songId}`, { method: 'DELETE' });
-    if (!res.ok) {
-      const body = await res.json();
-      setError(body.error);
+    try {
+      await enqueue('song-delete', { songId });
+    } catch {
+      setError('Αποτυχία αποθήκευσης. Δοκίμασε ξανά.');
       return;
     }
     await clearSelectedEditSongId(preferencesStore);
+    await notifyQueueChanged();
     router.push('/admin/songs');
   }
 
-  if (!checked) {
+  if (!checked || (songId !== null && !resolved)) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center">
         <PageNav backHref="/admin/songs" showHome={false} />
@@ -126,10 +118,22 @@ export default function LocalEditSongPage() {
     );
   }
 
+  if (notFound) {
+    return (
+      <div className="flex flex-col items-center gap-4 p-4 text-center">
+        <PageNav backHref="/admin/songs" showHome={false} />
+        <p className="text-lg">Το τραγούδι δεν βρέθηκε στα αποθηκευμένα δεδομένα.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <PageNav backHref="/admin/songs" showHome={false} />
       <h1 className="text-xl font-bold">Επεξεργασία τραγουδιού</h1>
+      {hasPendingEdit && (
+        <p className="text-sm text-base-content/50">Δείχνονται οι μη συγχρονισμένες αλλαγές.</p>
+      )}
       {error && (
         <div role="alert" className="alert alert-error max-w-2xl">
           <span>{error}</span>
@@ -145,8 +149,8 @@ export default function LocalEditSongPage() {
         />
         <div className="flex flex-col gap-2">
           <label className="label-text">Εικόνα παρτιτούρας (προαιρετικό, εναλλακτικά ή μαζί με τους στίχους)</label>
-          <input type="file" accept="image/png,image/jpeg,image/webp" onChange={handleImageChange} className="file-input file-input-bordered" />
-          {uploading && <span className="loading loading-spinner loading-sm" />}
+          <input type="file" accept="image/png,image/jpeg,image/webp" disabled className="file-input file-input-bordered" />
+          <span className="text-xs text-base-content/50">Η αλλαγή εικόνας από τη native εφαρμογή δεν υποστηρίζεται ακόμη — χρησιμοποίησε την ιστοσελίδα διαχείρισης.</span>
           {imageUrl && <img src={imageUrl} alt="Προεπισκόπηση παρτιτούρας" className="max-h-64 rounded-box object-contain" />}
         </div>
         <SongAxisEditor value={axisValues} onChange={setAxisValues} />
