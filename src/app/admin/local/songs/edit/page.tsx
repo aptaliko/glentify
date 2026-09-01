@@ -2,15 +2,51 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { nativeApiFetch } from '@/lib/nativeApiFetch';
 import { preferencesStore } from '@/lib/preferencesStore';
 import { getSelectedEditSongId, clearSelectedEditSongId } from '@/lib/adminEditStore';
 import { loadReferenceData } from '@/lib/offlineCache';
-import { loadSongsListCache } from '@/lib/songsListCache';
+import { loadSongsListCache, type CachedSong } from '@/lib/songsListCache';
 import { getQueuedActions, enqueue } from '@/lib/syncQueue';
 import { resolveSongForEdit } from '@/lib/songsMerge';
 import { useSyncQueue } from '@/components/SyncQueueProvider';
 import SongAxisEditor, { type AxisValueEntry } from '@/components/SongAxisEditor';
 import PageNav from '@/components/PageNav';
+
+// Attempts a live GET of the song first, so axis values (which the offline reference-data
+// cache only ever refreshes on a manual sync tap, unlike the songs-list cache which
+// refreshes on every visit to admin/songs) are never stale or missing when this page opens.
+// Returns null on any failure (offline, network error, non-ok response — 404 included, since
+// a pending-edit overlay or the cache fallback still needs a chance to resolve this song) so
+// the caller can fall back to the cached data exactly as it did before this existed.
+async function fetchLiveSong(
+  id: number
+): Promise<{ base: CachedSong; baseAxisValues: AxisValueEntry[] } | null> {
+  try {
+    const liveRes = await nativeApiFetch(`/api/songs/${id}`);
+    if (!liveRes.ok) return null;
+    const data = await liveRes.json();
+    const base: CachedSong = {
+      id: data.id,
+      title: data.title,
+      lyrics: data.lyrics,
+      imageUrl: data.imageUrl,
+      notes: data.notes,
+      maleKey: data.maleKey,
+      femaleKey: data.femaleKey,
+    };
+    const baseAxisValues: AxisValueEntry[] = (data.axisValues ?? []).map(
+      (v: { axisType: string; refId: number | null; yearValue: number | null }) => ({
+        axisType: v.axisType,
+        refId: v.refId,
+        yearValue: v.yearValue,
+      })
+    );
+    return { base, baseAxisValues };
+  } catch {
+    return null;
+  }
+}
 
 export default function LocalEditSongPage() {
   const router = useRouter();
@@ -38,12 +74,14 @@ export default function LocalEditSongPage() {
 
   useEffect(() => {
     if (songId === null) return;
-    Promise.all([loadSongsListCache(), loadReferenceData(), getQueuedActions()]).then(
-      ([cachedSongs, referenceData, actions]) => {
-        const base = cachedSongs?.find((s) => s.id === songId) ?? null;
-        const baseAxisValues: AxisValueEntry[] = (referenceData?.axisValues ?? [])
-          .filter((v) => v.songId === songId)
-          .map((v) => ({ axisType: v.axisType, refId: v.refId, yearValue: v.yearValue }));
+    Promise.all([fetchLiveSong(songId), loadSongsListCache(), loadReferenceData(), getQueuedActions()])
+      .then(([live, cachedSongs, referenceData, actions]) => {
+        const base = live?.base ?? cachedSongs?.find((s) => s.id === songId) ?? null;
+        const baseAxisValues: AxisValueEntry[] =
+          live?.baseAxisValues ??
+          (referenceData?.axisValues ?? [])
+            .filter((v) => v.songId === songId)
+            .map((v) => ({ axisType: v.axisType, refId: v.refId, yearValue: v.yearValue }));
         const result = resolveSongForEdit(songId, base, baseAxisValues, actions);
         setHasPendingEdit(result.hasPendingEdit);
         if (result.song) {
@@ -59,8 +97,11 @@ export default function LocalEditSongPage() {
           setNotFound(true);
         }
         setResolved(true);
-      }
-    );
+      })
+      .catch(() => {
+        setNotFound(true);
+        setResolved(true);
+      });
   }, [songId]);
 
   async function handleSubmit(e: React.FormEvent) {

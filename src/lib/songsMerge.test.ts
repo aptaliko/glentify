@@ -120,6 +120,17 @@ describe('mergeSongsWithPending', () => {
       { id: 2, title: 'Τραγούδι Β', lyrics: null, status: 'active' },
     ]);
   });
+
+  it('when the same song has two queued edits, the later one in queue order wins', () => {
+    const actions = [
+      makeAction({ type: 'song-update', payload: { songId: 1, title: 'Πρώτη επεξεργασία', lyrics: 'Πρώτοι στίχοι', ...emptySongFields } }),
+      makeAction({ type: 'song-update', payload: { songId: 1, title: 'Δεύτερη επεξεργασία', lyrics: 'Δεύτεροι στίχοι', ...emptySongFields } }),
+    ];
+    expect(mergeSongsWithPending(base, actions)).toEqual([
+      { id: 1, title: 'Δεύτερη επεξεργασία', lyrics: 'Δεύτεροι στίχοι', status: 'edited' },
+      { id: 2, title: 'Τραγούδι Β', lyrics: null, status: 'active' },
+    ]);
+  });
 });
 
 describe('resolveSongForEdit', () => {
@@ -187,5 +198,24 @@ describe('resolveSongForEdit', () => {
 
   it('returns a null song when there is no base row and no pending edit', () => {
     expect(resolveSongForEdit(99, null, [], [])).toEqual({ song: null, hasPendingEdit: false });
+  });
+
+  it('when the same song has two queued edits, the later one in queue order wins', () => {
+    const firstAxisValues: AxisValueEntry[] = [{ axisType: 'genre', refId: 1, yearValue: null }];
+    const secondAxisValues: AxisValueEntry[] = [{ axisType: 'year', refId: null, yearValue: 1995 }];
+    const actions = [
+      makeAction({
+        type: 'song-update',
+        payload: { songId: 1, title: 'Πρώτη επεξεργασία', lyrics: 'Πρώτοι στίχοι', imageUrl: null, notes: null, maleKey: null, femaleKey: null, axisValues: firstAxisValues },
+      }),
+      makeAction({
+        type: 'song-update',
+        payload: { songId: 1, title: 'Δεύτερη επεξεργασία', lyrics: 'Δεύτεροι στίχοι', imageUrl: null, notes: null, maleKey: null, femaleKey: null, axisValues: secondAxisValues },
+      }),
+    ];
+    expect(resolveSongForEdit(1, base, baseAxisValues, actions)).toEqual({
+      song: { title: 'Δεύτερη επεξεργασία', lyrics: 'Δεύτεροι στίχοι', imageUrl: null, notes: null, maleKey: null, femaleKey: null, axisValues: secondAxisValues },
+      hasPendingEdit: true,
+    });
   });
 });
