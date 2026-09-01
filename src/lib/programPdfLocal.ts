@@ -28,7 +28,21 @@ export async function generateProgramPdfLocal(programTitle: string, sequences: P
     loadFontBytes('/fonts/DejaVuSans.ttf'),
     loadFontBytes('/fonts/DejaVuSans-Bold.ttf'),
   ]);
-  const doc = new PDFDocument({ margin: 50 });
+  // font: null (not simply omitted) is required here: pdfkit's browser bundle
+  // (pdfkit.browser.mjs, resolved via this package's "default" export condition — unlike the
+  // Node build web's programPdf.ts resolves to) does not auto-register standard fonts. The
+  // PDFDocument constructor unconditionally defaults an unset `font` option to 'Helvetica' and
+  // eagerly calls this.font('Helvetica') during construction — before drawProgramPdf below
+  // ever gets a chance to set the real (embedded, custom) font — which throws immediately
+  // ("Standard font "Helvetica" is not registered. Call registerStdFonts() before using it.")
+  // since this bundle never calls registerStdFonts(). Passing an explicit `font: null` is
+  // pdfkit's own documented way to skip that eager default; we always set a real font via
+  // drawProgramPdf immediately after, so no default is ever needed. Confirmed via
+  // node_modules/pdfkit/js/pdfkit.browser.mjs's PDFDocument constructor and initFonts().
+  // The `@types/pdfkit` declaration only allows `font?: string | undefined` — it doesn't know
+  // about this `null`-vs-`undefined` distinction, so the cast below is bridging a type-defs
+  // gap, not working around a real type error.
+  const doc = new PDFDocument({ margin: 50, font: null as unknown as string | undefined });
   drawProgramPdf(doc, programTitle, sequences, { regular, bold });
   // toBlob() attaches its data/end/error listeners immediately when called — call it (and
   // capture the pending Promise) BEFORE doc.end(), matching the exact listeners-then-end

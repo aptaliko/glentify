@@ -62,7 +62,12 @@ export default function LocalProgramPage() {
       await Filesystem.writeFile({ path: filename, data: base64, directory: Directory.Cache });
       const { uri } = await Filesystem.getUri({ path: filename, directory: Directory.Cache });
       await Share.share({ url: uri, title });
-    } catch {
+    } catch (err) {
+      // The generic Greek message is what the user sees; the real cause (this is the first
+      // on-device execution of pdfkit's browser build + Filesystem/Share — see
+      // programPdfLocal.ts and the mobile-roadmap's "sharper on-device risk framing") goes to
+      // the console so it's visible via chrome://inspect or logcat while diagnosing.
+      console.error('PDF export failed:', err);
       setExportError('Η εξαγωγή απέτυχε.');
     } finally {
       setExporting(false);
