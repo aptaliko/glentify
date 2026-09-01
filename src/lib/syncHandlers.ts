@@ -4,6 +4,7 @@ import { registerHandler } from './syncQueue';
 import type { SyncOutcome } from './syncQueue';
 import type { AddCollaboratorPayload, RemoveCollaboratorPayload } from './collaboratorsMerge';
 import type { CreateProgramPayload, RenameProgramPayload, DeleteProgramPayload } from './programsMerge';
+import type { CreateSongPayload, UpdateSongPayload, DeleteSongPayload } from './songsMerge';
 
 export type SessionSavePayload =
   | { destination: 'new'; title: string; sequences: { title: string; songIds: number[] }[] }
@@ -133,6 +134,56 @@ async function handleDeleteProgramSync(payload: unknown): Promise<SyncOutcome> {
   return 'item-error';
 }
 
+async function handleCreateSongSync(payload: unknown): Promise<SyncOutcome> {
+  const body = payload as CreateSongPayload;
+  const res = await nativeApiFetch(
+    '/api/songs',
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
+    undefined,
+    { redirectOn401: false }
+  );
+  if (res.ok) return 'success';
+  if (res.status === 401 || res.status >= 500) return 'systemic-error';
+  return 'item-error';
+}
+
+async function handleUpdateSongSync(payload: unknown): Promise<SyncOutcome> {
+  const { songId, ...body } = payload as UpdateSongPayload;
+  const res = await nativeApiFetch(
+    `/api/songs/${encodeURIComponent(songId)}`,
+    { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
+    undefined,
+    { redirectOn401: false }
+  );
+  if (res.ok) return 'success';
+  // Already gone (deleted elsewhere before this update synced) — the desired end state
+  // can't be reached, but there's nothing left to update either; matches
+  // handleDeleteProgramSync's 404-as-success precedent.
+  if (res.status === 404) return 'success';
+  if (res.status === 401 || res.status >= 500) return 'systemic-error';
+  return 'item-error';
+}
+
+async function handleDeleteSongSync(payload: unknown): Promise<SyncOutcome> {
+  const { songId } = payload as DeleteSongPayload;
+  const res = await nativeApiFetch(
+    `/api/songs/${encodeURIComponent(songId)}`,
+    { method: 'DELETE' },
+    undefined,
+    { redirectOn401: false }
+  );
+  if (res.ok) return 'success';
+  // Already gone — the desired end state is already true. Reachable as a genuine 404
+  // since Task 1 fixed the route to distinguish "not found" from a real conflict.
+  if (res.status === 404) return 'success';
+  if (res.status === 401 || res.status >= 500) return 'systemic-error';
+  // 409: a real, permanent conflict (song already played in a session, or is a session's
+  // current song — deleteSong's own documented conflict cases). item-error, retried up
+  // to the existing cap, then needsAttention; mergeSongsWithPending's needs-attention
+  // delete case makes the row reappear rather than staying hidden once this happens.
+  return 'item-error';
+}
+
 // The single place every sync-queue action type gets registered. Called once per app
 // load by SyncQueueProvider; the `initialized` guard makes a second call (e.g. from a
 // React effect re-running) a harmless no-op instead of double-registering.
@@ -147,4 +198,7 @@ export function initSyncHandlers(): void {
   registerHandler('program-create', handleCreateProgramSync);
   registerHandler('program-rename', handleRenameProgramSync);
   registerHandler('program-delete', handleDeleteProgramSync);
+  registerHandler('song-create', handleCreateSongSync);
+  registerHandler('song-update', handleUpdateSongSync);
+  registerHandler('song-delete', handleDeleteSongSync);
 }
