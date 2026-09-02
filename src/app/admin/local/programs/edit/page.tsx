@@ -2,18 +2,19 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { nativeApiFetch } from '@/lib/nativeApiFetch';
 import { preferencesStore } from '@/lib/preferencesStore';
 import { getSelectedEditProgramId, clearSelectedEditProgramId } from '@/lib/adminEditStore';
 import { enqueue, getQueuedActions } from '@/lib/syncQueue';
 import type { QueuedAction } from '@/lib/syncQueue';
 import { useSyncQueue } from '@/components/SyncQueueProvider';
-import { saveCollaboratorsCache, loadCollaboratorsCache } from '@/lib/collaboratorsCache';
 import { mergeCollaboratorsWithPending, isCollaboratorQueueActionForProgram } from '@/lib/collaboratorsMerge';
-import { loadProgramDetail, saveProgramDetail, saveSequenceSongs, type CachedProgramDetail, type CachedSequenceSong } from '@/lib/programDetailCache';
 import { mergeSequencesWithPending, type DisplaySequence } from '@/lib/sequencesMerge';
 import { mintDraftId } from '@/lib/draftIds';
-import { loadSongsListCache } from '@/lib/songsListCache';
+import { loadReferenceData } from '@/lib/offlineCache';
+import { toProgramDetail, toCollaboratorsView, buildSongTitleMap } from '@/lib/offlineProgramView';
+import type { CachedProgramDetail, CachedSequenceSong } from '@/lib/referenceData';
 import PageNav from '@/components/PageNav';
 
 interface Song {
@@ -63,14 +64,14 @@ export default function LocalEditProgramPage() {
       .finally(() => setChecked(true));
   }, []);
 
-  // Online: fetches the program + every sequence's songs, writes the full detail to the
-  // offline cache, and overlays any still-pending queue actions on top before rendering.
-  // Offline: falls back to the last-cached detail (also overlaid). Returns the program's
-  // role either way so the mount effect can thread it into loadCollaborators without
-  // reading back React state in the same tick (which would see the stale pre-update value).
+  // Online: fetches the program + every sequence's songs and overlays any still-pending
+  // queue actions on top before rendering. Offline: falls back to the reference-data blob
+  // (also overlaid). Returns the program's role either way so the mount effect can thread
+  // it into loadCollaborators without reading back React state in the same tick (which
+  // would see the stale pre-update value).
   async function loadSequences(id: number): Promise<'creator' | 'collaborator' | null> {
-    const [actions, songsCache] = await Promise.all([getQueuedActions(), loadSongsListCache()]);
-    const titles = new Map<number, string>((songsCache ?? []).map((s) => [s.id, s.title]));
+    const [actions, cached] = await Promise.all([getQueuedActions(), loadReferenceData().catch(() => null)]);
+    const titles = buildSongTitleMap(cached?.songs ?? [], cached?.sharedSongs ?? []);
     setSongTitles(titles);
     try {
       const res = await nativeApiFetch(`/api/programs/${id}`);
@@ -78,7 +79,6 @@ export default function LocalEditProgramPage() {
       const data = await res.json();
       setTitle(data.title);
       setRole(data.role);
-      // Fetch each sequence's songs so the offline cache is complete for later editing.
       const sequences = await Promise.all(
         (data.sequences as { id: number; title: string; position: number }[]).map(async (seq) => {
           const sres = await nativeApiFetch(`/api/programs/${id}/sequences/${seq.id}`);
@@ -95,25 +95,19 @@ export default function LocalEditProgramPage() {
           return { id: seq.id, title: seq.title, position: seq.position, songs };
         })
       );
-      const detail: CachedProgramDetail = {
-        programId: id,
-        title: data.title,
-        role: data.role,
-        sequences,
-        cachedAt: new Date().toISOString(),
-      };
-      await saveProgramDetail(detail);
+      const detail: CachedProgramDetail = { programId: id, title: data.title, role: data.role, sequences, cachedAt: '' };
       setSequencesUnavailableOffline(false);
       setDisplaySequences(mergeSequencesWithPending(detail, actions, titles));
       return data.role;
     } catch {
-      const cached = await loadProgramDetail(id).catch(() => null);
-      if (cached) {
-        setTitle(cached.title);
-        setRole(cached.role);
+      const program = cached?.programs.find((p) => p.id === id) ?? null;
+      if (program && cached && cached.primedAt !== null) {
+        const detail = toProgramDetail(program, titles);
+        setTitle(detail.title);
+        setRole(detail.role);
         setSequencesUnavailableOffline(false);
-        setDisplaySequences(mergeSequencesWithPending(cached, actions, titles));
-        return cached.role;
+        setDisplaySequences(mergeSequencesWithPending(detail, actions, titles));
+        return detail.role;
       }
       setSequencesUnavailableOffline(true);
       return null;
@@ -150,28 +144,15 @@ export default function LocalEditProgramPage() {
       setCollaborators(data.collaborators);
       setOfflineCollaborators(false);
       setCollaboratorsUnavailable(false);
-      if (roleForCache && userForCache) {
-        try {
-          await saveCollaboratorsCache({
-            programId: id,
-            role: roleForCache,
-            creator: data.creator,
-            collaborators: data.collaborators,
-            currentUser: userForCache,
-            cachedAt: new Date().toISOString(),
-          });
-        } catch {
-          // A cache-write failure must not affect the already-successful state above,
-          // nor trigger the outer catch's offline-UI logic — the fetch just succeeded.
-        }
-      }
     } catch {
-      const cached = await loadCollaboratorsCache(id).catch(() => null);
-      if (cached) {
-        setRole(cached.role);
-        setCreator(cached.creator);
-        setCollaborators(cached.collaborators);
-        setCurrentUser(cached.currentUser);
+      const cached = await loadReferenceData().catch(() => null);
+      const program = cached?.programs.find((p) => p.id === id) ?? null;
+      if (program && cached && cached.primedAt !== null) {
+        const view = toCollaboratorsView(program, cached.currentUser);
+        setRole(view.role);
+        setCreator(view.creator);
+        setCollaborators(view.collaborators);
+        if (view.currentUser) setCurrentUser(view.currentUser);
         setOfflineCollaborators(true);
         setCollaboratorsUnavailable(false);
       } else {
@@ -290,7 +271,7 @@ export default function LocalEditProgramPage() {
     setSearch('');
     setSearchResults([]);
     if (programId === null) return;
-    // Best-effort online refresh of this sequence's songs into the cache; offline this
+    // Best-effort online refresh of this sequence's songs into React state; offline this
     // throws and we keep the already-merged cached/overlaid songs.
     try {
       const res = await nativeApiFetch(`/api/programs/${programId}/sequences/${seqId}`);
@@ -299,15 +280,24 @@ export default function LocalEditProgramPage() {
       const rawSongs = Array.isArray(data.songs)
         ? (data.songs as { sequenceSongId: number; song: { id: number; title: string } }[])
         : [];
-      const songs: CachedSequenceSong[] = rawSongs.map((e) => ({
+      const freshSongs: CachedSequenceSong[] = rawSongs.map((e) => ({
         sequenceSongId: e.sequenceSongId,
         songId: e.song.id,
         title: e.song.title,
       }));
-      await saveSequenceSongs(programId, seqId, songs);
-      const actions = await getQueuedActions();
-      const cached = await loadProgramDetail(programId);
-      if (cached) setDisplaySequences(mergeSequencesWithPending(cached, actions, songTitles));
+      const [actions, cached] = await Promise.all([getQueuedActions(), loadReferenceData().catch(() => null)]);
+      const program = cached?.programs.find((p) => p.id === programId);
+      if (program) {
+        // Rebuild from the blob slice (real ids) with the just-fetched sequence's songs
+        // overlaid, then re-apply the queue overlay. Draft sequences absent from the blob
+        // come back through the queue overlay in mergeSequencesWithPending.
+        const detail = toProgramDetail(program, songTitles);
+        const withFresh: CachedProgramDetail = {
+          ...detail,
+          sequences: detail.sequences.map((s) => (s.id === seqId ? { ...s, songs: freshSongs } : s)),
+        };
+        setDisplaySequences(mergeSequencesWithPending(withFresh, actions, songTitles));
+      }
     } catch {
       // offline — displaySequences already holds the cached+overlaid songs
     }
@@ -319,10 +309,10 @@ export default function LocalEditProgramPage() {
       const res = await nativeApiFetch(`/api/songs?search=${encodeURIComponent(search)}`);
       setSearchResults(await res.json());
     } catch {
-      const cache = (await loadSongsListCache()) ?? [];
+      const cached = await loadReferenceData().catch(() => null);
       const q = search.toLowerCase();
       setSearchResults(
-        cache.filter((s) => s.title.toLowerCase().includes(q)).map((s) => ({ id: s.id, title: s.title }))
+        (cached?.songs ?? []).filter((s) => s.title.toLowerCase().includes(q)).map((s) => ({ id: s.id, title: s.title }))
       );
     }
   }
@@ -441,7 +431,10 @@ export default function LocalEditProgramPage() {
           <div className="card-body gap-3 p-4">
             <h2 className="font-semibold">Συνεργάτες</h2>
             {collaboratorsUnavailable && (
-              <p className="text-sm text-base-content/50">Άγνωστο χωρίς σύνδεση.</p>
+              <p className="text-sm text-base-content/50">
+                Άγνωστο χωρίς σύνδεση.{' '}
+                <Link href="/" className="link">Προετοιμασία για offline</Link>
+              </p>
             )}
             {offlineCollaborators && (
               <p className="text-sm text-warning">Χωρίς σύνδεση — τελευταία γνωστά δεδομένα.</p>
@@ -520,7 +513,8 @@ export default function LocalEditProgramPage() {
 
       {sequencesUnavailableOffline ? (
         <p className="text-sm text-base-content/50">
-          Η επεξεργασία σειρών δεν είναι διαθέσιμη χωρίς σύνδεση.
+          Η επεξεργασία σειρών δεν είναι διαθέσιμη χωρίς σύνδεση.{' '}
+          <Link href="/" className="link">Προετοιμασία για offline</Link>
         </p>
       ) : (
         <>
