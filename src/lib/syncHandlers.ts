@@ -5,6 +5,67 @@ import type { SyncOutcome } from './syncQueue';
 import type { AddCollaboratorPayload, RemoveCollaboratorPayload } from './collaboratorsMerge';
 import type { CreateProgramPayload, RenameProgramPayload, DeleteProgramPayload } from './programsMerge';
 import type { CreateSongPayload, UpdateSongPayload, DeleteSongPayload } from './songsMerge';
+import { loadDraftMap, recordResolution, resolveOne, isDraftId, type DraftEntity } from './draftIds';
+
+interface TaxonomyCreatePayload { draftId: number; name: string; parentId: number | null }
+interface TaxonomyDeletePayload { id: number }
+
+const TAXONOMY_ENTITIES: DraftEntity[] = ['regions', 'genres', 'rhythms', 'dromoi', 'composers'];
+
+function makeTaxonomyCreateHandler(entity: DraftEntity) {
+  return async function (payload: unknown): Promise<SyncOutcome> {
+    const { draftId, name, parentId } = payload as TaxonomyCreatePayload;
+    // Regions can have a draft parent created earlier in the same offline session.
+    let resolvedParent: number | null = parentId;
+    if (parentId !== null && isDraftId(parentId)) {
+      const map = await loadDraftMap();
+      const r = resolveOne(map, 'regions', parentId);
+      if (r === null) return 'item-error'; // parent create hasn't synced yet — wait
+      resolvedParent = r;
+    }
+    const body = entity === 'regions' ? { name, parentId: resolvedParent } : { name };
+    const res = await nativeApiFetch(
+      `/api/${entity}`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
+      undefined,
+      { redirectOn401: false }
+    );
+    if (res.ok) {
+      const created = await res.json();
+      if (created && typeof created.id === 'number') await recordResolution(entity, draftId, created.id);
+      return 'success';
+    }
+    if (res.status === 401 || res.status >= 500) return 'systemic-error';
+    return 'item-error';
+  };
+}
+
+function makeTaxonomyDeleteHandler(entity: DraftEntity) {
+  return async function (payload: unknown): Promise<SyncOutcome> {
+    const { id } = payload as TaxonomyDeletePayload;
+    // A draft created and deleted in the same session: the create synced first and recorded
+    // its real id; resolve to it. If unresolved, the create is still queued ahead — wait.
+    let realId = id;
+    if (isDraftId(id)) {
+      const map = await loadDraftMap();
+      const r = resolveOne(map, entity, id);
+      if (r === null) return 'item-error';
+      realId = r;
+    }
+    const res = await nativeApiFetch(
+      `/api/${entity}/${encodeURIComponent(realId)}`,
+      { method: 'DELETE' },
+      undefined,
+      { redirectOn401: false }
+    );
+    if (res.ok) return 'success';
+    if (res.status === 404) return 'success'; // already gone
+    if (res.status === 401 || res.status >= 500) return 'systemic-error';
+    // 403 (non-owner) and 409 (still referenced by a song axis value / has child regions)
+    // are both permanent — item-error retries to the cap, then surfaces via needsAttention.
+    return 'item-error';
+  };
+}
 
 export type SessionSavePayload =
   | { destination: 'new'; title: string; sequences: { title: string; songIds: number[] }[] }
@@ -201,4 +262,8 @@ export function initSyncHandlers(): void {
   registerHandler('song-create', handleCreateSongSync);
   registerHandler('song-update', handleUpdateSongSync);
   registerHandler('song-delete', handleDeleteSongSync);
+  for (const entity of TAXONOMY_ENTITIES) {
+    registerHandler(`${entity}-create`, makeTaxonomyCreateHandler(entity));
+    registerHandler(`${entity}-delete`, makeTaxonomyDeleteHandler(entity));
+  }
 }
