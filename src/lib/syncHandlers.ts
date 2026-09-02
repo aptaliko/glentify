@@ -5,7 +5,7 @@ import type { SyncOutcome } from './syncQueue';
 import type { AddCollaboratorPayload, RemoveCollaboratorPayload } from './collaboratorsMerge';
 import type { CreateProgramPayload, RenameProgramPayload, DeleteProgramPayload } from './programsMerge';
 import type { CreateSongPayload, UpdateSongPayload, DeleteSongPayload } from './songsMerge';
-import { loadDraftMap, recordResolution, resolveOne, isDraftId, type DraftEntity } from './draftIds';
+import { loadDraftMap, recordResolution, resolveOne, resolveMany, isDraftId, type DraftEntity } from './draftIds';
 
 interface TaxonomyCreatePayload { draftId: number; name: string; parentId: number | null }
 interface TaxonomyDeletePayload { id: number }
@@ -245,6 +245,135 @@ async function handleDeleteSongSync(payload: unknown): Promise<SyncOutcome> {
   return 'item-error';
 }
 
+interface SeqCreatePayload { draftId: number; programId: number; title: string }
+interface SeqRenamePayload { programId: number; sequenceId: number; title: string }
+interface SeqDeletePayload { programId: number; sequenceId: number }
+interface SeqAddSongPayload { draftId: number; programId: number; sequenceId: number; songId: number }
+interface SeqRemoveSongPayload { programId: number; sequenceId: number; sequenceSongId: number }
+interface SeqReorderPayload { programId: number; sequenceId: number; orderedIds: number[] }
+
+// Resolves a possibly-draft id against the current draft map; returns null if still
+// unresolved (caller returns item-error to wait for the create ahead in the queue).
+async function resolveSeqId(entity: 'sequence' | 'sequence-song' | 'song', id: number): Promise<number | null> {
+  if (!isDraftId(id)) return id;
+  const map = await loadDraftMap();
+  return resolveOne(map, entity, id);
+}
+
+async function handleSequenceCreateSync(payload: unknown): Promise<SyncOutcome> {
+  const { draftId, programId, title } = payload as SeqCreatePayload;
+  const pid = await resolveSeqId('sequence', programId); // program may itself be a draft
+  if (pid === null) return 'item-error';
+  const res = await nativeApiFetch(
+    `/api/programs/${encodeURIComponent(pid)}/sequences`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title }) },
+    undefined,
+    { redirectOn401: false }
+  );
+  if (res.ok) {
+    const created = await res.json();
+    if (created && typeof created.id === 'number') await recordResolution('sequence', draftId, created.id);
+    return 'success';
+  }
+  if (res.status === 404) return 'success';
+  if (res.status === 401 || res.status >= 500) return 'systemic-error';
+  return 'item-error';
+}
+
+async function handleSequenceRenameSync(payload: unknown): Promise<SyncOutcome> {
+  const { programId, sequenceId, title } = payload as SeqRenamePayload;
+  const pid = await resolveSeqId('sequence', programId);
+  const sid = await resolveSeqId('sequence', sequenceId);
+  if (pid === null || sid === null) return 'item-error';
+  const res = await nativeApiFetch(
+    `/api/programs/${encodeURIComponent(pid)}/sequences/${encodeURIComponent(sid)}`,
+    { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title }) },
+    undefined,
+    { redirectOn401: false }
+  );
+  if (res.ok || res.status === 404) return 'success';
+  if (res.status === 401 || res.status >= 500) return 'systemic-error';
+  return 'item-error';
+}
+
+async function handleSequenceDeleteSync(payload: unknown): Promise<SyncOutcome> {
+  const { programId, sequenceId } = payload as SeqDeletePayload;
+  const pid = await resolveSeqId('sequence', programId);
+  const sid = await resolveSeqId('sequence', sequenceId);
+  if (pid === null || sid === null) return 'item-error';
+  const res = await nativeApiFetch(
+    `/api/programs/${encodeURIComponent(pid)}/sequences/${encodeURIComponent(sid)}`,
+    { method: 'DELETE' },
+    undefined,
+    { redirectOn401: false }
+  );
+  if (res.ok || res.status === 404) return 'success';
+  if (res.status === 401 || res.status >= 500) return 'systemic-error';
+  return 'item-error';
+}
+
+async function handleSequenceAddSongSync(payload: unknown): Promise<SyncOutcome> {
+  const { draftId, programId, sequenceId, songId } = payload as SeqAddSongPayload;
+  const pid = await resolveSeqId('sequence', programId);
+  const sid = await resolveSeqId('sequence', sequenceId);
+  const song = await resolveSeqId('song', songId);
+  if (pid === null || sid === null || song === null) return 'item-error';
+  const res = await nativeApiFetch(
+    `/api/programs/${encodeURIComponent(pid)}/sequences/${encodeURIComponent(sid)}/songs`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ songId: song }) },
+    undefined,
+    { redirectOn401: false }
+  );
+  if (res.ok) {
+    const body = await res.json().catch(() => null);
+    // The route returns { ok: true }; if it also returns the join-row id, record it so a
+    // later reorder/remove referencing this draft entry can resolve. When absent, a draft
+    // remove/reorder of this brand-new entry can't resolve and will surface via needsAttention
+    // — acceptable v1 (the common flow adds then syncs before reordering).
+    if (body && typeof body.sequenceSongId === 'number') await recordResolution('sequence-song', draftId, body.sequenceSongId);
+    return 'success';
+  }
+  if (res.status === 404) return 'success';
+  if (res.status === 401 || res.status >= 500) return 'systemic-error';
+  return 'item-error';
+}
+
+async function handleSequenceRemoveSongSync(payload: unknown): Promise<SyncOutcome> {
+  const { programId, sequenceId, sequenceSongId } = payload as SeqRemoveSongPayload;
+  const pid = await resolveSeqId('sequence', programId);
+  const sid = await resolveSeqId('sequence', sequenceId);
+  const entry = await resolveSeqId('sequence-song', sequenceSongId);
+  if (pid === null || sid === null || entry === null) return 'item-error';
+  const res = await nativeApiFetch(
+    `/api/programs/${encodeURIComponent(pid)}/sequences/${encodeURIComponent(sid)}/songs/${encodeURIComponent(entry)}`,
+    { method: 'DELETE' },
+    undefined,
+    { redirectOn401: false }
+  );
+  if (res.ok || res.status === 404) return 'success';
+  if (res.status === 401 || res.status >= 500) return 'systemic-error';
+  return 'item-error';
+}
+
+async function handleSequenceReorderSync(payload: unknown): Promise<SyncOutcome> {
+  const { programId, sequenceId, orderedIds } = payload as SeqReorderPayload;
+  const pid = await resolveSeqId('sequence', programId);
+  const sid = await resolveSeqId('sequence', sequenceId);
+  if (pid === null || sid === null) return 'item-error';
+  const map = await loadDraftMap();
+  const resolved = resolveMany(map, 'sequence-song', orderedIds);
+  if (!resolved.allResolved) return 'item-error';
+  const res = await nativeApiFetch(
+    `/api/programs/${encodeURIComponent(pid)}/sequences/${encodeURIComponent(sid)}/songs`,
+    { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ orderedIds: resolved.ids }) },
+    undefined,
+    { redirectOn401: false }
+  );
+  if (res.ok || res.status === 404) return 'success';
+  if (res.status === 401 || res.status >= 500) return 'systemic-error';
+  return 'item-error';
+}
+
 // The single place every sync-queue action type gets registered. Called once per app
 // load by SyncQueueProvider; the `initialized` guard makes a second call (e.g. from a
 // React effect re-running) a harmless no-op instead of double-registering.
@@ -266,4 +395,10 @@ export function initSyncHandlers(): void {
     registerHandler(`${entity}-create`, makeTaxonomyCreateHandler(entity));
     registerHandler(`${entity}-delete`, makeTaxonomyDeleteHandler(entity));
   }
+  registerHandler('sequence-create', handleSequenceCreateSync);
+  registerHandler('sequence-rename', handleSequenceRenameSync);
+  registerHandler('sequence-delete', handleSequenceDeleteSync);
+  registerHandler('sequence-add-song', handleSequenceAddSongSync);
+  registerHandler('sequence-remove-song', handleSequenceRemoveSongSync);
+  registerHandler('sequence-reorder', handleSequenceReorderSync);
 }
