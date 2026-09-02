@@ -185,7 +185,10 @@ export default function ProgramsAdminPage() {
     <div className="flex flex-col gap-4">
       <h1 className="text-xl font-bold">Προγράμματα</h1>
       {programsUnavailable && (
-        <p className="text-sm text-base-content/50">Άγνωστο χωρίς σύνδεση.</p>
+        <p className="text-sm text-base-content/50">
+          Άγνωστο χωρίς σύνδεση — αυτή η λίστα αποθηκεύεται για offline χρήση μόνο αφού την ανοίξεις
+          μία φορά με σύνδεση.
+        </p>
       )}
       {offlinePrograms && (
         <p className="text-sm text-warning">Χωρίς σύνδεση — τελευταία γνωστά δεδομένα.</p>

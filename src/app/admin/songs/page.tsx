@@ -107,7 +107,12 @@ export default function SongsAdminPage() {
         <h1 className="text-xl font-bold">Τραγούδια</h1>
         <Link href="/admin/songs/new" className="btn btn-primary">Νέο τραγούδι</Link>
       </div>
-      {songsUnavailable && <p className="text-sm text-base-content/50">Άγνωστο χωρίς σύνδεση.</p>}
+      {songsUnavailable && (
+        <p className="text-sm text-base-content/50">
+          Άγνωστο χωρίς σύνδεση — αυτή η λίστα αποθηκεύεται για offline χρήση μόνο αφού την ανοίξεις
+          μία φορά με σύνδεση.
+        </p>
+      )}
       {offlineSongs && <p className="text-sm text-warning">Χωρίς σύνδεση — τελευταία γνωστά δεδομένα.</p>}
       {!songsUnavailable && (
         <>
