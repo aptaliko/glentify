@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { nativeApiFetch } from '@/lib/nativeApiFetch';
 import { isNativeApp } from '@/lib/platform';
 import { loadReferenceData } from '@/lib/offlineCache';
@@ -42,18 +43,28 @@ export default function SongAxisEditor({
       // Offline-safe: reads the already-cached ReferenceData blob instead of the five
       // live fetches below, so this renders correctly with no network at all — the fix
       // for "Κανένας άξονας ακόμη" swallowing the whole "+ Πρόσθεσε άξονα" UI offline.
-      loadReferenceData().then((data) => {
-        if (!data) {
+      loadReferenceData()
+        .then((data) => {
+          // Treat "no cached data at all" and "cached data has no axis types" the same
+          // way: both leave the user with nothing to tag with, and both need the same
+          // actionable "go sync" message rather than a silently empty card. The latter
+          // case is reachable even with a normalized, non-null blob — e.g. a device that
+          // synced once, long enough ago that the server's axis-type list was empty or
+          // not yet seeded, without ever re-syncing since.
+          const { axisTypes: types, optionsByAxis: options } = data ? resolveAxisEditorData(data) : { axisTypes: [], optionsByAxis: {} };
+          setAxisTypes(types);
+          setOptionsByAxis(options);
+          setReferenceDataMissing(types.length === 0);
+        })
+        .catch(() => {
+          // Any unexpected failure reading/parsing the cache (a still-malformed cached
+          // blob despite normalizeReferenceData's backfills, a genuine IndexedDB error)
+          // must not silently strand this UI at its initial empty state with zero
+          // indication anything is wrong — same "go sync again" recovery applies.
           setAxisTypes([]);
           setOptionsByAxis({});
           setReferenceDataMissing(true);
-          return;
-        }
-        const { axisTypes: types, optionsByAxis: options } = resolveAxisEditorData(data);
-        setAxisTypes(types);
-        setOptionsByAxis(options);
-        setReferenceDataMissing(false);
-      });
+        });
       return;
     }
     nativeApiFetch('/api/axis-types')
@@ -229,7 +240,13 @@ export default function SongAxisEditor({
             )}
           </div>
         ) : referenceDataMissing ? (
-          <span className="text-sm text-warning">Δεν υπάρχουν ακόμη αποθηκευμένα δεδομένα αξόνων — συνδέσου μία φορά για να συγχρονιστούν.</span>
+          <span className="text-sm text-warning">
+            Δεν υπάρχουν ακόμη αποθηκευμένα δεδομένα αξόνων.{' '}
+            <Link href="/" className="underline">
+              Πήγαινε στην αρχική και πάτα &quot;Συγχρονισμός τραγουδιών&quot;
+            </Link>{' '}
+            ενώ έχεις σύνδεση.
+          </span>
         ) : null}
       </div>
     </div>

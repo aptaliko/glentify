@@ -27,13 +27,22 @@ export interface ReferenceData {
 
 /**
  * Normalizes a ReferenceData blob loaded from disk/cache, tolerating data
- * persisted before the `programs`/`sharedSongs` fields existed. The
+ * persisted before the `programs`/`sharedSongs`/`axisTypes` fields existed. The
  * `ReferenceData` type annotation on `data` is what the compiler expects;
  * real-world cached blobs can still be missing these fields at runtime,
- * which is exactly the case this function exists to handle.
+ * which is exactly the case this function exists to handle. A missing
+ * `axisTypes` in particular used to make `resolveAxisEditorData` throw
+ * (it iterates the array directly), silently stranding SongAxisEditor's
+ * native branch with no Tags UI and no error shown — see
+ * src/lib/axisEditorData.ts and SongAxisEditor.tsx's native effect.
  */
 export function normalizeReferenceData(data: ReferenceData): ReferenceData {
-  return { ...data, programs: data.programs ?? [], sharedSongs: data.sharedSongs ?? [] };
+  return {
+    ...data,
+    programs: data.programs ?? [],
+    sharedSongs: data.sharedSongs ?? [],
+    axisTypes: data.axisTypes ?? [],
+  };
 }
 
 export function collectReferencedSongIds(programs: OfflineProgram[]): number[] {

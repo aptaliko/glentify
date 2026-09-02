@@ -84,6 +84,28 @@ describe('normalizeReferenceData', () => {
     const result = normalizeReferenceData(legacyData);
     expect(result.sharedSongs).toEqual([]);
   });
+
+  it('defaults axisTypes to an empty array when missing (pre-feature cached blob)', () => {
+    // Simulates a ReferenceData blob synced/cached before axisTypes was added to this
+    // shape (or from a device that has never re-synced since) — resolveAxisEditorData
+    // iterates referenceData.axisTypes directly and throws on undefined, which
+    // SongAxisEditor's native branch does not catch, silently stranding the Tags UI
+    // with no error shown. See src/lib/axisEditorData.ts.
+    const legacyData = {
+      songs: [],
+      sharedSongs: [],
+      axisValues: [],
+      regions: [],
+      rhythms: [],
+      dromoi: [],
+      composers: [],
+      genres: [],
+      programs: [],
+    } as unknown as ReferenceData;
+
+    const result = normalizeReferenceData(legacyData);
+    expect(result.axisTypes).toEqual([]);
+  });
 });
 
 describe('collectReferencedSongIds', () => {
