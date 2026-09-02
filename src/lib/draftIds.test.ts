@@ -38,5 +38,6 @@ describe('resolveMany', () => {
   it('flags allResolved false and keeps nulls out of ids when one is unresolved', () => {
     const r = resolveMany(map, 'sequence-song', [-1, -3]);
     expect(r.allResolved).toBe(false);
+    expect(r.ids).toEqual([11]);
   });
 });
