@@ -10,22 +10,15 @@ import type { QueuedAction } from '@/lib/syncQueue';
 import { useSyncQueue } from '@/components/SyncQueueProvider';
 import { saveCollaboratorsCache, loadCollaboratorsCache } from '@/lib/collaboratorsCache';
 import { mergeCollaboratorsWithPending, isCollaboratorQueueActionForProgram } from '@/lib/collaboratorsMerge';
+import { loadProgramDetail, saveProgramDetail, saveSequenceSongs, type CachedProgramDetail, type CachedSequenceSong } from '@/lib/programDetailCache';
+import { mergeSequencesWithPending, type DisplaySequence } from '@/lib/sequencesMerge';
+import { mintDraftId } from '@/lib/draftIds';
+import { loadSongsListCache } from '@/lib/songsListCache';
 import PageNav from '@/components/PageNav';
-
-interface Sequence {
-  id: number;
-  title: string;
-  position: number;
-}
 
 interface Song {
   id: number;
   title: string;
-}
-
-interface SequenceSongEntry {
-  sequenceSongId: number;
-  song: Song;
 }
 
 interface CurrentUser {
@@ -43,10 +36,10 @@ export default function LocalEditProgramPage() {
   const [programId, setProgramId] = useState<number | null>(null);
   const [checked, setChecked] = useState(false);
   const [title, setTitle] = useState('');
-  const [sequences, setSequences] = useState<Sequence[]>([]);
+  const [displaySequences, setDisplaySequences] = useState<DisplaySequence[]>([]);
+  const [songTitles, setSongTitles] = useState<Map<number, string>>(new Map());
   const [newSeqTitle, setNewSeqTitle] = useState('');
   const [expandedSeqId, setExpandedSeqId] = useState<number | null>(null);
-  const [seqSongs, setSeqSongs] = useState<SequenceSongEntry[]>([]);
   const [search, setSearch] = useState('');
   const [searchResults, setSearchResults] = useState<Song[]>([]);
   const [editingSeqId, setEditingSeqId] = useState<number | null>(null);
@@ -70,16 +63,57 @@ export default function LocalEditProgramPage() {
       .finally(() => setChecked(true));
   }, []);
 
-  async function loadProgram(id: number): Promise<{ role: 'creator' | 'collaborator' } | null> {
+  // Online: fetches the program + every sequence's songs, writes the full detail to the
+  // offline cache, and overlays any still-pending queue actions on top before rendering.
+  // Offline: falls back to the last-cached detail (also overlaid). Returns the program's
+  // role either way so the mount effect can thread it into loadCollaborators without
+  // reading back React state in the same tick (which would see the stale pre-update value).
+  async function loadSequences(id: number): Promise<'creator' | 'collaborator' | null> {
+    const [actions, songsCache] = await Promise.all([getQueuedActions(), loadSongsListCache()]);
+    const titles = new Map<number, string>((songsCache ?? []).map((s) => [s.id, s.title]));
+    setSongTitles(titles);
     try {
       const res = await nativeApiFetch(`/api/programs/${id}`);
+      if (!res.ok) throw new Error('bad status');
       const data = await res.json();
       setTitle(data.title);
-      setSequences(data.sequences);
       setRole(data.role);
+      // Fetch each sequence's songs so the offline cache is complete for later editing.
+      const sequences = await Promise.all(
+        (data.sequences as { id: number; title: string; position: number }[]).map(async (seq) => {
+          const sres = await nativeApiFetch(`/api/programs/${id}/sequences/${seq.id}`);
+          const sdata = await sres.json();
+          const rawSongs = Array.isArray(sdata.songs)
+            ? (sdata.songs as { sequenceSongId: number; song: { id: number; title: string } }[])
+            : [];
+          const songs: CachedSequenceSong[] = rawSongs.map((e) => ({
+            sequenceSongId: e.sequenceSongId,
+            songId: e.song.id,
+            title: e.song.title,
+          }));
+          return { id: seq.id, title: seq.title, position: seq.position, songs };
+        })
+      );
+      const detail: CachedProgramDetail = {
+        programId: id,
+        title: data.title,
+        role: data.role,
+        sequences,
+        cachedAt: new Date().toISOString(),
+      };
+      await saveProgramDetail(detail);
       setSequencesUnavailableOffline(false);
-      return { role: data.role };
+      setDisplaySequences(mergeSequencesWithPending(detail, actions, titles));
+      return data.role;
     } catch {
+      const cached = await loadProgramDetail(id).catch(() => null);
+      if (cached) {
+        setTitle(cached.title);
+        setRole(cached.role);
+        setSequencesUnavailableOffline(false);
+        setDisplaySequences(mergeSequencesWithPending(cached, actions, titles));
+        return cached.role;
+      }
       setSequencesUnavailableOffline(true);
       return null;
     }
@@ -148,12 +182,12 @@ export default function LocalEditProgramPage() {
   useEffect(() => {
     if (programId === null) return;
     (async () => {
-      // loadProgram and loadCurrentUser both catch their own network failures and never
+      // loadSequences and loadCurrentUser both catch their own network failures and never
       // reject, so Promise.all is correct here (no need for allSettled). Their return
       // values are threaded into loadCollaborators explicitly rather than read back from
       // React state in the same tick, which would see the pre-update, stale value.
-      const [programResult, user] = await Promise.all([loadProgram(programId), loadCurrentUser()]);
-      await loadCollaborators(programId, programResult?.role ?? null, user);
+      const [seqRole, user] = await Promise.all([loadSequences(programId), loadCurrentUser()]);
+      await loadCollaborators(programId, seqRole, user);
     })();
   }, [programId]);
 
@@ -183,33 +217,40 @@ export default function LocalEditProgramPage() {
       .catch(() => {});
   }, [programId, pendingCount, role, currentUser]);
 
-  async function refreshSequenceSongs(seqId: number) {
+  // Re-runs the sequences overlay whenever the queue's pendingCount actually changes for
+  // this program (e.g. a background sync completing after network restore), but not on
+  // the initial mount — the [programId] effect above already performs that first load.
+  const prevPendingSeqCountRef = useRef<{ programId: number; count: number } | null>(null);
+
+  useEffect(() => {
     if (programId === null) return;
-    const res = await nativeApiFetch(`/api/programs/${programId}/sequences/${seqId}`);
-    const data = await res.json();
-    setSeqSongs(data.songs);
-  }
+    const prevInfo = prevPendingSeqCountRef.current;
+    const isSameProgram = prevInfo !== null && prevInfo.programId === programId;
+    const prevCount = isSameProgram ? prevInfo.count : null;
+    prevPendingSeqCountRef.current = { programId, count: pendingCount };
+    if (prevCount !== null && prevCount !== pendingCount) {
+      loadSequences(programId);
+    }
+  }, [programId, pendingCount]);
 
   async function handleAddSequence(e: React.FormEvent) {
     e.preventDefault();
     if (programId === null) return;
-    await nativeApiFetch(`/api/programs/${programId}/sequences`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: newSeqTitle }),
-    });
+    await enqueue('sequence-create', { draftId: mintDraftId(), programId, title: newSeqTitle });
     setNewSeqTitle('');
-    await loadProgram(programId);
+    await notifyQueueChanged();
+    await loadSequences(programId);
   }
 
   async function handleDeleteSequence(seqId: number) {
     if (programId === null) return;
-    await nativeApiFetch(`/api/programs/${programId}/sequences/${seqId}`, { method: 'DELETE' });
+    await enqueue('sequence-delete', { programId, sequenceId: seqId });
     if (expandedSeqId === seqId) setExpandedSeqId(null);
-    await loadProgram(programId);
+    await notifyQueueChanged();
+    await loadSequences(programId);
   }
 
-  function startEditingSequence(seq: Sequence) {
+  function startEditingSequence(seq: DisplaySequence) {
     setEditingSeqId(seq.id);
     setEditingSeqTitle(seq.title);
   }
@@ -217,27 +258,26 @@ export default function LocalEditProgramPage() {
   async function handleRenameSequence(e: React.FormEvent, seqId: number) {
     e.preventDefault();
     if (programId === null) return;
-    await nativeApiFetch(`/api/programs/${programId}/sequences/${seqId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: editingSeqTitle }),
-    });
+    await enqueue('sequence-rename', { programId, sequenceId: seqId, title: editingSeqTitle });
     setEditingSeqId(null);
-    await loadProgram(programId);
+    await notifyQueueChanged();
+    await loadSequences(programId);
   }
 
   async function handleMoveSong(fromIndex: number, direction: -1 | 1) {
     if (expandedSeqId === null || programId === null) return;
+    const current = displaySequences.find((s) => s.id === expandedSeqId)?.songs ?? [];
     const toIndex = fromIndex + direction;
-    if (toIndex < 0 || toIndex >= seqSongs.length) return;
-    const reordered = [...seqSongs];
+    if (toIndex < 0 || toIndex >= current.length) return;
+    const reordered = [...current];
     [reordered[fromIndex], reordered[toIndex]] = [reordered[toIndex], reordered[fromIndex]];
-    setSeqSongs(reordered);
-    await nativeApiFetch(`/api/programs/${programId}/sequences/${expandedSeqId}/songs`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ orderedIds: reordered.map((entry) => entry.sequenceSongId) }),
+    await enqueue('sequence-reorder', {
+      programId,
+      sequenceId: expandedSeqId,
+      orderedIds: reordered.map((entry) => entry.sequenceSongId),
     });
+    await notifyQueueChanged();
+    await loadSequences(programId);
   }
 
   async function handleToggleExpand(seqId: number) {
@@ -248,29 +288,57 @@ export default function LocalEditProgramPage() {
     setExpandedSeqId(seqId);
     setSearch('');
     setSearchResults([]);
-    await refreshSequenceSongs(seqId);
+    if (programId === null) return;
+    // Best-effort online refresh of this sequence's songs into the cache; offline this
+    // throws and we keep the already-merged cached/overlaid songs.
+    try {
+      const res = await nativeApiFetch(`/api/programs/${programId}/sequences/${seqId}`);
+      const data = await res.json();
+      const rawSongs = Array.isArray(data.songs)
+        ? (data.songs as { sequenceSongId: number; song: { id: number; title: string } }[])
+        : [];
+      const songs: CachedSequenceSong[] = rawSongs.map((e) => ({
+        sequenceSongId: e.sequenceSongId,
+        songId: e.song.id,
+        title: e.song.title,
+      }));
+      await saveSequenceSongs(programId, seqId, songs);
+      const actions = await getQueuedActions();
+      const cached = await loadProgramDetail(programId);
+      if (cached) setDisplaySequences(mergeSequencesWithPending(cached, actions, songTitles));
+    } catch {
+      // offline — displaySequences already holds the cached+overlaid songs
+    }
   }
 
   async function handleSearch(e: React.FormEvent) {
     e.preventDefault();
-    const res = await nativeApiFetch(`/api/songs?search=${encodeURIComponent(search)}`);
-    setSearchResults(await res.json());
+    try {
+      const res = await nativeApiFetch(`/api/songs?search=${encodeURIComponent(search)}`);
+      setSearchResults(await res.json());
+    } catch {
+      const cache = (await loadSongsListCache()) ?? [];
+      const q = search.toLowerCase();
+      setSearchResults(
+        cache.filter((s) => s.title.toLowerCase().includes(q)).map((s) => ({ id: s.id, title: s.title }))
+      );
+    }
   }
 
   async function handleAddSong(songId: number) {
     if (expandedSeqId === null || programId === null) return;
-    await nativeApiFetch(`/api/programs/${programId}/sequences/${expandedSeqId}/songs`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ songId }),
-    });
-    await refreshSequenceSongs(expandedSeqId);
+    await enqueue('sequence-add-song', { draftId: mintDraftId(), programId, sequenceId: expandedSeqId, songId });
+    setSearch('');
+    setSearchResults([]);
+    await notifyQueueChanged();
+    await loadSequences(programId);
   }
 
   async function handleRemoveSong(entryId: number) {
     if (expandedSeqId === null || programId === null) return;
-    await nativeApiFetch(`/api/programs/${programId}/sequences/${expandedSeqId}/songs/${entryId}`, { method: 'DELETE' });
-    await refreshSequenceSongs(expandedSeqId);
+    await enqueue('sequence-remove-song', { programId, sequenceId: expandedSeqId, sequenceSongId: entryId });
+    await notifyQueueChanged();
+    await loadSequences(programId);
   }
 
   async function handleAddCollaborator(e: React.FormEvent) {
@@ -359,6 +427,7 @@ export default function LocalEditProgramPage() {
 
   const displayCollaborators =
     programId !== null ? mergeCollaboratorsWithPending(collaborators, pendingActions, programId) : [];
+  const expandedSongs = displaySequences.find((s) => s.id === expandedSeqId)?.songs ?? [];
 
   return (
     <div className="flex flex-col gap-4">
@@ -465,71 +534,80 @@ export default function LocalEditProgramPage() {
           </form>
 
           <ul className="flex flex-col gap-3">
-            {sequences.map((seq) => (
-              <li key={seq.id} className="card border border-base-300 bg-base-100">
-                <div className="card-body gap-3 p-4">
-                  {editingSeqId === seq.id ? (
-                    <form onSubmit={(e) => handleRenameSequence(e, seq.id)} className="flex items-center gap-2">
-                      <input
-                        value={editingSeqTitle}
-                        onChange={(e) => setEditingSeqTitle(e.target.value)}
-                        className="input input-bordered input-sm flex-1"
-                        autoFocus
-                        required
-                      />
-                      <button type="submit" className="btn btn-primary btn-sm">Αποθήκευση</button>
-                      <button type="button" onClick={() => setEditingSeqId(null)} className="btn btn-ghost btn-sm">Άκυρο</button>
-                    </form>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <button onClick={() => handleToggleExpand(seq.id)} className="btn btn-ghost btn-sm flex-1 justify-start">
-                        {expandedSeqId === seq.id ? '▾' : '▸'} {seq.title}
-                      </button>
-                      <button onClick={() => startEditingSequence(seq)} className="btn btn-ghost btn-sm">Μετονομασία</button>
-                      <button onClick={() => handleDeleteSequence(seq.id)} className="btn btn-ghost btn-sm text-error">Διαγραφή σειράς</button>
-                    </div>
-                  )}
-
-                  {expandedSeqId === seq.id && (
-                    <div className="flex flex-col gap-3 border-t border-base-300 pt-3">
-                      <ul className="flex flex-col gap-1">
-                        {seqSongs.map((entry, i) => (
-                          <li key={entry.sequenceSongId} className="flex items-center gap-2">
-                            <span className="badge badge-neutral badge-sm">{i + 1}</span>
-                            <span className="flex-1">{entry.song.title}</span>
-                            <button onClick={() => handleMoveSong(i, -1)} disabled={i === 0} className="btn btn-ghost btn-xs">↑</button>
-                            <button onClick={() => handleMoveSong(i, 1)} disabled={i === seqSongs.length - 1} className="btn btn-ghost btn-xs">↓</button>
-                            <button onClick={() => handleRemoveSong(entry.sequenceSongId)} className="btn btn-ghost btn-xs text-error">Αφαίρεση</button>
-                          </li>
-                        ))}
-                        {seqSongs.length === 0 && <li className="text-sm text-base-content/50">Κανένα τραγούδι ακόμη</li>}
-                      </ul>
-
-                      <form onSubmit={handleSearch} className="flex gap-2">
+            {displaySequences.map((seq) => {
+              const isPending = seq.status === 'pending-create';
+              return (
+                <li key={seq.id} className="card border border-base-300 bg-base-100">
+                  <div className="card-body gap-3 p-4">
+                    {editingSeqId === seq.id ? (
+                      <form onSubmit={(e) => handleRenameSequence(e, seq.id)} className="flex items-center gap-2">
                         <input
-                          value={search}
-                          onChange={(e) => setSearch(e.target.value)}
-                          placeholder="Αναζήτηση τραγουδιού για προσθήκη"
+                          value={editingSeqTitle}
+                          onChange={(e) => setEditingSeqTitle(e.target.value)}
                           className="input input-bordered input-sm flex-1"
+                          autoFocus
+                          required
                         />
-                        <button type="submit" className="btn btn-sm">Αναζήτηση</button>
+                        <button type="submit" className="btn btn-primary btn-sm">Αποθήκευση</button>
+                        <button type="button" onClick={() => setEditingSeqId(null)} className="btn btn-ghost btn-sm">Άκυρο</button>
                       </form>
-                      {searchResults.length > 0 && (
-                        <ul className="flex max-h-48 flex-col gap-1 overflow-y-auto">
-                          {searchResults.map((s) => (
-                            <li key={s.id} className="flex items-center gap-2">
-                              <span className="flex-1">{s.title}</span>
-                              <button onClick={() => handleAddSong(s.id)} className="btn btn-primary btn-xs">+ Προσθήκη</button>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        {isPending ? (
+                          <span className="flex-1">{seq.title} (εκκρεμεί)</span>
+                        ) : (
+                          <button onClick={() => handleToggleExpand(seq.id)} className="btn btn-ghost btn-sm flex-1 justify-start">
+                            {expandedSeqId === seq.id ? '▾' : '▸'} {seq.title}
+                          </button>
+                        )}
+                        {!isPending && (
+                          <button onClick={() => startEditingSequence(seq)} className="btn btn-ghost btn-sm">Μετονομασία</button>
+                        )}
+                        <button onClick={() => handleDeleteSequence(seq.id)} className="btn btn-ghost btn-sm text-error">Διαγραφή σειράς</button>
+                      </div>
+                    )}
+
+                    {!isPending && expandedSeqId === seq.id && (
+                      <div className="flex flex-col gap-3 border-t border-base-300 pt-3">
+                        <ul className="flex flex-col gap-1">
+                          {expandedSongs.map((entry, i) => (
+                            <li key={entry.sequenceSongId} className="flex items-center gap-2">
+                              <span className="badge badge-neutral badge-sm">{i + 1}</span>
+                              <span className="flex-1">{entry.title}</span>
+                              <button onClick={() => handleMoveSong(i, -1)} disabled={i === 0} className="btn btn-ghost btn-xs">↑</button>
+                              <button onClick={() => handleMoveSong(i, 1)} disabled={i === expandedSongs.length - 1} className="btn btn-ghost btn-xs">↓</button>
+                              <button onClick={() => handleRemoveSong(entry.sequenceSongId)} className="btn btn-ghost btn-xs text-error">Αφαίρεση</button>
                             </li>
                           ))}
+                          {expandedSongs.length === 0 && <li className="text-sm text-base-content/50">Κανένα τραγούδι ακόμη</li>}
                         </ul>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </li>
-            ))}
-            {sequences.length === 0 && <li className="text-sm text-base-content/50">Καμία σειρά ακόμη</li>}
+
+                        <form onSubmit={handleSearch} className="flex gap-2">
+                          <input
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            placeholder="Αναζήτηση τραγουδιού για προσθήκη"
+                            className="input input-bordered input-sm flex-1"
+                          />
+                          <button type="submit" className="btn btn-sm">Αναζήτηση</button>
+                        </form>
+                        {searchResults.length > 0 && (
+                          <ul className="flex max-h-48 flex-col gap-1 overflow-y-auto">
+                            {searchResults.map((s) => (
+                              <li key={s.id} className="flex items-center gap-2">
+                                <span className="flex-1">{s.title}</span>
+                                <button onClick={() => handleAddSong(s.id)} className="btn btn-primary btn-xs">+ Προσθήκη</button>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+            {displaySequences.length === 0 && <li className="text-sm text-base-content/50">Καμία σειρά ακόμη</li>}
           </ul>
         </>
       )}
