@@ -11,20 +11,22 @@ import { sharedBadgeText } from '@/lib/programBadge';
 import { enqueue, getQueuedActions } from '@/lib/syncQueue';
 import type { QueuedAction } from '@/lib/syncQueue';
 import { useSyncQueue } from '@/components/SyncQueueProvider';
-import { saveProgramsListCache, loadProgramsListCache } from '@/lib/programsListCache';
-import type { CachedProgram } from '@/lib/programsListCache';
+import { loadReferenceData } from '@/lib/offlineCache';
 import { mergeProgramsWithPending, isProgramQueueAction } from '@/lib/programsMerge';
+
+type ProgramListItem = { id: number; title: string; role: 'creator' | 'collaborator'; sharedWithEmails: string[] };
 
 export default function ProgramsAdminPage() {
   const native = isNativeApp();
   const router = useRouter();
-  const [programs, setPrograms] = useState<CachedProgram[]>([]);
+  const [programs, setPrograms] = useState<ProgramListItem[]>([]);
   const [title, setTitle] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
   const [offlinePrograms, setOfflinePrograms] = useState(false);
   const [programsUnavailable, setProgramsUnavailable] = useState(false);
+  const [neverPrimed, setNeverPrimed] = useState(false);
   const [pendingActions, setPendingActions] = useState<QueuedAction[]>([]);
   const { pendingCount, notifyQueueChanged } = useSyncQueue();
 
@@ -36,24 +38,21 @@ export default function ProgramsAdminPage() {
     }
     try {
       const res = await nativeApiFetch('/api/programs');
-      const data: CachedProgram[] = await res.json();
+      const data: ProgramListItem[] = await res.json();
       setPrograms(data);
       setOfflinePrograms(false);
       setProgramsUnavailable(false);
-      try {
-        await saveProgramsListCache(data);
-      } catch {
-        // A cache-write failure must not affect the already-successful state above,
-        // nor trigger the offline-UI logic below — the fetch just succeeded.
-      }
+      setNeverPrimed(false);
     } catch {
-      const cached = await loadProgramsListCache().catch(() => null);
-      if (cached) {
-        setPrograms(cached);
+      const cached = await loadReferenceData().catch(() => null);
+      if (cached && cached.primedAt !== null) {
+        setPrograms(cached.programs);
         setOfflinePrograms(true);
         setProgramsUnavailable(false);
+        setNeverPrimed(false);
       } else {
         setProgramsUnavailable(true);
+        setNeverPrimed(!cached || cached.primedAt === null);
       }
     }
   }
@@ -186,8 +185,10 @@ export default function ProgramsAdminPage() {
       <h1 className="text-xl font-bold">Προγράμματα</h1>
       {programsUnavailable && (
         <p className="text-sm text-base-content/50">
-          Άγνωστο χωρίς σύνδεση — αυτή η λίστα αποθηκεύεται για offline χρήση μόνο αφού την ανοίξεις
-          μία φορά με σύνδεση.
+          {neverPrimed
+            ? 'Δεν έχει προετοιμαστεί για offline χρήση. '
+            : 'Άγνωστο χωρίς σύνδεση. '}
+          <Link href="/" className="link">Προετοιμασία για offline</Link>
         </p>
       )}
       {offlinePrograms && (
