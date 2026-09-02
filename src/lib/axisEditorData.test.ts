@@ -14,6 +14,7 @@ function makeReferenceData(overrides: Partial<ReferenceData> = {}): ReferenceDat
     genres: [],
     axisTypes: [],
     programs: [],
+    currentUser: null,
     ...overrides,
   };
 }

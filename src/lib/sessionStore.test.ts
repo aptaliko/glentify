@@ -43,6 +43,7 @@ function referenceData(): ReferenceData {
     axisTypes: [],
     genres,
     programs: [],
+    currentUser: null,
   };
 }
 
@@ -60,6 +61,7 @@ function referenceDataWithThreeSongs(): ReferenceData {
     axisTypes: [],
     genres,
     programs: [],
+    currentUser: null,
   };
 }
 
@@ -258,6 +260,7 @@ function referenceDataWithGenreAxes(): ReferenceData {
     axisTypes: [],
     genres: [{ id: 1, name: 'Παραδοσιακό', ownerId: null } as GenreRow, { id: 2, name: 'Λαϊκό', ownerId: null } as GenreRow],
     programs: [],
+    currentUser: null,
   };
 }
 

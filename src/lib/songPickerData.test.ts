@@ -35,6 +35,7 @@ function referenceData(): ReferenceData {
     axisTypes: [],
     genres: [],
     programs: [],
+    currentUser: null,
   };
 }
 

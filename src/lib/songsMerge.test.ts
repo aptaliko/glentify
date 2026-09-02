@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { mergeSongsWithPending, resolveSongForEdit } from './songsMerge';
 import type { QueuedAction } from './syncQueue';
-import type { CachedSong } from './songsListCache';
+import type { CachedSong } from './referenceData';
 import type { AxisValueEntry } from './axisEditorData';
 
 function makeAction(overrides: Partial<QueuedAction>): QueuedAction {

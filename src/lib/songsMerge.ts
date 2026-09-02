@@ -1,6 +1,6 @@
 // src/lib/songsMerge.ts
 import type { QueuedAction } from './syncQueue';
-import type { CachedSong } from './songsListCache';
+import type { CachedSong } from './referenceData';
 import type { AxisValueEntry } from './axisEditorData';
 
 export interface CreateSongPayload {

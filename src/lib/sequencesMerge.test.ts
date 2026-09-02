@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { mergeSequencesWithPending } from './sequencesMerge';
-import type { CachedProgramDetail } from './programDetailCache';
+import type { CachedProgramDetail } from './referenceData';
 import type { QueuedAction } from './syncQueue';
 
 function action(overrides: Partial<QueuedAction>): QueuedAction {

@@ -32,6 +32,7 @@ function referenceData(): ReferenceData {
     axisTypes: [],
     genres: [],
     programs: [],
+    currentUser: null,
   };
 }
 
@@ -44,9 +45,15 @@ describe('normalizeReferenceData', () => {
 
   it('returns programs unchanged when already populated', () => {
     const data = referenceData();
-    data.programs = [{ id: 1, title: 'Program A', sequences: [] }];
+    data.programs = [{
+      id: 1, title: 'Program A', role: 'creator', sharedWithEmails: [],
+      creator: null, collaborators: [], sequences: [],
+    }];
     const result = normalizeReferenceData(data);
-    expect(result.programs).toEqual([{ id: 1, title: 'Program A', sequences: [] }]);
+    expect(result.programs).toEqual([{
+      id: 1, title: 'Program A', role: 'creator', sharedWithEmails: [],
+      creator: null, collaborators: [], sequences: [],
+    }]);
   });
 
   it('defaults programs to an empty array when missing (pre-feature cached blob)', () => {
@@ -106,6 +113,39 @@ describe('normalizeReferenceData', () => {
     const result = normalizeReferenceData(legacyData);
     expect(result.axisTypes).toEqual([]);
   });
+
+  it('backfills currentUser to null when missing (pre-feature cached blob)', () => {
+    const legacy = {
+      songs: [], sharedSongs: [], axisValues: [], regions: [], rhythms: [],
+      dromoi: [], composers: [], axisTypes: [], genres: [], programs: [],
+    } as unknown as ReferenceData;
+    expect(normalizeReferenceData(legacy).currentUser).toBeNull();
+  });
+
+  it('backfills new program fields and sequence.entries for an old-shape program', () => {
+    const legacy = {
+      songs: [], sharedSongs: [], axisValues: [], regions: [], rhythms: [],
+      dromoi: [], composers: [], axisTypes: [], genres: [],
+      programs: [{ id: 1, title: 'A', sequences: [{ id: 10, title: 'S1', songIds: [1, 2] }] }],
+    } as unknown as ReferenceData;
+    const p = normalizeReferenceData(legacy).programs[0];
+    expect(p.role).toBe('creator');
+    expect(p.sharedWithEmails).toEqual([]);
+    expect(p.creator).toBeNull();
+    expect(p.collaborators).toEqual([]);
+    expect(p.sequences[0].entries).toEqual([]);
+    expect(p.sequences[0].songIds).toEqual([1, 2]); // preserved untouched
+  });
+
+  it('leaves a new-shape program unchanged', () => {
+    const data = referenceData();
+    data.programs = [{
+      id: 1, title: 'A', role: 'collaborator', sharedWithEmails: ['x@y.gr'],
+      creator: { id: 9, email: 'x@y.gr' }, collaborators: [],
+      sequences: [{ id: 10, title: 'S1', songIds: [1], entries: [{ sequenceSongId: 100, songId: 1 }] }],
+    }];
+    expect(normalizeReferenceData(data).programs[0]).toEqual(data.programs[0]);
+  });
 });
 
 describe('collectReferencedSongIds', () => {
@@ -115,8 +155,14 @@ describe('collectReferencedSongIds', () => {
 
   it('collects song ids across sequences and programs, de-duplicated', () => {
     const programs = [
-      { id: 1, title: 'A', sequences: [{ id: 10, title: 'S1', songIds: [1, 2] }] },
-      { id: 2, title: 'B', sequences: [{ id: 20, title: 'S2', songIds: [2, 3] }] },
+      {
+        id: 1, title: 'A', role: 'creator' as const, sharedWithEmails: [], creator: null, collaborators: [],
+        sequences: [{ id: 10, title: 'S1', songIds: [1, 2], entries: [] }],
+      },
+      {
+        id: 2, title: 'B', role: 'creator' as const, sharedWithEmails: [], creator: null, collaborators: [],
+        sequences: [{ id: 20, title: 'S2', songIds: [2, 3], entries: [] }],
+      },
     ];
     expect(collectReferencedSongIds(programs).sort()).toEqual([1, 2, 3]);
   });

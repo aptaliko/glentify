@@ -1,5 +1,5 @@
 import type { QueuedAction } from './syncQueue';
-import type { CachedProgramDetail } from './programDetailCache';
+import type { CachedProgramDetail } from './referenceData';
 
 export interface DisplaySequenceSong {
   sequenceSongId: number;
