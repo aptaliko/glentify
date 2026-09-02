@@ -247,31 +247,33 @@ run on a real device yet.
 message — if the cached `ReferenceData` was `null` or had no `axisTypes` (e.g. a
 never-synced fresh install, or a stale device that synced before `axisTypes` existed).
 Fixed to always show an actionable message in that case instead.
-- [ ] **Fresh install, do NOT tap "Συγχρονισμός τραγουδιών" first.** Open Νέο τραγούδι →
+- [ ] **Fresh install, do NOT tap "Προετοιμασία για offline" first.** Open Νέο τραγούδι →
       confirm the Άξονες card shows the actionable "Δεν υπάρχουν ακόμη αποθηκευμένα δεδομένα
       αξόνων… Πήγαινε στην αρχική…" message with a working link to Home — not a blank card
       with only "Κανένας άξονας ακόμη" and nothing tappable.
 - [ ] Tap that link, sync from Home, reopen Νέο τραγούδι → axis types are now selectable.
 
-### Admin songs/programs list — offline cache priming (finding, 2026-09-02)
-`Διαχείριση → Τραγούδια` and `Διαχείριση → Προγράμματα` each warm their own offline cache
-only the moment you successfully open that specific page while online — tapping
-"Συγχρονισμός τραγουδιών" on Home does **not** populate either of them (it only feeds
-`referenceData`, used by Σταθερά προγράμματα / Ξεκίνα Live / axis Tags). This is the
-documented, intended design (see `docs/superpowers/specs/2026-08-31-offline-program-crud-design.md`
-§2), not a bug — but it means "offline works on the Home-button-synced screens but not in
-Διαχείριση" is the expected first-run experience, and is worth confirming reads clearly:
-- [ ] Fresh install, without ever opening either admin list page online, go offline, open
+### Admin songs/programs list — offline cache priming (finding, 2026-09-02; superseded 2026-09-02)
+**Superseded the same day it was written** — see "Unified offline-cache priming" below. At
+the time this was written, `Διαχείριση → Τραγούδια` and `Διαχείριση → Προγράμματα` each
+warmed their own offline cache only the moment you successfully opened that specific page
+while online, independently of the Home priming button. That three-cache split is gone:
+`songsListCache` and `programsListCache` no longer exist — tapping "Προετοιμασία για offline"
+on Home now primes everything, including these two admin lists. The two bullets below (and
+their expected message text) describe the **retired** behavior; do not use them to verify —
+use the "Unified offline-cache priming" section's checks instead.
+- [ ] ~~Fresh install, without ever opening either admin list page online, go offline, open
       each — confirm the actionable "Άγνωστο χωρίς σύνδεση — αυτή η λίστα αποθηκεύεται…"
-      message (not a bare, unexplained one).
-- [ ] Open each admin list page once online, go offline, reopen — confirm each renders its
-      cached list with "Χωρίς σύνδεση — τελευταία γνωστά δεδομένα".
+      message (not a bare, unexplained one).~~ *(retired — see Unified offline-cache priming)*
+- [ ] ~~Open each admin list page once online, go offline, reopen — confirm each renders its
+      cached list with "Χωρίς σύνδεση — τελευταία γνωστά δεδομένα".~~ *(retired — see Unified
+      offline-cache priming)*
 
 ---
 
 ## Offline Sequence & Taxonomy CRUD (#6 + #7)
 
-Preconditions: native build installed; tap "Συγχρονισμός τραγουδιών" on the home page once while online so `referenceData` (taxonomy + programs) is cached; open the target program's edit page once while online so its detail is cached.
+Preconditions: native build installed; tap "Προετοιμασία για offline" on the home page once while online so `referenceData` (taxonomy + programs) is cached; open the target program's edit page once while online so its detail is cached.
 
 ### Taxonomy admin offline (regions/genres/rhythms/dromoi/composers)
 - [ ] Go offline (airplane mode). Open Περιοχές — the list renders from cache with an "Χωρίς σύνδεση" notice.
@@ -294,17 +296,39 @@ Preconditions: native build installed; tap "Συγχρονισμός τραγο�
 - [ ] Go online → badge drains → reload → every change persisted server-side in the right order (added songs present, reorder applied, deletes gone).
 - [ ] Edge: open a program that was NEVER opened online while offline → shows "δεν είναι διαθέσιμη χωρίς σύνδεση" (expected).
 
+## Unified offline-cache priming (shipped 2026-09-02)
+
+Replaces the three independent priming triggers referenced elsewhere in this checklist
+(`referenceData` via the old Home sync button, `songsListCache`/`programsListCache` each via
+their own list page) with a single `primeOfflineData()` orchestrator that populates one
+`referenceData` blob, stamped with a `primedAt` envelope. Not yet exercised on a device.
+
+- [ ] Tap Προετοιμασία για offline on Home while online → shows Έτοιμο για offline χρήση.
+- [ ] Then enable airplane mode and confirm ALL of these work offline: Διαχείριση → Τραγούδια,
+      Διαχείριση → Προγράμματα, opening a program's editor that was NEVER individually opened
+      before (sequences + collaborators render), Σταθερά προγράμματα, Ξεκίνα Live, and a song's
+      axis Tags.
+- [ ] Fresh install (or clear app data) → go offline before ever priming → every offline screen
+      shows "Δεν έχει προετοιμαστεί για offline χρήση" with a Προετοιμασία για offline link, not a
+      bare "άγνωστο".
+- [ ] Queue an offline program/sequence edit, then reconnect → the write queue drains AND the blob
+      re-primes (edit persists server-side; reopening shows server truth, not a stale optimistic copy).
+- [ ] After any successful prime, confirm the four old databases are gone in DevTools →
+      Application → IndexedDB: glentify-songs-list-cache, glentify-programs-list-cache,
+      glentify-program-detail-cache, glentify-collaborators-cache.
+
+---
+
 ## Cross-cutting notes
 
-- **Three independent, silently-triggered offline caches exist, found 2026-09-02** — don't
-  read "offline works on screen A but not screen B" as a bug while testing. `referenceData`
-  (feeds Σταθερά προγράμματα, Ξεκίνα Live, axis Tags) is populated only by tapping
-  "Συγχρονισμός τραγουδιών" on Home. `songsListCache` (Διαχείριση → Τραγούδια) and
-  `programsListCache` (Διαχείριση → Προγράμματα) are each populated only by successfully
-  opening that specific page while online — the Home sync button does nothing for either of
-  them. Each screen's own "unavailable offline" message was made actionable (see the Phase
-  1/#5 section above). Unifying the three triggers into one is a real, separate idea, not a
-  testing task — tracked in `docs/feature-backlog.md`, not here.
+- **Three independent, silently-triggered offline caches — found 2026-09-02, superseded
+  2026-09-02.** This app used to have `referenceData`, `songsListCache`, and
+  `programsListCache` as three separately-triggered caches (see the now-retired "Admin
+  songs/programs list" checks above for what that looked like). They've since been unified
+  into a single `referenceData` blob primed by one "Προετοιμασία για offline" button — see
+  "Unified offline-cache priming" above for the current checks. If you ever see "offline
+  works on screen A but not screen B" after a successful prime, that's a real regression now,
+  not expected behavior.
 - **Sync badge states** appear bottom-right whenever anything is queued: a plain count
   ("N εκκρεμεί συγχρονισμός"), a red "needs attention" count if something failed
   permanently (3 retries), or "Ο συγχρονισμός σταμάτησε προσωρινά" if a systemic error

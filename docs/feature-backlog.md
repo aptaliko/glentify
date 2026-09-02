@@ -19,24 +19,18 @@ offline-created taxonomy values/songs/sequences. Originally bundled with offline
 taxonomy-value creation as one "Phase 2" — that half already shipped separately
 (`bb4eb5b`, 2026-09-02), so this is now the only piece left. Not yet brainstormed/spec'd.
 
-## Unify the three independent offline-cache priming triggers
+## Collaborator write-conflict resolution
 
-Found 2026-09-02 while investigating an on-device bug report. This app has three separate
-offline caches with no connection between them:
-
-- `referenceData` — populated only by tapping "Συγχρονισμός τραγουδιών" on Home. Feeds
-  Σταθερά προγράμματα, Ξεκίνα Live, and axis Tags.
-- `songsListCache` — populated only by successfully opening Διαχείριση → Τραγούδια while
-  online.
-- `programsListCache` — populated only by successfully opening Διαχείριση → Προγράμματα
-  while online.
-
-There's no single "prepare this device for offline use" step; a device can be fully synced
-for one set of screens and show "άγνωστο/δεν είναι διαθέσιμη χωρίς σύνδεση" on another, with
-no indication why. Each screen's own "unavailable offline" message was made actionable as a
-stopgap (`3fd6c36`, `dee39ed`), but the underlying three-trigger design is unchanged. Not yet
-brainstormed/spec'd — genuinely architectural (would need to decide whether to merge the
-caches, have one trigger populate all three, or something else).
+The offline write model is last-write-wins with no conflict detection: song and shared
+program/sequence writes apply unconditionally (scoped by ownership/access); `updatedAt` is
+stored but never used as a version guard, and there is no `If-Match` / 409-on-stale. If a user
+and a collaborator both edit the same shared program sequence offline, whichever queue drains
+last silently wins. This is a pre-existing property of the offline write model, called out as a
+Non-goal of the offline-cache priming unification
+(`docs/superpowers/specs/2026-09-02-unify-offline-cache-priming-design.md`). Real resolution
+needs version columns + `If-Match` on the shared program/sequence endpoints + a merge/warn UX.
+Only programs and their sequences are a shared-edit surface (songs/taxonomy are owner-scoped).
+Not yet brainstormed/spec'd.
 
 ## Multi-value axis metadata per song
 
