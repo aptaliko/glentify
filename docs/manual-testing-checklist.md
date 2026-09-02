@@ -112,10 +112,13 @@ to "Helvetica". **Fixed in commit `e734015`** (`font: null` to skip pdfkit's eag
 Verified via the same logcat method (clean run, successful share-sheet completion, no error)
 but not yet visually confirmed on-screen — re-check the actual PDF content below.
 
-- [x] Open a program's local page. Tap **"Εξαγωγή PDF."** Confirm the share sheet opens with
+- [ ] Open a program's local page. Tap **"Εξαγωγή PDF."** Confirm the share sheet opens with
       the correct file and **Greek glyphs render correctly** (font embedding via the bundled
       DejaVu Sans TTFs happening entirely on-device was the specific, now-fixed risk here).
-- [x] Repeat in **airplane mode** (on a program you've already viewed once online, so it's
+      (Corrected 2026-09-02: this was marked done, but the paragraph above it says the visual
+      on-screen check was never actually done — only the logcat-level fix was confirmed.
+      Left unchecked until someone actually looks at the rendered PDF.)
+- [ ] Repeat in **airplane mode** (on a program you've already viewed once online, so it's
       cached). Confirm **no network activity and no delay** waiting on a timed-out request —
       should behave identically to the online case above.
 
