@@ -112,10 +112,10 @@ to "Helvetica". **Fixed in commit `e734015`** (`font: null` to skip pdfkit's eag
 Verified via the same logcat method (clean run, successful share-sheet completion, no error)
 but not yet visually confirmed on-screen — re-check the actual PDF content below.
 
-- [ ] Open a program's local page. Tap **"Εξαγωγή PDF."** Confirm the share sheet opens with
+- [x] Open a program's local page. Tap **"Εξαγωγή PDF."** Confirm the share sheet opens with
       the correct file and **Greek glyphs render correctly** (font embedding via the bundled
       DejaVu Sans TTFs happening entirely on-device was the specific, now-fixed risk here).
-- [ ] Repeat in **airplane mode** (on a program you've already viewed once online, so it's
+- [x] Repeat in **airplane mode** (on a program you've already viewed once online, so it's
       cached). Confirm **no network activity and no delay** waiting on a timed-out request —
       should behave identically to the online case above.
 
@@ -214,6 +214,31 @@ New (2026-08-31), not yet exercised on a device or in a real browser. Covers bot
       characteristics by design.
 
 ---
+
+## Offline Sequence & Taxonomy CRUD (#6 + #7)
+
+Preconditions: native build installed; tap "Συγχρονισμός τραγουδιών" on the home page once while online so `referenceData` (taxonomy + programs) is cached; open the target program's edit page once while online so its detail is cached.
+
+### Taxonomy admin offline (regions/genres/rhythms/dromoi/composers)
+- [ ] Go offline (airplane mode). Open Περιοχές — the list renders from cache with an "Χωρίς σύνδεση" notice.
+- [ ] Create a value offline → it appears immediately tagged "(εκκρεμεί)"; the sync badge increments.
+- [ ] Delete a cached value offline → it disappears immediately.
+- [ ] Repeat create for Είδη, Ρυθμοί, Δρόμοι, Συνθέτες.
+- [ ] Go online → badge drains; reopen each page → pending values are now real (no "(εκκρεμεί)"), deletes stuck.
+- [ ] Offline-delete a value that IS used by a song, then go online → it lands in needsAttention (still referenced / 409); the row reappears.
+
+### Create-and-assign inside a song (SongAxisEditor)
+- [ ] Offline, edit a song → Άξονες → pick an axis → "+ Νέα τιμή" is now enabled → create a value → it's selected → Προσθήκη → Αποθήκευση.
+- [ ] Go online → the taxonomy value syncs first, then the song update, and the song shows the new axis value assigned (verify on the web admin).
+
+### Sequences offline (inside a Σταθερό Πρόγραμμα)
+- [ ] Offline, open the previously-cached program's edit page → sequences render (no "δεν είναι διαθέσιμη" message).
+- [ ] Add a sequence → appears "(εκκρεμεί)".
+- [ ] On an existing sequence: rename it; expand it; add a song (search works offline over cached songs); remove a song; reorder with ↑/↓.
+- [ ] Delete a sequence.
+- [ ] Confirm each action increments the sync badge and the UI updates immediately.
+- [ ] Go online → badge drains → reload → every change persisted server-side in the right order (added songs present, reorder applied, deletes gone).
+- [ ] Edge: open a program that was NEVER opened online while offline → shows "δεν είναι διαθέσιμη χωρίς σύνδεση" (expected).
 
 ## Cross-cutting notes
 
