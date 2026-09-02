@@ -7,23 +7,26 @@ import { listDromoi } from '@/db/queries/dromoi';
 import { listComposers } from '@/db/queries/composers';
 import { listGenres } from '@/db/queries/genres';
 import { listProgramsWithSequencesAndSongs } from '@/db/queries/programs';
+import { getUserById } from '@/db/queries/users';
 import { collectReferencedSongIds } from '@/lib/referenceData';
 import type { ReferenceData } from '@/lib/referenceData';
 import { getUserId } from '@/lib/requestUser';
 
 export async function GET(request: NextRequest) {
   const userId = getUserId(request);
-  const [ownSongs, axisValues, axisTypes, regions, rhythms, dromoi, composers, genres, programs] = await Promise.all([
-    listSongs(userId),
-    getAxisValuesForOwner(userId),
-    listAxisTypes(),
-    listRegions(userId),
-    listRhythms(userId),
-    listDromoi(userId),
-    listComposers(userId),
-    listGenres(userId),
-    listProgramsWithSequencesAndSongs(userId),
-  ]);
+  const [ownSongs, axisValues, axisTypes, regions, rhythms, dromoi, composers, genres, programs, currentUser] =
+    await Promise.all([
+      listSongs(userId),
+      getAxisValuesForOwner(userId),
+      listAxisTypes(),
+      listRegions(userId),
+      listRhythms(userId),
+      listDromoi(userId),
+      listComposers(userId),
+      listGenres(userId),
+      listProgramsWithSequencesAndSongs(userId),
+      getUserById(userId),
+    ]);
 
   // Shared programs can reference songs owned by a collaborator, not just the requester —
   // those ids won't be in `ownSongs` (listSongs is strictly owner-scoped), so the client-side
@@ -36,6 +39,18 @@ export async function GET(request: NextRequest) {
   const missingIds = referencedIds.filter((id) => !ownIds.has(id));
   const sharedSongs = missingIds.length ? await getSongsByIds(missingIds) : [];
 
-  const payload: ReferenceData = { songs: ownSongs, sharedSongs, axisValues, axisTypes, regions, rhythms, dromoi, composers, genres, programs };
+  const payload: ReferenceData = {
+    songs: ownSongs,
+    sharedSongs,
+    axisValues,
+    axisTypes,
+    regions,
+    rhythms,
+    dromoi,
+    composers,
+    genres,
+    programs,
+    currentUser: currentUser ? { id: currentUser.id, email: currentUser.email } : null,
+  };
   return NextResponse.json(payload);
 }

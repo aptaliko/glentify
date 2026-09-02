@@ -119,11 +119,24 @@ export async function listProgramsWithSequencesAndSongs(userId: number): Promise
       const sequenceList = await listSequencesForProgram(program.id);
       const sequences = await Promise.all(
         sequenceList.map(async (sequence) => {
-          const entries = await listSongsForSequence(sequence.id);
-          return { id: sequence.id, title: sequence.title, songIds: entries.map((e) => e.song.id) };
+          const seqEntries = await listSongsForSequence(sequence.id);
+          return {
+            id: sequence.id,
+            title: sequence.title,
+            songIds: seqEntries.map((e) => e.song.id),
+            entries: seqEntries.map((e) => ({ sequenceSongId: e.sequenceSongId, songId: e.song.id })),
+          };
         })
       );
-      return { id: program.id, title: program.title, sequences };
+      return {
+        id: program.id,
+        title: program.title,
+        role: program.role,
+        sharedWithEmails: program.sharedWithEmails,
+        creator: program.creator,
+        collaborators: program.collaborators,
+        sequences,
+      };
     })
   );
 }
@@ -133,6 +146,8 @@ export interface AccessibleProgram {
   title: string;
   role: 'creator' | 'collaborator';
   sharedWithEmails: string[];
+  creator: { id: number; email: string } | null;
+  collaborators: { id: number; email: string }[];
 }
 
 export async function listCollaborators(programId: number): Promise<{ id: number; email: string }[]> {
@@ -191,7 +206,14 @@ export async function listAccessiblePrograms(userId: number): Promise<Accessible
       ...(creator ? [creator.email] : []),
       ...collaborators.filter((c) => c.id !== userId).map((c) => c.email),
     ];
-    return { id: program.id, title: program.title, role, sharedWithEmails: emails };
+    return {
+      id: program.id,
+      title: program.title,
+      role,
+      sharedWithEmails: emails,
+      creator: creator ? { id: creator.id, email: creator.email } : null,
+      collaborators,
+    };
   }
 
   return Promise.all([
