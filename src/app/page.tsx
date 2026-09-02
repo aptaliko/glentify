@@ -4,9 +4,9 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { isNativeApp } from '@/lib/platform';
-import { getAuthToken, clearAuthToken } from '@/lib/authToken';
+import { clearAuthToken } from '@/lib/authToken';
 import { apiUrl } from '@/lib/apiClient';
-import { saveReferenceData } from '@/lib/offlineCache';
+import { primeOfflineData } from '@/lib/offlineCache';
 import { preferencesStore } from '@/lib/preferencesStore';
 import { hasLocalSession as checkHasLocalSession } from '@/lib/sessionStore';
 
@@ -56,24 +56,11 @@ export default function HomePage() {
     window.location.href = '/login';
   }
 
-  async function handleSync() {
+  async function handlePrime() {
     setSyncStatus('syncing');
-    try {
-      const token = await getAuthToken();
-      const res = await fetch(apiUrl('/api/reference-data'), {
-        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-      });
-      if (res.status === 401) {
-        await clearAuthToken();
-        setSyncStatus('unauthorized');
-        return;
-      }
-      if (!res.ok) throw new Error('sync failed');
-      await saveReferenceData(await res.json());
-      setSyncStatus('done');
-    } catch {
-      setSyncStatus('error');
-    }
+    const result = await primeOfflineData();
+    if (result.status === 'unauthorized') { setSyncStatus('unauthorized'); return; }
+    setSyncStatus(result.status === 'ok' ? 'done' : 'error');
   }
 
   return (
@@ -82,11 +69,11 @@ export default function HomePage() {
 
       {native && loaded && (
         <div className="flex flex-col items-center gap-2">
-          <button onClick={handleSync} className="btn btn-outline btn-sm" disabled={syncStatus === 'syncing'}>
-            {syncStatus === 'syncing' ? 'Συγχρονισμός...' : 'Συγχρονισμός τραγουδιών'}
+          <button onClick={handlePrime} className="btn btn-outline btn-sm" disabled={syncStatus === 'syncing'}>
+            {syncStatus === 'syncing' ? 'Προετοιμασία...' : 'Προετοιμασία για offline'}
           </button>
           {syncStatus === 'done' && <p className="text-sm text-success">Έτοιμο για offline χρήση</p>}
-          {syncStatus === 'error' && <p className="text-sm text-error">Ο συγχρονισμός απέτυχε — χρειάζεται σύνδεση</p>}
+          {syncStatus === 'error' && <p className="text-sm text-error">Η προετοιμασία απέτυχε — χρειάζεται σύνδεση</p>}
           {syncStatus === 'unauthorized' && (
             <Link href="/login" className="text-sm text-error underline">
               Η σύνδεση έληξε — ξανασυνδέσου
