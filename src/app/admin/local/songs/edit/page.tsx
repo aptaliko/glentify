@@ -6,7 +6,7 @@ import { nativeApiFetch } from '@/lib/nativeApiFetch';
 import { preferencesStore } from '@/lib/preferencesStore';
 import { getSelectedEditSongId, clearSelectedEditSongId } from '@/lib/adminEditStore';
 import { loadReferenceData } from '@/lib/offlineCache';
-import { loadSongsListCache, type CachedSong } from '@/lib/songsListCache';
+import type { CachedSong } from '@/lib/referenceData';
 import { getQueuedActions, enqueue } from '@/lib/syncQueue';
 import { resolveSongForEdit } from '@/lib/songsMerge';
 import { useSyncQueue } from '@/components/SyncQueueProvider';
@@ -74,9 +74,11 @@ export default function LocalEditSongPage() {
 
   useEffect(() => {
     if (songId === null) return;
-    Promise.all([fetchLiveSong(songId), loadSongsListCache(), loadReferenceData(), getQueuedActions()])
-      .then(([live, cachedSongs, referenceData, actions]) => {
-        const base = live?.base ?? cachedSongs?.find((s) => s.id === songId) ?? null;
+    Promise.all([fetchLiveSong(songId), loadReferenceData(), getQueuedActions()])
+      .then(([live, referenceData, actions]) => {
+        const cachedBase: CachedSong | null =
+          referenceData?.songs.find((s) => s.id === songId) ?? null;
+        const base = live?.base ?? cachedBase;
         const baseAxisValues: AxisValueEntry[] =
           live?.baseAxisValues ??
           (referenceData?.axisValues ?? [])
