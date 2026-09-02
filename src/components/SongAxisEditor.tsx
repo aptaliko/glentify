@@ -6,6 +6,9 @@ import { isNativeApp } from '@/lib/platform';
 import { loadReferenceData } from '@/lib/offlineCache';
 import { resolveAxisEditorData } from '@/lib/axisEditorData';
 import type { AxisType, Option, AxisValueEntry } from '@/lib/axisEditorData';
+import { enqueue } from '@/lib/syncQueue';
+import { mintDraftId } from '@/lib/draftIds';
+import { useSyncQueue } from '@/components/SyncQueueProvider';
 
 export type { AxisValueEntry };
 
@@ -32,6 +35,7 @@ export default function SongAxisEditor({
   const [newYear, setNewYear] = useState('');
   const [creatingValue, setCreatingValue] = useState(false);
   const [newValueName, setNewValueName] = useState('');
+  const { notifyQueueChanged } = useSyncQueue();
 
   useEffect(() => {
     if (isNativeApp()) {
@@ -102,8 +106,27 @@ export default function SongAxisEditor({
 
   async function handleCreateValue() {
     if (!selectedType?.lookupTable || !newValueName.trim()) return;
-    const endpoint = LOOKUP_ENDPOINTS[selectedType.lookupTable];
-    const body = selectedType.lookupTable === 'regions' ? { name: newValueName.trim(), parentId: null } : { name: newValueName.trim() };
+    const table = selectedType.lookupTable;
+    const name = newValueName.trim();
+
+    if (isNativeApp()) {
+      const draftId = mintDraftId();
+      try {
+        await enqueue(`${table}-create`, { draftId, name, parentId: null });
+      } catch {
+        return;
+      }
+      const created: Option = { id: draftId, name };
+      setOptionsByAxis((prev) => ({ ...prev, [selectedType.key]: [...(prev[selectedType.key] ?? []), created] }));
+      setNewRefId(String(draftId));
+      setCreatingValue(false);
+      setNewValueName('');
+      await notifyQueueChanged();
+      return;
+    }
+
+    const endpoint = LOOKUP_ENDPOINTS[table];
+    const body = table === 'regions' ? { name, parentId: null } : { name };
     const res = await nativeApiFetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -183,11 +206,8 @@ export default function SongAxisEditor({
                   {(optionsByAxis[selectedType.key] ?? []).map((o) => (
                     <option key={o.id} value={o.id}>{o.name}</option>
                   ))}
-                  <option value="__new__" disabled={isNativeApp()}>+ Νέα τιμή...</option>
+                  <option value="__new__">+ Νέα τιμή...</option>
                 </select>
-                {isNativeApp() && (
-                  <span className="text-xs text-base-content/50">Νέες τιμές μόνο από την ιστοσελίδα διαχείρισης προς το παρόν.</span>
-                )}
                 {creatingValue && (
                   <>
                     <input
