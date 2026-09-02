@@ -1,5 +1,7 @@
 # Offline Sync Foundation + Offline Session Save Implementation Plan
 
+> **Status: COMPLETE.** All 9 tasks landed as commits `5cda2de..9cdc47c` ("Fix final review findings: serialize queue ops, surface blocked state...").
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build a generic offline write-queue (enqueue now, auto-sync when connectivity returns) and wire it to the first real consumer: ending a γλέντι natively now offers to save it as a program, fully offline, with the exact same σειρά-preserving quality as the already-shipped web flow.

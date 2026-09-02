@@ -1,5 +1,7 @@
 # Offline PDF Export Implementation Plan
 
+> **Status: COMPLETE.** All 4 tasks landed as commits `211f548..b893c0f`. A later on-device bug (`e734015`, 2026-09-01 — pdfkit's browser bundle needs `font: null`) was found and fixed after shipping; see `docs/manual-testing-checklist.md` §4b.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Native "Εξαγωγή PDF" generates the PDF entirely on-device (no network call, ever), fully replacing today's server-fetch approach — web PDF export is untouched.

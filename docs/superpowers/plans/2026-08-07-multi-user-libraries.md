@@ -1,5 +1,7 @@
 # Multi-user Personal Libraries Implementation Plan
 
+> **Status: COMPLETE.** All 21 tasks landed as commits `8ff8edb..b6cf301`, ending in `2717ae8` (worktree merge) — this is the foundational auth/ownership model the whole app now runs on.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Turn Glentify from a single shared password-gated app into a multi-user app where each musician has their own account, songs, programs and sessions, while the original admin's repertoire doubles as a copy-from-me suggestion pool for everyone else.

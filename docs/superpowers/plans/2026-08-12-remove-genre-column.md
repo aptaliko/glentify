@@ -1,5 +1,7 @@
 # Remove Genre Column Implementation Plan
 
+> **Status: COMPLETE.** All 14 tasks landed as commits `c707a4f..93f3176`, including two in-flight plan amendments (`294e36a`, `4098bf3`) and review-fix commits (`0e16db6`, `ae5f429`).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Remove the mandatory `songs.genreId` column and move "genre" into the existing flexible `song_axis_values` system, so it behaves exactly like region/rhythm/dromos/composer/year — optional, self-service, no special-cased code path.

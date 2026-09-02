@@ -1,5 +1,7 @@
 # Dynamic Song Classification (Tags) Implementation Plan
 
+> **Status: COMPLETE.** Implemented — confirmed directly against `src/db/schema.ts` (`axisTypes`/`songAxisValues`, no fixed rhythm/region/dromos columns on `songs`) and `src/lib/suggestions.ts`. Folded into the repo's early history rather than tracked as individual per-task commits (no granular history exists from before that point in this repo).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Replace the fixed Region/Rhythm/Dromos columns on `songs` with a flexible per-song set of typed axis values (tags), so non-traditional songs (rembetika, laika, entechna) can be classified only by the axes that actually apply to them, and the live-session suggestion engine becomes a single dynamically-filtered list driven by whichever axes the user has toggled on.

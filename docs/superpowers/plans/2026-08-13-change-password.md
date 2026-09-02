@@ -1,5 +1,7 @@
 # Authenticated Change-Password Implementation Plan
 
+> **Status: COMPLETE.** All 3 tasks landed as commits `cbc7082..106d7e8` — this plan's own checkboxes below were already checked off at the time (`106d7e8`); no correction needed.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** A logged-in user can change their own password from `/account`, given their current password.

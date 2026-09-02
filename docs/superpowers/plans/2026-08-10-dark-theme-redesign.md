@@ -1,5 +1,7 @@
 # Dark Theme Redesign Implementation Plan
 
+> **Status: COMPLETE.** All 2 tasks landed as commits `7ac21ca..3714e7f` — this plan's own checkboxes below were already checked off at the time (`3714e7f`), unlike most plans in this directory; no correction needed.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Replace Glentify's locked light daisyUI theme (`corporate`) with a new locked dark theme (`glentify-dark`, teal accent), applied globally across native, web, and admin — no toggle, no markup changes.

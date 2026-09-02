@@ -1,5 +1,7 @@
 # Consistent Page Navigation (Back / Home) Implementation Plan
 
+> **Status: COMPLETE.** All 11 tasks landed as commits `6eaed35..6827b5a` ("Fix final review findings").
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Every page in the app shows a consistent, always-visible way to go back to its logical parent page and return home, replacing the scattered/missing/error-state-only ad-hoc links that exist today.

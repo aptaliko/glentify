@@ -1,5 +1,7 @@
 # Offline Program CRUD Implementation Plan
 
+> **Status: COMPLETE.** All 4 tasks landed as commits `9339e26..7422b90` ("Fix native+online sync refresh race and add-collaborator-after-delete 404 handling"). This plan covers the programs **list page** only — sequence-level CRUD within an open program is a separate plan, `2026-09-02-offline-sequence-and-taxonomy-crud.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make create/rename/delete of a whole Σταθερό Πρόγραμμα work offline on the native admin tool's programs list page, queued via the existing generic sync-queue engine, viewable from a cache when offline — while leaving the web version of the same page completely unaffected.

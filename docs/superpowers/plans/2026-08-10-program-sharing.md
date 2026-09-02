@@ -1,5 +1,7 @@
 # Program Sharing (Collaborative Ownership) Implementation Plan
 
+> **Status: COMPLETE.** All 8 tasks landed as commits `39bae63..8522b4c` ("Fix 3 findings from program-sharing final review").
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Let a Σταθερό Πρόγραμμα (fixed program) have multiple co-owners with equal edit rights, added by email, with only the original creator able to manage membership or delete the program.

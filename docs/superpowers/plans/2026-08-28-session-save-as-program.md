@@ -1,5 +1,7 @@
 # Save a Live Session as a Program — Implementation Plan
 
+> **Status: COMPLETE.** All 8 tasks landed as commits `3830084..c0ef807` ("Fix final review findings: blank-title guard, replace-on-save, active-session guard...").
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** When George ends a remote (web) live session, offer to save the setlist as a new Σταθερό Πρόγραμμα or as new sequences appended to an existing one, preserving the on-stage σειρές (each `Τέλος σειράς` press) as separate sequences. Also rename "Ξεκίνα γλέντι" to "Ξεκίνα Live".

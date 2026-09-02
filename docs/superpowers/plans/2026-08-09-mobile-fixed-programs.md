@@ -1,5 +1,7 @@
 # Σταθερά Προγράμματα offline στο Android — Implementation Plan
 
+> **Status: COMPLETE.** All 7 tasks landed as commits `3d8f3a5..3a1ff5d` (worktree merge).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Let the Android (Capacitor) build of Glentify show and play back the user's existing Σταθερά Προγράμματα (fixed programs/setlists) offline, after the same sync the app already does for songs.

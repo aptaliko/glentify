@@ -1,5 +1,7 @@
 # Swipe Left/Right for Next/Previous Song (Android) Implementation Plan
 
+> **Status: COMPLETE.** All 2 tasks landed as commits `7da25a2..ba89a5e` — this plan's own checkboxes below were already checked off at the time (`ba89a5e`); no correction needed.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** On `/programs/local/sequence` (the only next/previous-song screen that ships in the Android build), swiping left advances to the next song and swiping right goes to the previous one, identically to the existing on-screen buttons.

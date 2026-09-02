@@ -1,5 +1,7 @@
 # PDF Export of a Σταθερό Πρόγραμμα Implementation Plan
 
+> **Status: COMPLETE.** All 7 tasks landed as commits `518c11b..91e8ff5`, including two post-ship fixes (`5d9377c` Turbopack build failure, `0e877cf` Content-Disposition crash) folded back into the spec/plan docs (`91e8ff5`).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add an "Export PDF" action to a program's detail page, on both web and native (Android), that produces a PDF with the program's title and, per sequence, a numbered list of song titles.

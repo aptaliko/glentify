@@ -1,5 +1,7 @@
 # Panigyri Setlist App Implementation Plan
 
+> **Status: COMPLETE (foundational).** This is the original MVP plan — folded into the repo's initial commit (`8bc238c`) rather than tracked as individual per-task commits (no granular history exists from before that point). The app running today is its delivered outcome. Its data model has since evolved past what this plan originally describes (see `2026-07-29-dynamic-song-tags.md` and `2026-08-12-remove-genre-column.md` for the axis-based classification that replaced the fixed region/rhythm/dromos/genre columns this plan specifies) — read this for MVP-era context, not current schema.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build a single-user, tablet-friendly web app that stores Greek folk/laiko songs with lyrics and metadata (region, rhythm, dromos, genre), and during a live performance shows the current song's lyrics alongside three ranked suggestion lists for what to play next, respecting configurable rhythm-transition rules.
