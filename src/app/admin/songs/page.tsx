@@ -10,8 +10,8 @@ import { setSelectedEditSongId } from '@/lib/adminEditStore';
 import { getQueuedActions } from '@/lib/syncQueue';
 import type { QueuedAction } from '@/lib/syncQueue';
 import { useSyncQueue } from '@/components/SyncQueueProvider';
-import { saveSongsListCache, loadSongsListCache } from '@/lib/songsListCache';
-import type { CachedSong } from '@/lib/songsListCache';
+import { loadReferenceData } from '@/lib/offlineCache';
+import type { CachedSong } from '@/lib/referenceData';
 import { mergeSongsWithPending, isSongQueueAction } from '@/lib/songsMerge';
 
 export default function SongsAdminPage() {
@@ -21,6 +21,7 @@ export default function SongsAdminPage() {
   const [search, setSearch] = useState('');
   const [offlineSongs, setOfflineSongs] = useState(false);
   const [songsUnavailable, setSongsUnavailable] = useState(false);
+  const [neverPrimed, setNeverPrimed] = useState(false);
   const [pendingActions, setPendingActions] = useState<QueuedAction[]>([]);
   const { pendingCount } = useSyncQueue();
 
@@ -37,24 +38,18 @@ export default function SongsAdminPage() {
       setSongs(data);
       setOfflineSongs(false);
       setSongsUnavailable(false);
-      // Only the unfiltered list is a safe base to cache — caching a search result would
-      // silently truncate the offline list to whatever was last searched for.
-      if (!q) {
-        try {
-          await saveSongsListCache(data);
-        } catch {
-          // A cache-write failure must not affect the already-successful state above.
-        }
-      }
+      setNeverPrimed(false);
     } catch {
-      const cached = await loadSongsListCache().catch(() => null);
-      if (cached) {
-        const filtered = q ? cached.filter((s) => s.title.toLowerCase().includes(q.toLowerCase())) : cached;
+      const cached = await loadReferenceData().catch(() => null);
+      if (cached && cached.primedAt !== null) {
+        const filtered = q ? cached.songs.filter((s) => s.title.toLowerCase().includes(q.toLowerCase())) : cached.songs;
         setSongs(filtered);
         setOfflineSongs(true);
         setSongsUnavailable(false);
+        setNeverPrimed(false);
       } else {
         setSongsUnavailable(true);
+        setNeverPrimed(!cached || cached.primedAt === null);
       }
     }
   }
@@ -109,8 +104,10 @@ export default function SongsAdminPage() {
       </div>
       {songsUnavailable && (
         <p className="text-sm text-base-content/50">
-          Άγνωστο χωρίς σύνδεση — αυτή η λίστα αποθηκεύεται για offline χρήση μόνο αφού την ανοίξεις
-          μία φορά με σύνδεση.
+          {neverPrimed
+            ? 'Δεν έχει προετοιμαστεί για offline χρήση. '
+            : 'Άγνωστο χωρίς σύνδεση. '}
+          <Link href="/" className="link">Προετοιμασία για offline</Link>
         </p>
       )}
       {offlineSongs && <p className="text-sm text-warning">Χωρίς σύνδεση — τελευταία γνωστά δεδομένα.</p>}
