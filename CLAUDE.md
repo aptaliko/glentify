@@ -31,7 +31,7 @@ npx vitest run -t "test name substring"        # single test by name
 
 npm run db:generate        # drizzle-kit generate — after editing src/db/schema.ts
 npm run db:migrate          # apply migrations (needs .env.local / DATABASE_URL)
-npm run build:mobile        # stage + static-export the native (Capacitor) bundle into out/, then `cap sync`
+npm run build:mobile        # stage + static-export the native (Capacitor) bundle into out/, `cap sync`, then build a debug APK
 ```
 
 There is no `db:migrate:finalize`-free path for a fresh multi-user database: migrations
@@ -40,27 +40,31 @@ backfills `owner_id`) → `db:migrate:finalize` (adds the `owner_id NOT NULL` co
 kept in a separate `drizzle-finalize/` folder specifically so it never runs before the
 backfill). See `README.md` for full local setup and the equivalent production sequence.
 
-**Installable debug APK** (after `npm run build:mobile`):
+**Installable debug APK**: `npm run build:mobile` (`scripts/build-mobile.sh`) ends by
+running `cd android && ./gradlew assembleDebug` itself, so every run leaves a fresh
+`android/app/build/outputs/apk/debug/app-debug.apk` — no separate step needed. Gradle
+auto-signs it with the default debug keystore — installable via `adb install` or copying
+to the device, but not a Play Store release build; `android/app/build.gradle` has no
+`release` `signingConfig`, so `assembleRelease` produces an unsigned APK that won't
+install as-is.
+
+`@capacitor/android` 8.x requires Java 21 source/target compatibility
+(`node_modules/@capacitor/android/capacitor/build.gradle`). If `~/.gradle/gradle.properties`
+(GRADLE_USER_HOME — a machine-wide file, not part of this repo) pins `org.gradle.java.home`
+to an older JDK, the APK step in `build-mobile.sh` resolves a JDK 21 itself via
+`/usr/libexec/java_home -v 21` (macOS) and passes it through `GRADLE_OPTS` for just that
+invocation — it doesn't touch the global pin, in case another project on the same machine
+depends on it. If no JDK 21 is found, the script logs a warning and skips the APK step
+without failing the rest of the mobile build (`out/` and `android/` are still refreshed);
+install a JDK 21 and rerun, or build the APK manually:
 
 ```bash
-cd android && ./gradlew assembleDebug
+cd android && GRADLE_OPTS="-Dorg.gradle.java.home=$(/usr/libexec/java_home -v 21)" ./gradlew assembleDebug
 # -> android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
-If this fails with `Java compilation initialization error: invalid source release: 21`,
-your `~/.gradle/gradle.properties` (GRADLE_USER_HOME — a machine-wide file, not part of
-this repo) is pinning `org.gradle.java.home` to a JDK older than 21; `@capacitor/android`
-8.x requires Java 21 source/target compatibility
-(`node_modules/@capacitor/android/capacitor/build.gradle`). That global pin wins over
-anything in `android/gradle.properties`, so fix it per-invocation instead:
-
-```bash
-GRADLE_OPTS="-Dorg.gradle.java.home=$(/usr/libexec/java_home -v 21)" ./gradlew assembleDebug
-```
-
 (or point at a specific JDK 21 install directly, e.g. a SDKMAN path, if `java_home` finds
-none). This doesn't touch the global JDK pin, in case another project on the same machine
-depends on it.
+none).
 
 Gradle auto-signs this with the default debug keystore — installable via `adb install` or
 copying to the device, but not a Play Store release build. `android/app/build.gradle` has

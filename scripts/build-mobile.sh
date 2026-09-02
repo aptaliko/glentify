@@ -72,3 +72,21 @@ cp -R .mobile-build/out out
 echo "Mobile static export written to ./out"
 
 npx cap sync
+
+# Debug APK, auto-signed with Gradle's default debug keystore (installable via `adb install`
+# or by copying the file to a device; not a Play Store release build - android/app/build.gradle
+# has no release signingConfig).
+# @capacitor/android 8.x requires Java 21 source/target compatibility, but this machine's
+# global ~/.gradle/gradle.properties (GRADLE_USER_HOME, not part of this repo) pins
+# org.gradle.java.home to an older JDK, and that global pin wins over anything set in
+# android/gradle.properties. Point Gradle at a JDK 21 for just this invocation instead of
+# touching the global pin, in case another project on this machine depends on it.
+JAVA21_HOME="$(/usr/libexec/java_home -v 21 2>/dev/null || true)"
+if [ -z "$JAVA21_HOME" ]; then
+  echo "build-mobile: no JDK 21 found via 'java_home -v 21' - skipping APK build." >&2
+  echo "build-mobile: out/ and android/ are still up to date; install a JDK 21 and rerun, or build manually:" >&2
+  echo "build-mobile:   cd android && GRADLE_OPTS=\"-Dorg.gradle.java.home=\$(/usr/libexec/java_home -v 21)\" ./gradlew assembleDebug" >&2
+else
+  (cd android && GRADLE_OPTS="-Dorg.gradle.java.home=$JAVA21_HOME" ./gradlew assembleDebug)
+  echo "Debug APK written to android/app/build/outputs/apk/debug/app-debug.apk"
+fi
