@@ -215,6 +215,57 @@ New (2026-08-31), not yet exercised on a device or in a real browser. Covers bot
 
 ---
 
+## Offline Song CRUD Phase 1 (#5 Phase 1)
+
+These items were specified by the implementation plan's own final task but never actually
+added here until this 2026-09-02 pass — the feature shipped 2026-09-01 with none of this
+run on a real device yet.
+
+### Create/edit/delete a song offline (`admin/songs`, `admin/songs/new`, `admin/local/songs/edit`)
+- [ ] Add a song offline with axis values chosen from cached options — confirm the new song
+      shows as a pending, non-clickable row on the list ("Θα είναι διαθέσιμο μόλις
+      συγχρονιστεί").
+- [ ] Go online, confirm the sync-queue drains and the song becomes a normal, real-id row.
+- [ ] Edit an existing song's text/axes offline, reopen its edit page before the edit has
+      synced — confirm the pending (unsynced) fields show, not stale cached data.
+- [ ] Delete a song offline, confirm it hides from the list immediately; separately, delete a
+      song that is a session's current song (or has been played in a session) — confirm the
+      real, permanent 409 makes it reappear as a normal active row rather than staying hidden
+      forever.
+- [ ] Confirm the image file input is disabled (with its inline note) on both
+      `admin/songs/new` (native) and `admin/local/songs/edit`, and that an existing image
+      still displays read-only on the edit page.
+- [ ] Create a song with axis values on native, let it sync, reopen it, confirm the axes are
+      still shown before touching anything (catches the "two caches feeding one form"
+      staleness class of bug fixed in `6f2f268`).
+
+### Axis "no data cached" recovery (hardened 2026-09-02, not yet verified on-device)
+`SongAxisEditor`'s native branch used to silently render nothing — no dropdown, no
+message — if the cached `ReferenceData` was `null` or had no `axisTypes` (e.g. a
+never-synced fresh install, or a stale device that synced before `axisTypes` existed).
+Fixed to always show an actionable message in that case instead.
+- [ ] **Fresh install, do NOT tap "Συγχρονισμός τραγουδιών" first.** Open Νέο τραγούδι →
+      confirm the Άξονες card shows the actionable "Δεν υπάρχουν ακόμη αποθηκευμένα δεδομένα
+      αξόνων… Πήγαινε στην αρχική…" message with a working link to Home — not a blank card
+      with only "Κανένας άξονας ακόμη" and nothing tappable.
+- [ ] Tap that link, sync from Home, reopen Νέο τραγούδι → axis types are now selectable.
+
+### Admin songs/programs list — offline cache priming (finding, 2026-09-02)
+`Διαχείριση → Τραγούδια` and `Διαχείριση → Προγράμματα` each warm their own offline cache
+only the moment you successfully open that specific page while online — tapping
+"Συγχρονισμός τραγουδιών" on Home does **not** populate either of them (it only feeds
+`referenceData`, used by Σταθερά προγράμματα / Ξεκίνα Live / axis Tags). This is the
+documented, intended design (see `docs/superpowers/specs/2026-08-31-offline-program-crud-design.md`
+§2), not a bug — but it means "offline works on the Home-button-synced screens but not in
+Διαχείριση" is the expected first-run experience, and is worth confirming reads clearly:
+- [ ] Fresh install, without ever opening either admin list page online, go offline, open
+      each — confirm the actionable "Άγνωστο χωρίς σύνδεση — αυτή η λίστα αποθηκεύεται…"
+      message (not a bare, unexplained one).
+- [ ] Open each admin list page once online, go offline, reopen — confirm each renders its
+      cached list with "Χωρίς σύνδεση — τελευταία γνωστά δεδομένα".
+
+---
+
 ## Offline Sequence & Taxonomy CRUD (#6 + #7)
 
 Preconditions: native build installed; tap "Συγχρονισμός τραγουδιών" on the home page once while online so `referenceData` (taxonomy + programs) is cached; open the target program's edit page once while online so its detail is cached.
@@ -242,6 +293,16 @@ Preconditions: native build installed; tap "Συγχρονισμός τραγο�
 
 ## Cross-cutting notes
 
+- **Three independent, silently-triggered offline caches exist, found 2026-09-02.**
+  `referenceData` (feeds Σταθερά προγράμματα, Ξεκίνα Live, axis Tags) is populated only by
+  tapping "Συγχρονισμός τραγουδιών" on Home. `songsListCache` (Διαχείριση → Τραγούδια) and
+  `programsListCache` (Διαχείριση → Προγράμματα) are each populated only by successfully
+  opening that specific page while online — the Home sync button does nothing for either of
+  them. There is no single "prepare this device for offline use" step; a device can be fully
+  synced for one set of screens and show "άγνωστο/δεν είναι διαθέσιμη χωρίς σύνδεση" on
+  another. Each screen's own "unavailable offline" message was made actionable in this same
+  pass (see the Phase 1/#5 section above), but unifying these three triggers into one is not
+  done and would need its own spec/plan if picked up.
 - **Sync badge states** appear bottom-right whenever anything is queued: a plain count
   ("N εκκρεμεί συγχρονισμός"), a red "needs attention" count if something failed
   permanently (3 retries), or "Ο συγχρονισμός σταμάτησε προσωρινά" if a systemic error
