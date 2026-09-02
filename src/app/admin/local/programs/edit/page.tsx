@@ -82,6 +82,7 @@ export default function LocalEditProgramPage() {
       const sequences = await Promise.all(
         (data.sequences as { id: number; title: string; position: number }[]).map(async (seq) => {
           const sres = await nativeApiFetch(`/api/programs/${id}/sequences/${seq.id}`);
+          if (!sres.ok) throw new Error('bad status');
           const sdata = await sres.json();
           const rawSongs = Array.isArray(sdata.songs)
             ? (sdata.songs as { sequenceSongId: number; song: { id: number; title: string } }[])
@@ -293,6 +294,7 @@ export default function LocalEditProgramPage() {
     // throws and we keep the already-merged cached/overlaid songs.
     try {
       const res = await nativeApiFetch(`/api/programs/${programId}/sequences/${seqId}`);
+      if (!res.ok) throw new Error('bad status');
       const data = await res.json();
       const rawSongs = Array.isArray(data.songs)
         ? (data.songs as { sequenceSongId: number; song: { id: number; title: string } }[])
