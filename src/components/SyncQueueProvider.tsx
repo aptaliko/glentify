@@ -4,6 +4,7 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import { Network } from '@capacitor/network';
 import { isNativeApp } from '@/lib/platform';
+import { primeOfflineData } from '@/lib/offlineCache';
 import { processQueue } from '@/lib/syncQueue';
 import { initSyncHandlers } from '@/lib/syncHandlers';
 
@@ -43,8 +44,10 @@ export default function SyncQueueProvider({ children }: { children: ReactNode })
     initSyncHandlers();
     // eslint-disable-next-line react-hooks/set-state-in-effect
     refresh();
-    const listenerPromise = Network.addListener('networkStatusChange', (status) => {
-      if (status.connected) refresh();
+    const listenerPromise = Network.addListener('networkStatusChange', async (status) => {
+      if (!status.connected) return;
+      await refresh(); // drain the write queue first
+      await primeOfflineData(); // then re-pull server truth into the blob
     });
     return () => {
       listenerPromise.then((listener) => listener.remove());
