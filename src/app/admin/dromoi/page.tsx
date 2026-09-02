@@ -2,57 +2,69 @@
 
 import { useEffect, useState } from 'react';
 import { nativeApiFetch } from '@/lib/nativeApiFetch';
+import { loadReferenceData } from '@/lib/offlineCache';
+import { enqueue, getQueuedActions } from '@/lib/syncQueue';
+import { mergeTaxonomyWithPending, type DisplayTaxonomyValue } from '@/lib/taxonomyMerge';
+import { mintDraftId } from '@/lib/draftIds';
+import { useSyncQueue } from '@/components/SyncQueueProvider';
 
-interface Dromos {
-  id: number;
-  name: string;
-}
+const ENTITY = 'dromoi' as const;
 
 export default function DromoiAdminPage() {
-  const [dromoi, setDromoi] = useState<Dromos[]>([]);
+  const { pendingCount, notifyQueueChanged } = useSyncQueue();
+  const [dromoi, setDromoi] = useState<DisplayTaxonomyValue[]>([]);
   const [name, setName] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [offline, setOffline] = useState(false);
 
   async function load() {
-    const res = await nativeApiFetch('/api/dromoi');
-    setDromoi(await res.json());
+    const actions = await getQueuedActions();
+    try {
+      const res = await nativeApiFetch('/api/dromoi');
+      if (!res.ok) throw new Error('bad status');
+      const base = await res.json();
+      setDromoi(mergeTaxonomyWithPending(base, actions, ENTITY));
+      setOffline(false);
+    } catch {
+      const data = await loadReferenceData();
+      setDromoi(mergeTaxonomyWithPending(data?.dromoi ?? [], actions, ENTITY));
+      setOffline(true);
+    }
   }
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
-  }, []);
+  }, [pendingCount]);
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    const res = await nativeApiFetch('/api/dromoi', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name }),
-    });
-    if (!res.ok) {
-      setError('Αποτυχία δημιουργίας δρόμου');
+    try {
+      await enqueue('dromoi-create', { draftId: mintDraftId(), name, parentId: null });
+    } catch {
+      setError('Αποτυχία αποθήκευσης. Δοκίμασε ξανά.');
       return;
     }
     setName('');
-    await load();
+    await notifyQueueChanged();
   }
 
   async function handleDelete(id: number) {
     setError(null);
-    const res = await nativeApiFetch(`/api/dromoi/${id}`, { method: 'DELETE' });
-    if (!res.ok) {
-      const body = await res.json();
-      setError(body.error);
+    try {
+      await enqueue('dromoi-delete', { id });
+    } catch {
+      setError('Αποτυχία αποθήκευσης. Δοκίμασε ξανά.');
       return;
     }
-    await load();
+    await notifyQueueChanged();
   }
 
   return (
     <div className="flex flex-col gap-4">
       <h1 className="text-xl font-bold">Δρόμοι</h1>
+      {offline && <p className="text-sm text-warning">Χωρίς σύνδεση — οι αλλαγές θα συγχρονιστούν αργότερα.</p>}
       {error && (
         <div role="alert" className="alert alert-error">
           <span>{error}</span>
@@ -65,7 +77,11 @@ export default function DromoiAdminPage() {
       <ul className="list rounded-box bg-base-100 shadow">
         {dromoi.map((d) => (
           <li key={d.id} className="list-row items-center">
-            <span>{d.name}</span>
+            <span>
+              {d.name}
+              {d.status === 'pending-create' && ' (εκκρεμεί)'}
+              {d.status === 'needs-attention-create' && ' (απέτυχε)'}
+            </span>
             <button onClick={() => handleDelete(d.id)} className="btn btn-ghost btn-sm text-error">Διαγραφή</button>
           </li>
         ))}

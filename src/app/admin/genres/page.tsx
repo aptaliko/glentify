@@ -2,57 +2,69 @@
 
 import { useEffect, useState } from 'react';
 import { nativeApiFetch } from '@/lib/nativeApiFetch';
+import { loadReferenceData } from '@/lib/offlineCache';
+import { enqueue, getQueuedActions } from '@/lib/syncQueue';
+import { mergeTaxonomyWithPending, type DisplayTaxonomyValue } from '@/lib/taxonomyMerge';
+import { mintDraftId } from '@/lib/draftIds';
+import { useSyncQueue } from '@/components/SyncQueueProvider';
 
-interface Genre {
-  id: number;
-  name: string;
-}
+const ENTITY = 'genres' as const;
 
 export default function GenresAdminPage() {
-  const [genres, setGenres] = useState<Genre[]>([]);
+  const { pendingCount, notifyQueueChanged } = useSyncQueue();
+  const [genres, setGenres] = useState<DisplayTaxonomyValue[]>([]);
   const [name, setName] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [offline, setOffline] = useState(false);
 
   async function load() {
-    const res = await nativeApiFetch('/api/genres');
-    setGenres(await res.json());
+    const actions = await getQueuedActions();
+    try {
+      const res = await nativeApiFetch('/api/genres');
+      if (!res.ok) throw new Error('bad status');
+      const base = await res.json();
+      setGenres(mergeTaxonomyWithPending(base, actions, ENTITY));
+      setOffline(false);
+    } catch {
+      const data = await loadReferenceData();
+      setGenres(mergeTaxonomyWithPending(data?.genres ?? [], actions, ENTITY));
+      setOffline(true);
+    }
   }
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
-  }, []);
+  }, [pendingCount]);
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    const res = await nativeApiFetch('/api/genres', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name }),
-    });
-    if (!res.ok) {
-      setError('Αποτυχία δημιουργίας είδους');
+    try {
+      await enqueue('genres-create', { draftId: mintDraftId(), name, parentId: null });
+    } catch {
+      setError('Αποτυχία αποθήκευσης. Δοκίμασε ξανά.');
       return;
     }
     setName('');
-    await load();
+    await notifyQueueChanged();
   }
 
   async function handleDelete(id: number) {
     setError(null);
-    const res = await nativeApiFetch(`/api/genres/${id}`, { method: 'DELETE' });
-    if (!res.ok) {
-      const body = await res.json();
-      setError(body.error);
+    try {
+      await enqueue('genres-delete', { id });
+    } catch {
+      setError('Αποτυχία αποθήκευσης. Δοκίμασε ξανά.');
       return;
     }
-    await load();
+    await notifyQueueChanged();
   }
 
   return (
     <div className="flex flex-col gap-4">
       <h1 className="text-xl font-bold">Είδη</h1>
+      {offline && <p className="text-sm text-warning">Χωρίς σύνδεση — οι αλλαγές θα συγχρονιστούν αργότερα.</p>}
       {error && (
         <div role="alert" className="alert alert-error">
           <span>{error}</span>
@@ -65,7 +77,11 @@ export default function GenresAdminPage() {
       <ul className="list rounded-box bg-base-100 shadow">
         {genres.map((g) => (
           <li key={g.id} className="list-row items-center">
-            <span>{g.name}</span>
+            <span>
+              {g.name}
+              {g.status === 'pending-create' && ' (εκκρεμεί)'}
+              {g.status === 'needs-attention-create' && ' (απέτυχε)'}
+            </span>
             <button onClick={() => handleDelete(g.id)} className="btn btn-ghost btn-sm text-error">Διαγραφή</button>
           </li>
         ))}
