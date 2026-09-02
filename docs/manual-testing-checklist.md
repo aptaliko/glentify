@@ -296,16 +296,15 @@ Preconditions: native build installed; tap "Συγχρονισμός τραγο�
 
 ## Cross-cutting notes
 
-- **Three independent, silently-triggered offline caches exist, found 2026-09-02.**
-  `referenceData` (feeds Σταθερά προγράμματα, Ξεκίνα Live, axis Tags) is populated only by
-  tapping "Συγχρονισμός τραγουδιών" on Home. `songsListCache` (Διαχείριση → Τραγούδια) and
+- **Three independent, silently-triggered offline caches exist, found 2026-09-02** — don't
+  read "offline works on screen A but not screen B" as a bug while testing. `referenceData`
+  (feeds Σταθερά προγράμματα, Ξεκίνα Live, axis Tags) is populated only by tapping
+  "Συγχρονισμός τραγουδιών" on Home. `songsListCache` (Διαχείριση → Τραγούδια) and
   `programsListCache` (Διαχείριση → Προγράμματα) are each populated only by successfully
   opening that specific page while online — the Home sync button does nothing for either of
-  them. There is no single "prepare this device for offline use" step; a device can be fully
-  synced for one set of screens and show "άγνωστο/δεν είναι διαθέσιμη χωρίς σύνδεση" on
-  another. Each screen's own "unavailable offline" message was made actionable in this same
-  pass (see the Phase 1/#5 section above), but unifying these three triggers into one is not
-  done and would need its own spec/plan if picked up.
+  them. Each screen's own "unavailable offline" message was made actionable (see the Phase
+  1/#5 section above). Unifying the three triggers into one is a real, separate idea, not a
+  testing task — tracked in `docs/feature-backlog.md`, not here.
 - **Sync badge states** appear bottom-right whenever anything is queued: a plain count
   ("N εκκρεμεί συγχρονισμός"), a red "needs attention" count if something failed
   permanently (3 retries), or "Ο συγχρονισμός σταμάτησε προσωρινά" if a systemic error
