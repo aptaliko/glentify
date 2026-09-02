@@ -65,8 +65,13 @@ export default function NewSongPage() {
         return;
       }
       nativeApiFetch(`/api/songs/suggestions?title=${encodeURIComponent(title.trim())}`)
-        .then((r) => r.json())
-        .then(setSuggestions);
+        .then((r) => (r.ok ? r.json() : []))
+        .then(setSuggestions)
+        // No connectivity (most commonly: native, offline) or any other fetch/parse
+        // failure — this is a convenience ("maybe you meant an existing song"), not
+        // something the create flow depends on, so fail silently to no suggestions
+        // rather than an unhandled promise rejection.
+        .catch(() => setSuggestions([]));
     }, 300);
     return () => clearTimeout(timeout);
   }, [title]);
