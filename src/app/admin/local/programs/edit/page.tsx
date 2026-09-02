@@ -64,6 +64,12 @@ export default function LocalEditProgramPage() {
       .finally(() => setChecked(true));
   }, []);
 
+  // The pre-overlay base CachedProgramDetail that the most recent loadSequences() call
+  // built (fresh from the server when online, from the blob slice when offline) — kept so
+  // handleToggleExpand can re-run mergeSequencesWithPending against a base that's at least
+  // as fresh as what's on screen, instead of re-reading the (possibly stale) blob.
+  const baseSequenceDetailRef = useRef<CachedProgramDetail | null>(null);
+
   // Online: fetches the program + every sequence's songs and overlays any still-pending
   // queue actions on top before rendering. Offline: falls back to the reference-data blob
   // (also overlaid). Returns the program's role either way so the mount effect can thread
@@ -96,6 +102,7 @@ export default function LocalEditProgramPage() {
         })
       );
       const detail: CachedProgramDetail = { programId: id, title: data.title, role: data.role, sequences, cachedAt: '' };
+      baseSequenceDetailRef.current = detail;
       setSequencesUnavailableOffline(false);
       setDisplaySequences(mergeSequencesWithPending(detail, actions, titles));
       return data.role;
@@ -103,12 +110,14 @@ export default function LocalEditProgramPage() {
       const program = cached?.programs.find((p) => p.id === id) ?? null;
       if (program && cached && cached.primedAt !== null) {
         const detail = toProgramDetail(program, titles);
+        baseSequenceDetailRef.current = detail;
         setTitle(detail.title);
         setRole(detail.role);
         setSequencesUnavailableOffline(false);
         setDisplaySequences(mergeSequencesWithPending(detail, actions, titles));
         return detail.role;
       }
+      baseSequenceDetailRef.current = null;
       setSequencesUnavailableOffline(true);
       return null;
     }
@@ -125,11 +134,7 @@ export default function LocalEditProgramPage() {
     }
   }
 
-  async function loadCollaborators(
-    id: number,
-    roleForCache: 'creator' | 'collaborator' | null,
-    userForCache: CurrentUser | null
-  ) {
+  async function loadCollaborators(id: number) {
     try {
       const res = await nativeApiFetch(`/api/programs/${id}/collaborators`);
       if (!res.ok) {
@@ -165,11 +170,9 @@ export default function LocalEditProgramPage() {
     if (programId === null) return;
     (async () => {
       // loadSequences and loadCurrentUser both catch their own network failures and never
-      // reject, so Promise.all is correct here (no need for allSettled). Their return
-      // values are threaded into loadCollaborators explicitly rather than read back from
-      // React state in the same tick, which would see the pre-update, stale value.
-      const [seqRole, user] = await Promise.all([loadSequences(programId), loadCurrentUser()]);
-      await loadCollaborators(programId, seqRole, user);
+      // reject, so Promise.all is correct here (no need for allSettled).
+      await Promise.all([loadSequences(programId), loadCurrentUser()]);
+      await loadCollaborators(programId);
     })();
   }, [programId]);
 
@@ -193,7 +196,7 @@ export default function LocalEditProgramPage() {
         const prevCount = prevInfo && prevInfo.programId === programId ? prevInfo.count : null;
         prevPendingCollaboratorInfoRef.current = { programId, count: thisProgramCount };
         if (prevCount !== null && prevCount > 0 && thisProgramCount === 0) {
-          loadCollaborators(programId, role, currentUser);
+          loadCollaborators(programId);
         }
       })
       .catch(() => {});
@@ -285,17 +288,18 @@ export default function LocalEditProgramPage() {
         songId: e.song.id,
         title: e.song.title,
       }));
-      const [actions, cached] = await Promise.all([getQueuedActions(), loadReferenceData().catch(() => null)]);
-      const program = cached?.programs.find((p) => p.id === programId);
-      if (program) {
-        // Rebuild from the blob slice (real ids) with the just-fetched sequence's songs
-        // overlaid, then re-apply the queue overlay. Draft sequences absent from the blob
-        // come back through the queue overlay in mergeSequencesWithPending.
-        const detail = toProgramDetail(program, songTitles);
+      const base = baseSequenceDetailRef.current;
+      if (base && base.programId === programId) {
+        // Overlay the just-fetched songs onto the server-fresh base that loadSequences
+        // last built — never the (possibly stale) blob — then re-apply the pending-queue
+        // overlay via mergeSequencesWithPending so a draft add/remove for this sequence
+        // isn't lost.
         const withFresh: CachedProgramDetail = {
-          ...detail,
-          sequences: detail.sequences.map((s) => (s.id === seqId ? { ...s, songs: freshSongs } : s)),
+          ...base,
+          sequences: base.sequences.map((s) => (s.id === seqId ? { ...s, songs: freshSongs } : s)),
         };
+        baseSequenceDetailRef.current = withFresh; // keep base current so a later expand compounds correctly
+        const actions = await getQueuedActions();
         setDisplaySequences(mergeSequencesWithPending(withFresh, actions, songTitles));
       }
     } catch {
@@ -351,7 +355,7 @@ export default function LocalEditProgramPage() {
         return;
       }
       setNewCollaboratorEmail('');
-      await loadCollaborators(programId, role, currentUser);
+      await loadCollaborators(programId);
     } catch {
       try {
         await enqueue('program-add-collaborator', { programId, email });
@@ -381,7 +385,7 @@ export default function LocalEditProgramPage() {
         router.push('/admin/programs');
         return;
       }
-      await loadCollaborators(programId, role, currentUser);
+      await loadCollaborators(programId);
     } catch {
       try {
         await enqueue('program-remove-collaborator', { programId, userId });
