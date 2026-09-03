@@ -38,14 +38,15 @@ export default function NewSongPage() {
   }, [localPreviewUrl]);
 
   async function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
+    const input = e.target;
+    const file = input.files?.[0];
     if (!file) return;
     setError(null);
     if (native) {
       const validation = validateImageFile(file);
       if (!validation.ok) {
         setError(validation.reason);
-        e.target.value = '';
+        input.value = '';
         return;
       }
       const draftId = mintDraftId();
@@ -55,10 +56,16 @@ export default function NewSongPage() {
         setError('Αποτυχία αποθήκευσης εικόνας.');
         return;
       }
+      // A re-pick supersedes a blob picked earlier this session — delete its bytes so they
+      // don't leak (a new-song draft id is never referenced by a queued action yet).
+      if (pendingImageBlobId != null) {
+        try { await deleteLocalImage(pendingImageBlobId); } catch { /* best-effort */ }
+      }
       if (localPreviewUrl) URL.revokeObjectURL(localPreviewUrl);
       setPendingImageBlobId(draftId);
       setLocalPreviewUrl(URL.createObjectURL(file));
       setImageUrl(null); // a fresh pending image supersedes any prior real URL
+      input.value = ''; // let the same filename be re-picked later (e.g. after Remove)
       return;
     }
     // Web: eager direct upload, unchanged.

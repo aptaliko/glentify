@@ -68,6 +68,10 @@ export default function LocalEditSongPage() {
   const [axisValues, setAxisValues] = useState<AxisValueEntry[]>([]);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [pendingImageBlobId, setPendingImageBlobId] = useState<number | null>(null);
+  // The pendingImageBlobId seeded from resolveSongForEdit (an earlier queued update owns
+  // those bytes). Never delete this id from the local store — doing so would make that
+  // queued update unresolvable on reconnect. null when this session picked the image.
+  const [loadedBlobId, setLoadedBlobId] = useState<number | null>(null);
   const [localPreviewUrl, setLocalPreviewUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -108,6 +112,7 @@ export default function LocalEditSongPage() {
           setNotFound(false);
           const pendingId = result.song.pendingImageBlobId;
           setPendingImageBlobId(pendingId);
+          setLoadedBlobId(pendingId);
           if (pendingId != null) {
             getLocalImage(pendingId)
               .then((local) => {
@@ -127,13 +132,14 @@ export default function LocalEditSongPage() {
   }, [songId]);
 
   async function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
+    const input = e.target;
+    const file = input.files?.[0];
     if (!file) return;
     setError(null);
     const validation = validateImageFile(file);
     if (!validation.ok) {
       setError(validation.reason);
-      e.target.value = '';
+      input.value = '';
       return;
     }
     const draftId = mintDraftId();
@@ -143,14 +149,23 @@ export default function LocalEditSongPage() {
       setError('Αποτυχία αποθήκευσης εικόνας.');
       return;
     }
+    // A re-pick supersedes a blob picked earlier this session — delete its bytes so they
+    // don't leak. Never delete loadedBlobId: an earlier still-queued update owns it.
+    if (pendingImageBlobId != null && pendingImageBlobId !== loadedBlobId) {
+      try { await deleteLocalImage(pendingImageBlobId); } catch { /* best-effort */ }
+    }
     if (localPreviewUrl) URL.revokeObjectURL(localPreviewUrl);
     setPendingImageBlobId(draftId);
     setLocalPreviewUrl(URL.createObjectURL(file));
     setImageUrl(null); // a fresh pending image supersedes the existing real URL
+    input.value = ''; // let the same filename be re-picked later (e.g. after Remove)
   }
 
   async function handleRemoveImage() {
-    if (pendingImageBlobId != null) {
+    // Only delete bytes picked in *this* session. A pendingImageBlobId seeded from
+    // resolveSongForEdit belongs to an earlier still-queued update; deleting it would make
+    // that update unresolvable (item-error -> needsAttention) once connectivity returns.
+    if (pendingImageBlobId != null && pendingImageBlobId !== loadedBlobId) {
       try {
         await deleteLocalImage(pendingImageBlobId);
       } catch {
