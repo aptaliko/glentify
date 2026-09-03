@@ -15,6 +15,28 @@ function inMemoryQueueStorage(): QueueStorage {
   };
 }
 
+function action(overrides: Partial<QueuedAction> & { id: string; type: string }): QueuedAction {
+  return {
+    payload: {},
+    attempts: 0,
+    needsAttention: false,
+    createdAt: new Date().toISOString(),
+    ...overrides,
+  };
+}
+
+function makeStorage(initial: QueuedAction[]): QueueStorage {
+  let actions: QueuedAction[] = initial;
+  return {
+    async get() {
+      return actions;
+    },
+    async set(next) {
+      actions = next;
+    },
+  };
+}
+
 describe('enqueueTo', () => {
   it('appends a new action with default attempts/needsAttention and a generated id', async () => {
     const storage = inMemoryQueueStorage();
@@ -49,7 +71,7 @@ describe('processQueueWith', () => {
 
     expect(handler).toHaveBeenCalledTimes(1);
     expect(await storage.get()).toEqual([]);
-    expect(result).toEqual({ processed: 1, remaining: 0, needsAttention: 0, blocked: false });
+    expect(result).toEqual({ processed: 1, remaining: 0, needsAttention: 0, conflict: 0, blocked: false });
   });
 
   it('gives every eligible item at most one attempt per call, requeuing item-errors to the back', async () => {
@@ -75,7 +97,7 @@ describe('processQueueWith', () => {
     expect(remaining[0].payload).toBe('A');
     expect(remaining[0].attempts).toBe(1);
     expect(remaining[0].needsAttention).toBe(false);
-    expect(result).toEqual({ processed: 1, remaining: 1, needsAttention: 0, blocked: false });
+    expect(result).toEqual({ processed: 1, remaining: 1, needsAttention: 0, conflict: 0, blocked: false });
   });
 
   it('flags an item needsAttention after 3 failed attempts and stops auto-retrying it', async () => {
@@ -117,7 +139,7 @@ describe('processQueueWith', () => {
     const remaining = await storage.get();
     expect(remaining).toHaveLength(2); // both items still present, neither mutated
     expect(remaining[0].attempts).toBe(0);
-    expect(result).toEqual({ processed: 0, remaining: 2, needsAttention: 0, blocked: true });
+    expect(result).toEqual({ processed: 0, remaining: 2, needsAttention: 0, conflict: 0, blocked: true });
   });
 
   it('leaves an item with no registered handler untouched and continues with the rest', async () => {
@@ -133,7 +155,7 @@ describe('processQueueWith', () => {
     const remaining = await storage.get();
     expect(remaining).toHaveLength(1);
     expect(remaining[0].payload).toBe('A');
-    expect(result).toEqual({ processed: 1, remaining: 1, needsAttention: 0, blocked: false });
+    expect(result).toEqual({ processed: 1, remaining: 1, needsAttention: 0, conflict: 0, blocked: false });
   });
 
   it('treats a handler that throws/rejects the same as an explicit systemic-error', async () => {
@@ -154,7 +176,36 @@ describe('processQueueWith', () => {
     const remaining = await storage.get();
     expect(remaining).toHaveLength(2); // both items still present, neither mutated
     expect(remaining[0].attempts).toBe(0);
-    expect(result).toEqual({ processed: 0, remaining: 2, needsAttention: 0, blocked: true });
+    expect(result).toEqual({ processed: 0, remaining: 2, needsAttention: 0, conflict: 0, blocked: true });
+  });
+
+  it('flags conflict immediately with reason "conflict" and keeps draining', async () => {
+    const storage = makeStorage([
+      action({ id: 'a', type: 'x' }),
+      action({ id: 'b', type: 'y' }),
+    ]);
+    const handlers = new Map<string, SyncHandler>([
+      ['x', async () => 'conflict'],
+      ['y', async () => 'success'],
+    ]);
+    const result = await processQueueWith(storage, handlers);
+    const remaining = await storage.get();
+    const a = remaining.find((x) => x.id === 'a')!;
+    expect(a.needsAttention).toBe(true);
+    expect(a.needsAttentionReason).toBe('conflict');
+    expect(a.attempts).toBe(1);
+    expect(remaining.find((x) => x.id === 'b')).toBeUndefined(); // y still processed
+    expect(result.blocked).toBe(false);
+    expect(result.conflict).toBe(1); // surfaced from this pass, no re-read needed
+  });
+
+  it('sets reason "failed" when an item-error reaches the attempt cap', async () => {
+    const storage = makeStorage([action({ id: 'a', type: 'x', attempts: 2 })]);
+    const handlers = new Map<string, SyncHandler>([['x', async () => 'item-error']]);
+    await processQueueWith(storage, handlers);
+    const a = (await storage.get()).find((x) => x.id === 'a')!;
+    expect(a.needsAttention).toBe(true);
+    expect(a.needsAttentionReason).toBe('failed');
   });
 });
 

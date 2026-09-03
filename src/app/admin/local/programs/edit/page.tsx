@@ -10,7 +10,7 @@ import { enqueue, getQueuedActions } from '@/lib/syncQueue';
 import type { QueuedAction } from '@/lib/syncQueue';
 import { useSyncQueue } from '@/components/SyncQueueProvider';
 import { mergeCollaboratorsWithPending, isCollaboratorQueueActionForProgram } from '@/lib/collaboratorsMerge';
-import { mergeSequencesWithPending, type DisplaySequence } from '@/lib/sequencesMerge';
+import { mergeSequencesWithPending, sequenceAttentionReasonById, type DisplaySequence } from '@/lib/sequencesMerge';
 import { mintDraftId } from '@/lib/draftIds';
 import { loadReferenceData } from '@/lib/offlineCache';
 import { toProgramDetail, toCollaboratorsView, buildSongTitleMap } from '@/lib/offlineProgramView';
@@ -86,7 +86,7 @@ export default function LocalEditProgramPage() {
       setTitle(data.title);
       setRole(data.role);
       const sequences = await Promise.all(
-        (data.sequences as { id: number; title: string; position: number }[]).map(async (seq) => {
+        (data.sequences as { id: number; title: string; position: number; version: number }[]).map(async (seq) => {
           const sres = await nativeApiFetch(`/api/programs/${id}/sequences/${seq.id}`);
           if (!sres.ok) throw new Error('bad status');
           const sdata = await sres.json();
@@ -98,10 +98,10 @@ export default function LocalEditProgramPage() {
             songId: e.song.id,
             title: e.song.title,
           }));
-          return { id: seq.id, title: seq.title, position: seq.position, songs };
+          return { id: seq.id, title: seq.title, position: seq.position, songs, version: seq.version };
         })
       );
-      const detail: CachedProgramDetail = { programId: id, title: data.title, role: data.role, sequences, cachedAt: '' };
+      const detail: CachedProgramDetail = { programId: id, title: data.title, role: data.role, sequences, cachedAt: '', version: data.version };
       baseSequenceDetailRef.current = detail;
       setSequencesUnavailableOffline(false);
       setDisplaySequences(mergeSequencesWithPending(detail, actions, titles));
@@ -243,7 +243,8 @@ export default function LocalEditProgramPage() {
   async function handleRenameSequence(e: React.FormEvent, seqId: number) {
     e.preventDefault();
     if (programId === null) return;
-    await enqueue('sequence-rename', { programId, sequenceId: seqId, title: editingSeqTitle });
+    const baseVersion = baseSequenceDetailRef.current?.sequences.find((s) => s.id === seqId)?.version;
+    await enqueue('sequence-rename', { programId, sequenceId: seqId, title: editingSeqTitle, baseVersion });
     setEditingSeqId(null);
     await notifyQueueChanged();
     await loadSequences(programId);
@@ -256,10 +257,12 @@ export default function LocalEditProgramPage() {
     if (toIndex < 0 || toIndex >= current.length) return;
     const reordered = [...current];
     [reordered[fromIndex], reordered[toIndex]] = [reordered[toIndex], reordered[fromIndex]];
+    const baseVersion = baseSequenceDetailRef.current?.sequences.find((s) => s.id === expandedSeqId)?.version;
     await enqueue('sequence-reorder', {
       programId,
       sequenceId: expandedSeqId,
       orderedIds: reordered.map((entry) => entry.sequenceSongId),
+      baseVersion,
     });
     await notifyQueueChanged();
     await loadSequences(programId);
@@ -424,6 +427,7 @@ export default function LocalEditProgramPage() {
   const displayCollaborators =
     programId !== null ? mergeCollaboratorsWithPending(collaborators, pendingActions, programId) : [];
   const expandedSongs = displaySequences.find((s) => s.id === expandedSeqId)?.songs ?? [];
+  const seqAttentionReason = sequenceAttentionReasonById(pendingActions);
 
   return (
     <div className="flex flex-col gap-4">
@@ -565,6 +569,13 @@ export default function LocalEditProgramPage() {
                         )}
                         <button onClick={() => handleDeleteSequence(seq.id)} className="btn btn-ghost btn-sm text-error">Διαγραφή σειράς</button>
                       </div>
+                    )}
+
+                    {seqAttentionReason.get(seq.id) === 'conflict' && (
+                      <span className="text-xs text-error">Άλλαξε από συνεργάτη — η αλλαγή δεν εφαρμόστηκε.</span>
+                    )}
+                    {seqAttentionReason.get(seq.id) === 'failed' && (
+                      <span className="text-xs text-error">Απέτυχε η αλλαγή.</span>
                     )}
 
                     {!isPending && expandedSeqId === seq.id && (

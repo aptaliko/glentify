@@ -6,6 +6,7 @@ import type { AddCollaboratorPayload, RemoveCollaboratorPayload } from './collab
 import type { CreateProgramPayload, RenameProgramPayload, DeleteProgramPayload } from './programsMerge';
 import type { CreateSongPayload, UpdateSongPayload, DeleteSongPayload } from './songsMerge';
 import { loadDraftMap, recordResolution, resolveOne, resolveMany, isDraftId, type DraftEntity } from './draftIds';
+import { loadSyncedVersionMap, recordSyncedVersion, resolveVersion } from './syncedVersions';
 
 interface TaxonomyCreatePayload { draftId: number; name: string; parentId: number | null }
 interface TaxonomyDeletePayload { id: number }
@@ -166,14 +167,19 @@ async function handleCreateProgramSync(payload: unknown): Promise<SyncOutcome> {
 }
 
 async function handleRenameProgramSync(payload: unknown): Promise<SyncOutcome> {
-  const { programId, title } = payload as RenameProgramPayload;
+  const { programId, title, baseVersion } = payload as RenameProgramPayload & { baseVersion?: number };
   const res = await nativeApiFetch(
     `/api/programs/${encodeURIComponent(programId)}`,
-    { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title }) },
+    { method: 'PATCH', headers: await guardedHeaders('program', programId, baseVersion), body: JSON.stringify({ title }) },
     undefined,
     { redirectOn401: false }
   );
-  if (res.ok) return 'success';
+  if (res.ok) {
+    const body = await res.json().catch(() => null);
+    if (body && typeof body.version === 'number') await recordSyncedVersion('program', programId, body.version);
+    return 'success';
+  }
+  if (res.status === 409 || res.status === 404) return 'conflict';
   if (res.status === 401 || res.status >= 500) return 'systemic-error';
   return 'item-error';
 }
@@ -246,11 +252,11 @@ async function handleDeleteSongSync(payload: unknown): Promise<SyncOutcome> {
 }
 
 interface SeqCreatePayload { draftId: number; programId: number; title: string }
-interface SeqRenamePayload { programId: number; sequenceId: number; title: string }
+interface SeqRenamePayload { programId: number; sequenceId: number; title: string; baseVersion?: number }
 interface SeqDeletePayload { programId: number; sequenceId: number }
 interface SeqAddSongPayload { draftId: number; programId: number; sequenceId: number; songId: number }
 interface SeqRemoveSongPayload { programId: number; sequenceId: number; sequenceSongId: number }
-interface SeqReorderPayload { programId: number; sequenceId: number; orderedIds: number[] }
+interface SeqReorderPayload { programId: number; sequenceId: number; orderedIds: number[]; baseVersion?: number }
 
 // Resolves a possibly-draft id against the current draft map; returns null if still
 // unresolved (caller returns item-error to wait for the create ahead in the queue).
@@ -258,6 +264,22 @@ async function resolveSeqId(entity: 'sequence' | 'sequence-song' | 'song', id: n
   if (!isDraftId(id)) return id;
   const map = await loadDraftMap();
   return resolveOne(map, entity, id);
+}
+
+// Builds headers for a guarded write: attaches If-Match only when a baseVersion is present,
+// forwarding it past the device's own already-synced writes so a user's consecutive offline
+// edits to one resource don't 409 against themselves.
+async function guardedHeaders(resource: 'sequence' | 'program', id: number, baseVersion: number | undefined): Promise<Record<string, string>> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (typeof baseVersion === 'number') {
+    const map = await loadSyncedVersionMap();
+    const resolved = resolveVersion(map, resource, id, baseVersion);
+    // Only guard with a real version (>= 1). A resolved 0 means the base came from a pre-feature
+    // cache blob and the device has no recorded version for this resource, so send no If-Match
+    // (last-write-wins) rather than a guard that could never legitimately match.
+    if (resolved >= 1) headers['If-Match'] = String(resolved);
+  }
+  return headers;
 }
 
 async function handleSequenceCreateSync(payload: unknown): Promise<SyncOutcome> {
@@ -281,17 +303,22 @@ async function handleSequenceCreateSync(payload: unknown): Promise<SyncOutcome> 
 }
 
 async function handleSequenceRenameSync(payload: unknown): Promise<SyncOutcome> {
-  const { programId, sequenceId, title } = payload as SeqRenamePayload;
+  const { programId, sequenceId, title, baseVersion } = payload as SeqRenamePayload;
   const pid = await resolveSeqId('sequence', programId);
   const sid = await resolveSeqId('sequence', sequenceId);
   if (pid === null || sid === null) return 'item-error';
   const res = await nativeApiFetch(
     `/api/programs/${encodeURIComponent(pid)}/sequences/${encodeURIComponent(sid)}`,
-    { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title }) },
+    { method: 'PATCH', headers: await guardedHeaders('sequence', sid, baseVersion), body: JSON.stringify({ title }) },
     undefined,
     { redirectOn401: false }
   );
-  if (res.ok || res.status === 404) return 'success';
+  if (res.ok) {
+    const body = await res.json().catch(() => null);
+    if (body && typeof body.version === 'number') await recordSyncedVersion('sequence', sid, body.version);
+    return 'success';
+  }
+  if (res.status === 409 || res.status === 404) return 'conflict';
   if (res.status === 401 || res.status >= 500) return 'systemic-error';
   return 'item-error';
 }
@@ -331,6 +358,9 @@ async function handleSequenceAddSongSync(payload: unknown): Promise<SyncOutcome>
     // remove/reorder of this brand-new entry can't resolve and will surface via needsAttention
     // — acceptable v1 (the common flow adds then syncs before reordering).
     if (body && typeof body.sequenceSongId === 'number') await recordResolution('sequence-song', draftId, body.sequenceSongId);
+    // add-song bumps the sequence version server-side; record it so a following guarded
+    // reorder/rename on this sequence forwards past it instead of false-conflicting.
+    if (body && typeof body.version === 'number') await recordSyncedVersion('sequence', sid, body.version);
     return 'success';
   }
   if (res.status === 404) return 'success';
@@ -350,13 +380,19 @@ async function handleSequenceRemoveSongSync(payload: unknown): Promise<SyncOutco
     undefined,
     { redirectOn401: false }
   );
-  if (res.ok || res.status === 404) return 'success';
+  if (res.ok) {
+    const body = await res.json().catch(() => null);
+    // remove-song bumps the sequence version too — record it for the same reason as add-song.
+    if (body && typeof body.version === 'number') await recordSyncedVersion('sequence', sid, body.version);
+    return 'success';
+  }
+  if (res.status === 404) return 'success';
   if (res.status === 401 || res.status >= 500) return 'systemic-error';
   return 'item-error';
 }
 
 async function handleSequenceReorderSync(payload: unknown): Promise<SyncOutcome> {
-  const { programId, sequenceId, orderedIds } = payload as SeqReorderPayload;
+  const { programId, sequenceId, orderedIds, baseVersion } = payload as SeqReorderPayload;
   const pid = await resolveSeqId('sequence', programId);
   const sid = await resolveSeqId('sequence', sequenceId);
   if (pid === null || sid === null) return 'item-error';
@@ -365,11 +401,16 @@ async function handleSequenceReorderSync(payload: unknown): Promise<SyncOutcome>
   if (!resolved.allResolved) return 'item-error';
   const res = await nativeApiFetch(
     `/api/programs/${encodeURIComponent(pid)}/sequences/${encodeURIComponent(sid)}/songs`,
-    { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ orderedIds: resolved.ids }) },
+    { method: 'PATCH', headers: await guardedHeaders('sequence', sid, baseVersion), body: JSON.stringify({ orderedIds: resolved.ids }) },
     undefined,
     { redirectOn401: false }
   );
-  if (res.ok || res.status === 404) return 'success';
+  if (res.ok) {
+    const body = await res.json().catch(() => null);
+    if (body && typeof body.version === 'number') await recordSyncedVersion('sequence', sid, body.version);
+    return 'success';
+  }
+  if (res.status === 409 || res.status === 404) return 'conflict';
   if (res.status === 401 || res.status >= 500) return 'systemic-error';
   return 'item-error';
 }

@@ -6,10 +6,11 @@ export interface QueuedAction<TPayload = unknown> {
   payload: TPayload;
   attempts: number;
   needsAttention: boolean;
+  needsAttentionReason?: 'conflict' | 'failed';
   createdAt: string;
 }
 
-export type SyncOutcome = 'success' | 'item-error' | 'systemic-error';
+export type SyncOutcome = 'success' | 'item-error' | 'systemic-error' | 'conflict';
 export type SyncHandler = (payload: unknown) => Promise<SyncOutcome>;
 
 export interface QueueStorage {
@@ -21,6 +22,9 @@ export interface ProcessResult {
   processed: number;
   remaining: number;
   needsAttention: number;
+  // Subset of needsAttention that was flagged specifically by a collaborator conflict — surfaced
+  // here so callers get it from this pass's snapshot instead of re-reading the whole queue.
+  conflict: number;
   blocked: boolean;
 }
 
@@ -81,13 +85,37 @@ export async function processQueueWith(storage: QueueStorage, handlers: Map<stri
         processed,
         remaining: current.length,
         needsAttention: current.filter((a) => a.needsAttention).length,
+        conflict: current.filter((a) => a.needsAttention && a.needsAttentionReason === 'conflict').length,
         blocked: true,
       };
     }
 
+    if (outcome === 'conflict') {
+      // A guarded write lost to a collaborator's change (or its target is gone). This is not
+      // the item's fault in the retryable sense — retrying would just lose again — so flag it
+      // needsAttention on this first pass (reason 'conflict', distinct from a capped failure)
+      // and keep draining the rest of the queue. Mapped in place (not moved to the back) so the
+      // next pass's `!a.needsAttention` filter permanently skips it, like a capped item-error.
+      const flagged: QueuedAction = {
+        ...action,
+        attempts: action.attempts + 1,
+        needsAttention: true,
+        needsAttentionReason: 'conflict',
+      };
+      current = current.map((a) => (a.id === action.id ? flagged : a));
+      await storage.set(current);
+      continue;
+    }
+
     // item-error: one more attempt spent, requeued to the back (or flagged, at the cap)
     const attempts = action.attempts + 1;
-    const updated: QueuedAction = { ...action, attempts, needsAttention: attempts >= MAX_ATTEMPTS };
+    const needsAttention = attempts >= MAX_ATTEMPTS;
+    const updated: QueuedAction = {
+      ...action,
+      attempts,
+      needsAttention,
+      needsAttentionReason: needsAttention ? 'failed' : action.needsAttentionReason,
+    };
     current = [...current.filter((a) => a.id !== action.id), updated];
     await storage.set(current);
   }
@@ -96,6 +124,7 @@ export async function processQueueWith(storage: QueueStorage, handlers: Map<stri
     processed,
     remaining: current.length,
     needsAttention: current.filter((a) => a.needsAttention).length,
+    conflict: current.filter((a) => a.needsAttention && a.needsAttentionReason === 'conflict').length,
     blocked: false,
   };
 }

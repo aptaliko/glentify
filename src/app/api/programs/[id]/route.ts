@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getProgramById, getProgramAccess, updateProgram, deleteProgram, listSequencesForProgram } from '@/db/queries/programs';
+import { getProgramById, getProgramAccess, updateProgram, updateProgramIfMatch, deleteProgram, listSequencesForProgram } from '@/db/queries/programs';
 import { getUserId } from '@/lib/requestUser';
+import { parseIfMatch } from '@/lib/ifMatch';
 
 const updateSchema = z.object({ title: z.string().min(1) });
 
@@ -22,6 +23,15 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (!role) return NextResponse.json({ error: 'Δεν βρέθηκε' }, { status: 404 });
   const parsed = updateSchema.safeParse(await request.json());
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  const expected = parseIfMatch(request);
+  if (expected !== null) {
+    const program = await updateProgramIfMatch(Number(id), parsed.data.title, expected);
+    if (!program) {
+      const current = await getProgramById(Number(id));
+      return NextResponse.json({ error: 'Άλλαξε από συνεργάτη', version: current?.version ?? null }, { status: 409 });
+    }
+    return NextResponse.json(program);
+  }
   const program = await updateProgram(Number(id), parsed.data.title);
   return NextResponse.json(program);
 }

@@ -37,6 +37,28 @@ export function isSequenceQueueActionForProgram(
   return false;
 }
 
+// For each sequence targeted by a needsAttention rename/reorder (which mergeSequencesWithPending
+// silently reverts to last-known state), reports why — so the edit page can show the right
+// per-sequence note: «άλλαξε από συνεργάτη» for a conflict, the generic failure copy otherwise.
+// Keys by the payload's sequenceId as-is (a draft id would send no If-Match and can only 404,
+// so matching the raw id is sufficient here).
+export function sequenceAttentionReasonById(actions: QueuedAction[]): Map<number, 'conflict' | 'failed'> {
+  const out = new Map<number, 'conflict' | 'failed'>();
+  for (const a of actions) {
+    if (!a.needsAttention) continue;
+    if (a.type !== 'sequence-rename' && a.type !== 'sequence-reorder') continue;
+    if (!isRecord(a.payload)) continue;
+    const seqId = a.payload.sequenceId;
+    if (typeof seqId !== 'number') continue;
+    const reason = a.needsAttentionReason === 'conflict' ? 'conflict' : 'failed';
+    // If one sequence has both a conflicted and a plain-failed action queued, the conflict
+    // must win regardless of queue order — its «άλλαξε από συνεργάτη» recovery story is the
+    // more specific one. A later 'failed' never downgrades an already-recorded 'conflict'.
+    if (reason === 'conflict' || !out.has(seqId)) out.set(seqId, reason);
+  }
+  return out;
+}
+
 function reorder(songs: DisplaySequenceSong[], orderedIds: number[]): DisplaySequenceSong[] {
   const byId = new Map(songs.map((s) => [s.sequenceSongId, s]));
   const out: DisplaySequenceSong[] = [];
@@ -64,6 +86,10 @@ export function mergeSequencesWithPending(
   for (const a of actions) {
     if (!isRecord(a.payload)) continue;
     const p = a.payload;
+    // A conflict/failed whole-value replacement (rename/reorder flagged needsAttention) must
+    // NOT be applied — keep the last-known real state, matching programsMerge's revert. Other
+    // action types aren't guarded and their needsAttention handling is out of scope here.
+    if (a.needsAttention && (a.type === 'sequence-rename' || a.type === 'sequence-reorder')) continue;
     switch (a.type) {
       case 'sequence-create': {
         if (p.programId === detail.programId && typeof p.draftId === 'number' && typeof p.title === 'string') {

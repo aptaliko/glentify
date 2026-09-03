@@ -15,6 +15,7 @@ export interface OfflineSequence {
   title: string;
   songIds: number[]; // already in playback order — read by programs/local/* + sessionStore; DO NOT remove
   entries: OfflineSequenceEntry[]; // join-row ids for the offline program editor
+  version: number; // for the collaborator write-conflict If-Match guard
 }
 
 export interface OfflineProgram {
@@ -25,6 +26,7 @@ export interface OfflineProgram {
   creator: OfflineCollaborator | null;
   collaborators: OfflineCollaborator[];
   sequences: OfflineSequence[]; // already in display order (server-side orderBy position)
+  version: number; // for the collaborator write-conflict If-Match guard
 }
 
 export interface ReferenceData {
@@ -71,6 +73,7 @@ export interface CachedSequence {
   title: string;
   position: number;
   songs: CachedSequenceSong[];
+  version: number;
 }
 
 export interface CachedProgramDetail {
@@ -79,6 +82,7 @@ export interface CachedProgramDetail {
   role: 'creator' | 'collaborator';
   sequences: CachedSequence[];
   cachedAt: string;
+  version: number;
 }
 
 /**
@@ -110,7 +114,12 @@ export function normalizeReferenceData(data: ReferenceData): ReferenceData {
       sharedWithEmails: p.sharedWithEmails ?? [],
       creator: p.creator ?? null,
       collaborators: p.collaborators ?? [],
-      sequences: (p.sequences ?? []).map((s) => ({ ...s, entries: s.entries ?? [] })),
+      // Backfill an UNKNOWN version (a blob primed before this feature existed) to 0, not 1.
+      // 0 is a sentinel no real row ever has (versions start at 1), so a guarded edit made from
+      // such a blob sends no If-Match and falls back to last-write-wins instead of false-conflicting
+      // against a server row the device never actually saw. The next prime overwrites it with truth.
+      version: (p as OfflineProgram).version ?? 0,
+      sequences: (p.sequences ?? []).map((s) => ({ ...s, entries: s.entries ?? [], version: (s as OfflineSequence).version ?? 0 })),
     })),
     sharedSongs: data.sharedSongs ?? [],
     axisTypes: data.axisTypes ?? [],

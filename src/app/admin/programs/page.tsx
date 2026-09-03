@@ -14,7 +14,7 @@ import { useSyncQueue } from '@/components/SyncQueueProvider';
 import { loadReferenceData } from '@/lib/offlineCache';
 import { mergeProgramsWithPending, isProgramQueueAction } from '@/lib/programsMerge';
 
-type ProgramListItem = { id: number; title: string; role: 'creator' | 'collaborator'; sharedWithEmails: string[] };
+type ProgramListItem = { id: number; title: string; role: 'creator' | 'collaborator'; sharedWithEmails: string[]; version: number };
 
 export default function ProgramsAdminPage() {
   const native = isNativeApp();
@@ -164,7 +164,8 @@ export default function ProgramsAdminPage() {
       return;
     }
     try {
-      await enqueue('program-rename', { programId: id, title: editingTitle });
+      const baseVersion = programs.find((p) => p.id === id)?.version;
+      await enqueue('program-rename', { programId: id, title: editingTitle, baseVersion });
     } catch {
       setError('Αποτυχία αποθήκευσης. Δοκίμασε ξανά.');
       return;
@@ -250,6 +251,9 @@ export default function ProgramsAdminPage() {
                       )}
                       {p.status === 'needs-attention-rename' && (
                         <span className="text-xs text-error">Απέτυχε η μετονομασία.</span>
+                      )}
+                      {p.status === 'conflict-rename' && (
+                        <span className="text-xs text-error">Άλλαξε από συνεργάτη — η μετονομασία δεν εφαρμόστηκε.</span>
                       )}
                     </div>
                     {p.id !== null && (

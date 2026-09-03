@@ -1,6 +1,6 @@
 import { db } from '../client';
 import { programs, programSequences, sequenceSongs, songs, programCollaborators } from '../schema';
-import { eq, and, asc, max, inArray } from 'drizzle-orm';
+import { eq, and, asc, max, inArray, sql } from 'drizzle-orm';
 import type { ProgramRow, ProgramSequenceRow, SongRow } from '../schema';
 import type { OfflineProgram } from '@/lib/referenceData';
 import { getUserById } from './users';
@@ -33,8 +33,25 @@ export async function createProgram(ownerId: number, title: string): Promise<Pro
 }
 
 export async function updateProgram(id: number, title: string): Promise<ProgramRow | undefined> {
-  const rows = await db.update(programs).set({ title }).where(eq(programs.id, id)).returning();
+  const rows = await db
+    .update(programs)
+    .set({ title, version: sql`${programs.version} + 1` })
+    .where(eq(programs.id, id))
+    .returning();
   return rows[0];
+}
+
+export async function updateProgramIfMatch(
+  id: number,
+  title: string,
+  expectedVersion: number
+): Promise<ProgramRow | null> {
+  const rows = await db
+    .update(programs)
+    .set({ title, version: sql`${programs.version} + 1` })
+    .where(and(eq(programs.id, id), eq(programs.version, expectedVersion)))
+    .returning();
+  return rows[0] ?? null;
 }
 
 export async function deleteProgram(id: number): Promise<void> {
@@ -66,8 +83,25 @@ export async function createSequence(programId: number, title: string): Promise<
 }
 
 export async function updateSequence(id: number, title: string): Promise<ProgramSequenceRow> {
-  const rows = await db.update(programSequences).set({ title }).where(eq(programSequences.id, id)).returning();
+  const rows = await db
+    .update(programSequences)
+    .set({ title, version: sql`${programSequences.version} + 1` })
+    .where(eq(programSequences.id, id))
+    .returning();
   return rows[0];
+}
+
+export async function updateSequenceIfMatch(
+  id: number,
+  title: string,
+  expectedVersion: number
+): Promise<ProgramSequenceRow | null> {
+  const rows = await db
+    .update(programSequences)
+    .set({ title, version: sql`${programSequences.version} + 1` })
+    .where(and(eq(programSequences.id, id), eq(programSequences.version, expectedVersion)))
+    .returning();
+  return rows[0] ?? null;
 }
 
 export async function deleteSequence(id: number): Promise<void> {
@@ -90,26 +124,62 @@ export async function listSongsForSequence(sequenceId: number): Promise<Sequence
   return rows;
 }
 
-export async function addSongToSequence(sequenceId: number, songId: number): Promise<void> {
+export async function bumpSequenceVersion(sequenceId: number): Promise<number> {
+  const rows = await db
+    .update(programSequences)
+    .set({ version: sql`${programSequences.version} + 1` })
+    .where(eq(programSequences.id, sequenceId))
+    .returning({ version: programSequences.version });
+  return rows[0]?.version ?? 0;
+}
+
+export async function bumpSequenceVersionIfMatch(
+  sequenceId: number,
+  expectedVersion: number
+): Promise<number | null> {
+  const rows = await db
+    .update(programSequences)
+    .set({ version: sql`${programSequences.version} + 1` })
+    .where(and(eq(programSequences.id, sequenceId), eq(programSequences.version, expectedVersion)))
+    .returning({ version: programSequences.version });
+  return rows[0]?.version ?? null;
+}
+
+// Returns the sequence's new version so the caller can echo it to native, which records it as
+// the last-synced version. add/remove-song aren't guarded writers, but they DO bump the version,
+// so a following guarded reorder/rename on the same sequence must be able to forward past them —
+// without this, the reorder would send a stale If-Match and false-conflict against the user's own edit.
+export async function addSongToSequence(sequenceId: number, songId: number): Promise<number> {
   const [{ value }] = await db
     .select({ value: max(sequenceSongs.position) })
     .from(sequenceSongs)
     .where(eq(sequenceSongs.sequenceId, sequenceId));
   const nextPosition = (value ?? -1) + 1;
   await db.insert(sequenceSongs).values({ sequenceId, songId, position: nextPosition });
+  return bumpSequenceVersion(sequenceId);
 }
 
-export async function removeSongFromSequence(sequenceSongId: number): Promise<void> {
+export async function removeSongFromSequence(sequenceId: number, sequenceSongId: number): Promise<number> {
   await db.delete(sequenceSongs).where(eq(sequenceSongs.id, sequenceSongId));
+  return bumpSequenceVersion(sequenceId);
 }
 
-export async function reorderSequenceSongs(sequenceId: number, orderedSequenceSongIds: number[]): Promise<void> {
+// Applies the positional updates without touching the sequence version. Used by the
+// guarded reorder branch, where the If-Match gate has already bumped the version — so
+// the response's version stays consistent with the DB and a user's own consecutive
+// offline reorders don't false-conflict.
+export async function applySequenceSongOrder(sequenceId: number, orderedSequenceSongIds: number[]): Promise<void> {
   for (const [position, sequenceSongId] of orderedSequenceSongIds.entries()) {
     await db
       .update(sequenceSongs)
       .set({ position })
       .where(and(eq(sequenceSongs.id, sequenceSongId), eq(sequenceSongs.sequenceId, sequenceId)));
   }
+}
+
+export async function reorderSequenceSongs(sequenceId: number, orderedSequenceSongIds: number[]): Promise<void> {
+  await applySequenceSongOrder(sequenceId, orderedSequenceSongIds);
+  await bumpSequenceVersion(sequenceId);
 }
 
 export async function listProgramsWithSequencesAndSongs(userId: number): Promise<OfflineProgram[]> {
@@ -125,6 +195,7 @@ export async function listProgramsWithSequencesAndSongs(userId: number): Promise
             title: sequence.title,
             songIds: seqEntries.map((e) => e.song.id),
             entries: seqEntries.map((e) => ({ sequenceSongId: e.sequenceSongId, songId: e.song.id })),
+            version: sequence.version,
           };
         })
       );
@@ -136,6 +207,7 @@ export async function listProgramsWithSequencesAndSongs(userId: number): Promise
         creator: program.creator,
         collaborators: program.collaborators,
         sequences,
+        version: program.version,
       };
     })
   );
@@ -148,6 +220,7 @@ export interface AccessibleProgram {
   sharedWithEmails: string[];
   creator: { id: number; email: string } | null;
   collaborators: { id: number; email: string }[];
+  version: number;
 }
 
 export async function listCollaborators(programId: number): Promise<{ id: number; email: string }[]> {
@@ -213,6 +286,7 @@ export async function listAccessiblePrograms(userId: number): Promise<Accessible
       sharedWithEmails: emails,
       creator: creator ? { id: creator.id, email: creator.email } : null,
       collaborators,
+      version: program.version,
     };
   }
 

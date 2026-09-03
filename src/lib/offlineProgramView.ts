@@ -19,6 +19,7 @@ export function toProgramDetail(
     programId: program.id,
     title: program.title,
     role: program.role,
+    version: program.version,
     cachedAt: '',
     sequences: program.sequences.map((seq, position) => ({
       id: seq.id,
@@ -29,6 +30,7 @@ export function toProgramDetail(
         songId: e.songId,
         title: songTitleById.get(e.songId) ?? '—',
       })),
+      version: seq.version,
     })),
   };
 }

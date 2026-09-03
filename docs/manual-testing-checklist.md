@@ -341,3 +341,31 @@ their own list page) with a single `primeOfflineData()` orchestrator that popula
   waiting for the next sync attempt.
 - **Clean up test data** when you're done — delete any test songs/programs/taxonomy entries
   created during this pass, on whichever account(s) you used.
+
+## Collaborator write-conflict resolution
+
+- [ ] Sequence rename with no If-Match header behaves as before (web edit page still works).
+- [ ] Sequence rename with a matching If-Match returns 200 and the row's version increments.
+- [ ] Sequence rename with a stale If-Match returns 409 with the current version, no title change.
+- [ ] Same three cases for reorder (PATCH .../songs) and program rename (PATCH /api/programs/[id]).
+- [ ] A collaborator's add-song bumps the sequence version, so a concurrent stale reorder 409s.
+- [ ] A malformed If-Match (e.g. "abc") is treated as no header (LWW), not a 400.
+- [ ] Reorder version accounting: the guarded reorder branch applies positions via a non-bumping
+      helper (the If-Match gate does the single bump), so the response's `version` equals the DB
+      value and a user's own consecutive offline reorders don't false-conflict. (Implementation
+      chose the non-bumping-helper option over leaving the extra bump.)
+- [ ] Two devices editing the same sequence offline: the second to sync surfaces «άλλαξε από συνεργάτη», the first wins.
+- [ ] Same user's two consecutive offline renames of one sequence both sync cleanly (no self-conflict) after reconnect.
+- [ ] Renaming a sequence a collaborator deleted (404) surfaces as a conflict, not a silent discard.
+- [ ] The sync badge reads «N άλλαξαν από συνεργάτη» (not the generic «χρειάζεται προσοχή») when a conflict is outstanding.
+- [ ] The conflicted program row / sequence shows the «Άλλαξε από συνεργάτη» note, and its value matches the collaborator's, not the discarded edit.
+- [ ] A non-conflict permanently-failed (3-retry) sequence rename/reorder shows the generic «Απέτυχε η αλλαγή.» note and also reverts to the last-known value (Task 9 reverts both reasons; only the copy differs).
+
+### Post-review fixes (2026-09-03)
+
+- [ ] Self-conflict fix: add a song to a sequence, then reorder/rename the *same* sequence, all offline, then reconnect. Both sync cleanly — the reorder/rename does NOT surface a phantom «άλλαξε από συνεργάτη» (add/remove-song now echo the bumped version and the handler records it, so the guarded op forwards past it).
+- [ ] Pre-upgrade blob: prime offline data on the OLD app, upgrade the APK, go offline before any re-prime, rename/reorder a sequence, then reconnect. The edit applies last-write-wins with no phantom conflict (backfilled version 0 → no If-Match sent).
+- [ ] A sequence carrying both a conflicted and a plain-failed queued action shows the «άλλαξε από συνεργάτη» (conflict) note, not the generic failure note.
+- [ ] `If-Match: ""` (empty) and `If-Match: "3"` (quoted) — empty is treated as no header (LWW), quoted is unwrapped to 3.
+
+**Known limitation (not fixed — documented):** a guarded reorder/rename whose HTTP response is lost *after* the server committed (dropped connection, or a 5xx after the write) is retried as `systemic-error`; the replay sends the same `If-Match` and now 409s (the old pre-`If-Match` path was idempotent via `404/ok → success`). The UI then reverts the displayed value while the server actually holds the change, flagged as a phantom conflict. A proper fix needs a per-action idempotency key on the guarded writes — out of scope for this feature; revisit if it bites in practice.
