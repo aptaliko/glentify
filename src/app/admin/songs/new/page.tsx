@@ -11,6 +11,9 @@ import { getAuthToken } from '@/lib/authToken';
 import { isNativeApp } from '@/lib/platform';
 import { enqueue } from '@/lib/syncQueue';
 import { useSyncQueue } from '@/components/SyncQueueProvider';
+import { validateImageFile, IMAGE_ACCEPT_ATTR } from '@/lib/imageValidation';
+import { putLocalImage, deleteLocalImage } from '@/lib/localImageStore';
+import { mintDraftId } from '@/lib/draftIds';
 
 export default function NewSongPage() {
   const router = useRouter();
@@ -23,14 +26,50 @@ export default function NewSongPage() {
   const [femaleKey, setFemaleKey] = useState('');
   const [axisValues, setAxisValues] = useState<AxisValueEntry[]>([]);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [pendingImageBlobId, setPendingImageBlobId] = useState<number | null>(null);
+  const [localPreviewUrl, setLocalPreviewUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    return () => {
+      if (localPreviewUrl) URL.revokeObjectURL(localPreviewUrl);
+    };
+  }, [localPreviewUrl]);
+
   async function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
+    const input = e.target;
+    const file = input.files?.[0];
     if (!file) return;
-    setUploading(true);
     setError(null);
+    if (native) {
+      const validation = validateImageFile(file);
+      if (!validation.ok) {
+        setError(validation.reason);
+        input.value = '';
+        return;
+      }
+      const draftId = mintDraftId();
+      try {
+        await putLocalImage(draftId, { blob: file, contentType: file.type, filename: file.name });
+      } catch {
+        setError('Αποτυχία αποθήκευσης εικόνας.');
+        return;
+      }
+      // A re-pick supersedes a blob picked earlier this session — delete its bytes so they
+      // don't leak (a new-song draft id is never referenced by a queued action yet).
+      if (pendingImageBlobId != null) {
+        try { await deleteLocalImage(pendingImageBlobId); } catch { /* best-effort */ }
+      }
+      if (localPreviewUrl) URL.revokeObjectURL(localPreviewUrl);
+      setPendingImageBlobId(draftId);
+      setLocalPreviewUrl(URL.createObjectURL(file));
+      setImageUrl(null); // a fresh pending image supersedes any prior real URL
+      input.value = ''; // let the same filename be re-picked later (e.g. after Remove)
+      return;
+    }
+    // Web: eager direct upload, unchanged.
+    setUploading(true);
     try {
       const token = await getAuthToken();
       const blob = await upload(file.name, file, {
@@ -44,6 +83,20 @@ export default function NewSongPage() {
     } finally {
       setUploading(false);
     }
+  }
+
+  async function handleRemoveImage() {
+    if (native && pendingImageBlobId != null) {
+      try {
+        await deleteLocalImage(pendingImageBlobId);
+      } catch {
+        // best-effort cleanup; clearing the form state below is what matters
+      }
+    }
+    if (localPreviewUrl) URL.revokeObjectURL(localPreviewUrl);
+    setLocalPreviewUrl(null);
+    setPendingImageBlobId(null);
+    setImageUrl(null);
   }
 
   interface SuggestionSong {
@@ -95,9 +148,8 @@ export default function NewSongPage() {
       maleKey: maleKey || null,
       femaleKey: femaleKey || null,
       axisValues,
-      // Phase 1 never lets native pick a new image (see the disabled file input below) —
-      // always null there, regardless of what web's upload flow may have set.
-      imageUrl: native ? null : imageUrl,
+      imageUrl,
+      pendingImageBlobId: native ? pendingImageBlobId : null,
     };
     if (native) {
       try {
@@ -154,10 +206,14 @@ export default function NewSongPage() {
         />
         <div className="flex flex-col gap-2">
           <label className="label-text">Εικόνα παρτιτούρας (προαιρετικό, εναλλακτικά ή μαζί με τους στίχους)</label>
-          <input type="file" accept="image/png,image/jpeg,image/webp" onChange={handleImageChange} disabled={native} className="file-input file-input-bordered" />
-          {native && <span className="text-xs text-base-content/50">Η προσθήκη εικόνας από τη native εφαρμογή δεν υποστηρίζεται ακόμη — χρησιμοποίησε την ιστοσελίδα διαχείρισης.</span>}
+          <input type="file" accept={IMAGE_ACCEPT_ATTR} onChange={handleImageChange} className="file-input file-input-bordered" />
           {uploading && <span className="loading loading-spinner loading-sm" />}
-          {imageUrl && <img src={imageUrl} alt="Προεπισκόπηση παρτιτούρας" className="max-h-64 rounded-box object-contain" />}
+          {(localPreviewUrl || imageUrl) && (
+            <>
+              <img src={localPreviewUrl ?? imageUrl ?? undefined} alt="Προεπισκόπηση παρτιτούρας" className="max-h-64 rounded-box object-contain" />
+              <button type="button" onClick={handleRemoveImage} className="btn btn-sm btn-outline btn-error self-start">Αφαίρεση εικόνας</button>
+            </>
+          )}
         </div>
         <SongAxisEditor value={axisValues} onChange={setAxisValues} />
         <div className="flex gap-3">

@@ -11,6 +11,9 @@ export interface CreateSongPayload {
   maleKey: string | null;
   femaleKey: string | null;
   axisValues: AxisValueEntry[];
+  // A negative draft id referencing locally-stored image bytes to upload on sync, or null.
+  // imageUrl stays a real URL/null; this field is the ONLY offline image reference.
+  pendingImageBlobId: number | null;
 }
 
 export interface UpdateSongPayload extends CreateSongPayload {
@@ -151,6 +154,7 @@ export function resolveSongForEdit(
         maleKey: payload.maleKey,
         femaleKey: payload.femaleKey,
         axisValues: payload.axisValues,
+        pendingImageBlobId: payload.pendingImageBlobId ?? null,
       },
       hasPendingEdit: true,
     };
@@ -167,6 +171,7 @@ export function resolveSongForEdit(
       maleKey: base.maleKey,
       femaleKey: base.femaleKey,
       axisValues: baseAxisValues,
+      pendingImageBlobId: null,
     },
     hasPendingEdit: false,
   };
