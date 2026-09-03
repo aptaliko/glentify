@@ -35,6 +35,10 @@ export default function EditSongPage() {
     }
   }
 
+  function handleRemoveImage() {
+    setImageUrl(null);
+  }
+
   useEffect(() => {
     fetch(`/api/songs/${params.id}`).then((r) => r.json()).then((song) => {
       setTitle(song.title);
@@ -108,7 +112,12 @@ export default function EditSongPage() {
           <label className="label-text">Εικόνα παρτιτούρας (προαιρετικό, εναλλακτικά ή μαζί με τους στίχους)</label>
           <input type="file" accept="image/png,image/jpeg,image/webp" onChange={handleImageChange} className="file-input file-input-bordered" />
           {uploading && <span className="loading loading-spinner loading-sm" />}
-          {imageUrl && <img src={imageUrl} alt="Προεπισκόπηση παρτιτούρας" className="max-h-64 rounded-box object-contain" />}
+          {imageUrl && (
+            <>
+              <img src={imageUrl} alt="Προεπισκόπηση παρτιτούρας" className="max-h-64 rounded-box object-contain" />
+              <button type="button" onClick={handleRemoveImage} className="btn btn-sm btn-outline btn-error self-start">Αφαίρεση εικόνας</button>
+            </>
+          )}
         </div>
         <SongAxisEditor value={axisValues} onChange={setAxisValues} />
         <div className="flex gap-3">
