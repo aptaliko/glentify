@@ -105,6 +105,7 @@ export const programs = pgTable('programs', {
   id: serial('id').primaryKey(),
   title: text('title').notNull(),
   ownerId: integer('owner_id').notNull().references(() => users.id),
+  version: integer('version').notNull().default(1),
 });
 
 export const programSequences = pgTable('program_sequences', {
@@ -112,6 +113,7 @@ export const programSequences = pgTable('program_sequences', {
   programId: integer('program_id').notNull().references(() => programs.id),
   title: text('title').notNull(),
   position: integer('position').notNull(),
+  version: integer('version').notNull().default(1),
 });
 
 export const sequenceSongs = pgTable('sequence_songs', {
