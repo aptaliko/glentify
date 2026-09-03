@@ -5,12 +5,13 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import { Network } from '@capacitor/network';
 import { isNativeApp } from '@/lib/platform';
 import { primeOfflineData } from '@/lib/offlineCache';
-import { processQueue } from '@/lib/syncQueue';
+import { processQueue, getQueuedActions } from '@/lib/syncQueue';
 import { initSyncHandlers } from '@/lib/syncHandlers';
 
 interface SyncQueueContextValue {
   pendingCount: number;
   needsAttentionCount: number;
+  conflictCount: number;
   blocked: boolean;
   notifyQueueChanged: () => Promise<void>;
 }
@@ -18,6 +19,7 @@ interface SyncQueueContextValue {
 const SyncQueueContext = createContext<SyncQueueContextValue>({
   pendingCount: 0,
   needsAttentionCount: 0,
+  conflictCount: 0,
   blocked: false,
   notifyQueueChanged: async () => {},
 });
@@ -29,6 +31,7 @@ export function useSyncQueue(): SyncQueueContextValue {
 export default function SyncQueueProvider({ children }: { children: ReactNode }) {
   const [pendingCount, setPendingCount] = useState(0);
   const [needsAttentionCount, setNeedsAttentionCount] = useState(0);
+  const [conflictCount, setConflictCount] = useState(0);
   const [blocked, setBlocked] = useState(false);
 
   const refresh = useCallback(async () => {
@@ -37,6 +40,8 @@ export default function SyncQueueProvider({ children }: { children: ReactNode })
     setPendingCount(result.remaining);
     setNeedsAttentionCount(result.needsAttention);
     setBlocked(result.blocked);
+    const actions = await getQueuedActions();
+    setConflictCount(actions.filter((a) => a.needsAttention && a.needsAttentionReason === 'conflict').length);
   }, []);
 
   useEffect(() => {
@@ -55,7 +60,7 @@ export default function SyncQueueProvider({ children }: { children: ReactNode })
   }, [refresh]);
 
   return (
-    <SyncQueueContext.Provider value={{ pendingCount, needsAttentionCount, blocked, notifyQueueChanged: refresh }}>
+    <SyncQueueContext.Provider value={{ pendingCount, needsAttentionCount, conflictCount, blocked, notifyQueueChanged: refresh }}>
       {children}
       {isNativeApp() && pendingCount > 0 && (
         <div
@@ -68,7 +73,9 @@ export default function SyncQueueProvider({ children }: { children: ReactNode })
           }`}
         >
           {needsAttentionCount > 0
-            ? `${needsAttentionCount} χρειάζεται προσοχή`
+            ? (conflictCount > 0
+                ? `${conflictCount} άλλαξαν από συνεργάτη`
+                : `${needsAttentionCount} χρειάζεται προσοχή`)
             : blocked
               ? 'Ο συγχρονισμός σταμάτησε προσωρινά'
               : `${pendingCount} εκκρεμεί συγχρονισμός`}

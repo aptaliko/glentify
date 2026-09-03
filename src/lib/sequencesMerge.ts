@@ -37,6 +37,24 @@ export function isSequenceQueueActionForProgram(
   return false;
 }
 
+// For each sequence targeted by a needsAttention rename/reorder (which mergeSequencesWithPending
+// silently reverts to last-known state), reports why — so the edit page can show the right
+// per-sequence note: «άλλαξε από συνεργάτη» for a conflict, the generic failure copy otherwise.
+// Keys by the payload's sequenceId as-is (a draft id would send no If-Match and can only 404,
+// so matching the raw id is sufficient here).
+export function sequenceAttentionReasonById(actions: QueuedAction[]): Map<number, 'conflict' | 'failed'> {
+  const out = new Map<number, 'conflict' | 'failed'>();
+  for (const a of actions) {
+    if (!a.needsAttention) continue;
+    if (a.type !== 'sequence-rename' && a.type !== 'sequence-reorder') continue;
+    if (!isRecord(a.payload)) continue;
+    const seqId = a.payload.sequenceId;
+    if (typeof seqId !== 'number') continue;
+    out.set(seqId, a.needsAttentionReason === 'conflict' ? 'conflict' : 'failed');
+  }
+  return out;
+}
+
 function reorder(songs: DisplaySequenceSong[], orderedIds: number[]): DisplaySequenceSong[] {
   const byId = new Map(songs.map((s) => [s.sequenceSongId, s]));
   const out: DisplaySequenceSong[] = [];

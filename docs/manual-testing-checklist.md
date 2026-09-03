@@ -357,3 +357,6 @@ their own list page) with a single `primeOfflineData()` orchestrator that popula
 - [ ] Two devices editing the same sequence offline: the second to sync surfaces «άλλαξε από συνεργάτη», the first wins.
 - [ ] Same user's two consecutive offline renames of one sequence both sync cleanly (no self-conflict) after reconnect.
 - [ ] Renaming a sequence a collaborator deleted (404) surfaces as a conflict, not a silent discard.
+- [ ] The sync badge reads «N άλλαξαν από συνεργάτη» (not the generic «χρειάζεται προσοχή») when a conflict is outstanding.
+- [ ] The conflicted program row / sequence shows the «Άλλαξε από συνεργάτη» note, and its value matches the collaborator's, not the discarded edit.
+- [ ] A non-conflict permanently-failed (3-retry) sequence rename/reorder shows the generic «Απέτυχε η αλλαγή.» note and also reverts to the last-known value (Task 9 reverts both reasons; only the copy differs).

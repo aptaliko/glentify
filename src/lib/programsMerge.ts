@@ -20,7 +20,7 @@ export interface DisplayProgram {
   title: string;
   role: 'creator' | 'collaborator';
   sharedWithEmails: string[];
-  status: 'active' | 'pending-create' | 'renamed' | 'needs-attention-create' | 'needs-attention-rename';
+  status: 'active' | 'pending-create' | 'renamed' | 'needs-attention-create' | 'needs-attention-rename' | 'conflict-rename';
 }
 
 const PROGRAM_ACTION_TYPES = new Set(['program-create', 'program-rename', 'program-delete']);
@@ -56,7 +56,7 @@ export function mergeProgramsWithPending(
   base: { id: number; title: string; role: 'creator' | 'collaborator'; sharedWithEmails: string[] }[],
   allQueuedActions: QueuedAction[]
 ): DisplayProgram[] {
-  const renames = new Map<number, { title: string; needsAttention: boolean }>();
+  const renames = new Map<number, { title: string; needsAttention: boolean; reason?: 'conflict' | 'failed' }>();
   const deletes = new Map<number, boolean>(); // programId -> needsAttention
   const creates: { title: string; needsAttention: boolean }[] = [];
 
@@ -66,7 +66,7 @@ export function mergeProgramsWithPending(
     if (action.type === 'program-rename') {
       const { programId, title } = payload;
       if (typeof programId === 'number' && typeof title === 'string') {
-        renames.set(programId, { title, needsAttention: action.needsAttention });
+        renames.set(programId, { title, needsAttention: action.needsAttention, reason: action.needsAttentionReason });
       }
     } else if (action.type === 'program-delete') {
       const { programId } = payload;
@@ -95,7 +95,9 @@ export function mergeProgramsWithPending(
       result.push({
         ...program,
         title: rename.needsAttention ? program.title : rename.title,
-        status: rename.needsAttention ? 'needs-attention-rename' : 'renamed',
+        status: rename.needsAttention
+          ? (rename.reason === 'conflict' ? 'conflict-rename' : 'needs-attention-rename')
+          : 'renamed',
       });
       continue;
     }

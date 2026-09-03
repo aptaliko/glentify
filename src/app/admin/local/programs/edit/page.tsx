@@ -10,7 +10,7 @@ import { enqueue, getQueuedActions } from '@/lib/syncQueue';
 import type { QueuedAction } from '@/lib/syncQueue';
 import { useSyncQueue } from '@/components/SyncQueueProvider';
 import { mergeCollaboratorsWithPending, isCollaboratorQueueActionForProgram } from '@/lib/collaboratorsMerge';
-import { mergeSequencesWithPending, type DisplaySequence } from '@/lib/sequencesMerge';
+import { mergeSequencesWithPending, sequenceAttentionReasonById, type DisplaySequence } from '@/lib/sequencesMerge';
 import { mintDraftId } from '@/lib/draftIds';
 import { loadReferenceData } from '@/lib/offlineCache';
 import { toProgramDetail, toCollaboratorsView, buildSongTitleMap } from '@/lib/offlineProgramView';
@@ -427,6 +427,7 @@ export default function LocalEditProgramPage() {
   const displayCollaborators =
     programId !== null ? mergeCollaboratorsWithPending(collaborators, pendingActions, programId) : [];
   const expandedSongs = displaySequences.find((s) => s.id === expandedSeqId)?.songs ?? [];
+  const seqAttentionReason = sequenceAttentionReasonById(pendingActions);
 
   return (
     <div className="flex flex-col gap-4">
@@ -568,6 +569,13 @@ export default function LocalEditProgramPage() {
                         )}
                         <button onClick={() => handleDeleteSequence(seq.id)} className="btn btn-ghost btn-sm text-error">Διαγραφή σειράς</button>
                       </div>
+                    )}
+
+                    {seqAttentionReason.get(seq.id) === 'conflict' && (
+                      <span className="text-xs text-error">Άλλαξε από συνεργάτη — η αλλαγή δεν εφαρμόστηκε.</span>
+                    )}
+                    {seqAttentionReason.get(seq.id) === 'failed' && (
+                      <span className="text-xs text-error">Απέτυχε η αλλαγή.</span>
                     )}
 
                     {!isPending && expandedSeqId === seq.id && (

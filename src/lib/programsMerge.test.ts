@@ -84,6 +84,15 @@ describe('mergeProgramsWithPending', () => {
     ]);
   });
 
+  it('marks a conflict rename distinctly from a plain failed rename', () => {
+    const conflictBase = [{ id: 1, title: 'Βάση', role: 'creator' as const, sharedWithEmails: [] }];
+    const out = mergeProgramsWithPending(conflictBase, [
+      makeAction({ type: 'program-rename', payload: { programId: 1, title: 'Νέο' }, needsAttention: true, needsAttentionReason: 'conflict' }),
+    ]);
+    expect(out[0].status).toBe('conflict-rename');
+    expect(out[0].title).toBe('Βάση');
+  });
+
   it('re-shows a permanently-failed delete as a normal active row', () => {
     const actions = [
       makeAction({

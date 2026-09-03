@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mergeSequencesWithPending } from './sequencesMerge';
+import { mergeSequencesWithPending, sequenceAttentionReasonById } from './sequencesMerge';
 import type { CachedProgramDetail } from './referenceData';
 import type { QueuedAction } from './syncQueue';
 
@@ -71,5 +71,29 @@ describe('mergeSequencesWithPending', () => {
       action({ id: 'a', type: 'sequence-reorder', payload: { sequenceId: 5, orderedIds: [101, 100] }, needsAttention: true }),
     ], new Map());
     expect(out[0].songs.map((s) => s.sequenceSongId)).toEqual([100, 101]); // base order kept
+  });
+});
+
+describe('sequenceAttentionReasonById', () => {
+  it('maps a conflicted rename/reorder to "conflict" and a plain failure to "failed"', () => {
+    const map = sequenceAttentionReasonById([
+      action({ id: 'a', type: 'sequence-rename', payload: { sequenceId: 5, title: 'x' }, needsAttention: true, needsAttentionReason: 'conflict' }),
+      action({ id: 'b', type: 'sequence-reorder', payload: { sequenceId: 6, orderedIds: [1, 2] }, needsAttention: true, needsAttentionReason: 'failed' }),
+    ]);
+    expect(map.get(5)).toBe('conflict');
+    expect(map.get(6)).toBe('failed');
+  });
+  it('ignores actions that are not needsAttention or not rename/reorder', () => {
+    const map = sequenceAttentionReasonById([
+      action({ id: 'a', type: 'sequence-rename', payload: { sequenceId: 5, title: 'x' } }), // not needsAttention
+      action({ id: 'b', type: 'sequence-delete', payload: { sequenceId: 6 }, needsAttention: true }), // wrong type
+    ]);
+    expect(map.size).toBe(0);
+  });
+  it('defaults a needsAttention rename with no reason to "failed"', () => {
+    const map = sequenceAttentionReasonById([
+      action({ id: 'a', type: 'sequence-rename', payload: { sequenceId: 5, title: 'x' }, needsAttention: true }),
+    ]);
+    expect(map.get(5)).toBe('failed');
   });
 });
