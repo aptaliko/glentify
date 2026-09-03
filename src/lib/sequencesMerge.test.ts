@@ -96,4 +96,16 @@ describe('sequenceAttentionReasonById', () => {
     ]);
     expect(map.get(5)).toBe('failed');
   });
+  it('prefers "conflict" over "failed" for one sequence, regardless of queue order', () => {
+    const failedFirst = sequenceAttentionReasonById([
+      action({ id: 'a', type: 'sequence-reorder', payload: { sequenceId: 5, orderedIds: [1, 2] }, needsAttention: true, needsAttentionReason: 'failed' }),
+      action({ id: 'b', type: 'sequence-rename', payload: { sequenceId: 5, title: 'x' }, needsAttention: true, needsAttentionReason: 'conflict' }),
+    ]);
+    expect(failedFirst.get(5)).toBe('conflict');
+    const conflictFirst = sequenceAttentionReasonById([
+      action({ id: 'b', type: 'sequence-rename', payload: { sequenceId: 5, title: 'x' }, needsAttention: true, needsAttentionReason: 'conflict' }),
+      action({ id: 'a', type: 'sequence-reorder', payload: { sequenceId: 5, orderedIds: [1, 2] }, needsAttention: true, needsAttentionReason: 'failed' }),
+    ]);
+    expect(conflictFirst.get(5)).toBe('conflict');
+  });
 });

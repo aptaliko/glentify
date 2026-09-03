@@ -114,8 +114,12 @@ export function normalizeReferenceData(data: ReferenceData): ReferenceData {
       sharedWithEmails: p.sharedWithEmails ?? [],
       creator: p.creator ?? null,
       collaborators: p.collaborators ?? [],
-      version: (p as OfflineProgram).version ?? 1,
-      sequences: (p.sequences ?? []).map((s) => ({ ...s, entries: s.entries ?? [], version: (s as OfflineSequence).version ?? 1 })),
+      // Backfill an UNKNOWN version (a blob primed before this feature existed) to 0, not 1.
+      // 0 is a sentinel no real row ever has (versions start at 1), so a guarded edit made from
+      // such a blob sends no If-Match and falls back to last-write-wins instead of false-conflicting
+      // against a server row the device never actually saw. The next prime overwrites it with truth.
+      version: (p as OfflineProgram).version ?? 0,
+      sequences: (p.sequences ?? []).map((s) => ({ ...s, entries: s.entries ?? [], version: (s as OfflineSequence).version ?? 0 })),
     })),
     sharedSongs: data.sharedSongs ?? [],
     axisTypes: data.axisTypes ?? [],

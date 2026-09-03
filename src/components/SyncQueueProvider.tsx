@@ -5,7 +5,7 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import { Network } from '@capacitor/network';
 import { isNativeApp } from '@/lib/platform';
 import { primeOfflineData } from '@/lib/offlineCache';
-import { processQueue, getQueuedActions } from '@/lib/syncQueue';
+import { processQueue } from '@/lib/syncQueue';
 import { initSyncHandlers } from '@/lib/syncHandlers';
 
 interface SyncQueueContextValue {
@@ -39,9 +39,8 @@ export default function SyncQueueProvider({ children }: { children: ReactNode })
     const result = await processQueue();
     setPendingCount(result.remaining);
     setNeedsAttentionCount(result.needsAttention);
+    setConflictCount(result.conflict);
     setBlocked(result.blocked);
-    const actions = await getQueuedActions();
-    setConflictCount(actions.filter((a) => a.needsAttention && a.needsAttentionReason === 'conflict').length);
   }, []);
 
   useEffect(() => {

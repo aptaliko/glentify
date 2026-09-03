@@ -273,7 +273,11 @@ async function guardedHeaders(resource: 'sequence' | 'program', id: number, base
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (typeof baseVersion === 'number') {
     const map = await loadSyncedVersionMap();
-    headers['If-Match'] = String(resolveVersion(map, resource, id, baseVersion));
+    const resolved = resolveVersion(map, resource, id, baseVersion);
+    // Only guard with a real version (>= 1). A resolved 0 means the base came from a pre-feature
+    // cache blob and the device has no recorded version for this resource, so send no If-Match
+    // (last-write-wins) rather than a guard that could never legitimately match.
+    if (resolved >= 1) headers['If-Match'] = String(resolved);
   }
   return headers;
 }
@@ -354,6 +358,9 @@ async function handleSequenceAddSongSync(payload: unknown): Promise<SyncOutcome>
     // remove/reorder of this brand-new entry can't resolve and will surface via needsAttention
     // — acceptable v1 (the common flow adds then syncs before reordering).
     if (body && typeof body.sequenceSongId === 'number') await recordResolution('sequence-song', draftId, body.sequenceSongId);
+    // add-song bumps the sequence version server-side; record it so a following guarded
+    // reorder/rename on this sequence forwards past it instead of false-conflicting.
+    if (body && typeof body.version === 'number') await recordSyncedVersion('sequence', sid, body.version);
     return 'success';
   }
   if (res.status === 404) return 'success';
@@ -373,7 +380,13 @@ async function handleSequenceRemoveSongSync(payload: unknown): Promise<SyncOutco
     undefined,
     { redirectOn401: false }
   );
-  if (res.ok || res.status === 404) return 'success';
+  if (res.ok) {
+    const body = await res.json().catch(() => null);
+    // remove-song bumps the sequence version too — record it for the same reason as add-song.
+    if (body && typeof body.version === 'number') await recordSyncedVersion('sequence', sid, body.version);
+    return 'success';
+  }
+  if (res.status === 404) return 'success';
   if (res.status === 401 || res.status >= 500) return 'systemic-error';
   return 'item-error';
 }

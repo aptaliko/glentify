@@ -124,11 +124,13 @@ export async function listSongsForSequence(sequenceId: number): Promise<Sequence
   return rows;
 }
 
-export async function bumpSequenceVersion(sequenceId: number): Promise<void> {
-  await db
+export async function bumpSequenceVersion(sequenceId: number): Promise<number> {
+  const rows = await db
     .update(programSequences)
     .set({ version: sql`${programSequences.version} + 1` })
-    .where(eq(programSequences.id, sequenceId));
+    .where(eq(programSequences.id, sequenceId))
+    .returning({ version: programSequences.version });
+  return rows[0]?.version ?? 0;
 }
 
 export async function bumpSequenceVersionIfMatch(
@@ -143,19 +145,23 @@ export async function bumpSequenceVersionIfMatch(
   return rows[0]?.version ?? null;
 }
 
-export async function addSongToSequence(sequenceId: number, songId: number): Promise<void> {
+// Returns the sequence's new version so the caller can echo it to native, which records it as
+// the last-synced version. add/remove-song aren't guarded writers, but they DO bump the version,
+// so a following guarded reorder/rename on the same sequence must be able to forward past them —
+// without this, the reorder would send a stale If-Match and false-conflict against the user's own edit.
+export async function addSongToSequence(sequenceId: number, songId: number): Promise<number> {
   const [{ value }] = await db
     .select({ value: max(sequenceSongs.position) })
     .from(sequenceSongs)
     .where(eq(sequenceSongs.sequenceId, sequenceId));
   const nextPosition = (value ?? -1) + 1;
   await db.insert(sequenceSongs).values({ sequenceId, songId, position: nextPosition });
-  await bumpSequenceVersion(sequenceId);
+  return bumpSequenceVersion(sequenceId);
 }
 
-export async function removeSongFromSequence(sequenceId: number, sequenceSongId: number): Promise<void> {
+export async function removeSongFromSequence(sequenceId: number, sequenceSongId: number): Promise<number> {
   await db.delete(sequenceSongs).where(eq(sequenceSongs.id, sequenceSongId));
-  await bumpSequenceVersion(sequenceId);
+  return bumpSequenceVersion(sequenceId);
 }
 
 // Applies the positional updates without touching the sequence version. Used by the

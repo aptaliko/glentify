@@ -22,6 +22,9 @@ export interface ProcessResult {
   processed: number;
   remaining: number;
   needsAttention: number;
+  // Subset of needsAttention that was flagged specifically by a collaborator conflict — surfaced
+  // here so callers get it from this pass's snapshot instead of re-reading the whole queue.
+  conflict: number;
   blocked: boolean;
 }
 
@@ -82,6 +85,7 @@ export async function processQueueWith(storage: QueueStorage, handlers: Map<stri
         processed,
         remaining: current.length,
         needsAttention: current.filter((a) => a.needsAttention).length,
+        conflict: current.filter((a) => a.needsAttention && a.needsAttentionReason === 'conflict').length,
         blocked: true,
       };
     }
@@ -120,6 +124,7 @@ export async function processQueueWith(storage: QueueStorage, handlers: Map<stri
     processed,
     remaining: current.length,
     needsAttention: current.filter((a) => a.needsAttention).length,
+    conflict: current.filter((a) => a.needsAttention && a.needsAttentionReason === 'conflict').length,
     blocked: false,
   };
 }

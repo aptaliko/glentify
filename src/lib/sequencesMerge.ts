@@ -50,7 +50,11 @@ export function sequenceAttentionReasonById(actions: QueuedAction[]): Map<number
     if (!isRecord(a.payload)) continue;
     const seqId = a.payload.sequenceId;
     if (typeof seqId !== 'number') continue;
-    out.set(seqId, a.needsAttentionReason === 'conflict' ? 'conflict' : 'failed');
+    const reason = a.needsAttentionReason === 'conflict' ? 'conflict' : 'failed';
+    // If one sequence has both a conflicted and a plain-failed action queued, the conflict
+    // must win regardless of queue order — its «άλλαξε από συνεργάτη» recovery story is the
+    // more specific one. A later 'failed' never downgrades an already-recorded 'conflict'.
+    if (reason === 'conflict' || !out.has(seqId)) out.set(seqId, reason);
   }
   return out;
 }

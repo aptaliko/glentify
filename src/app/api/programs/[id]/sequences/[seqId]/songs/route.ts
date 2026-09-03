@@ -31,8 +31,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   // ones to add is not).
   const song = await getSongById(userId, parsed.data.songId);
   if (!song) return NextResponse.json({ error: 'Δεν βρέθηκε' }, { status: 404 });
-  await addSongToSequence(Number(seqId), parsed.data.songId);
-  return NextResponse.json({ ok: true }, { status: 201 });
+  const version = await addSongToSequence(Number(seqId), parsed.data.songId);
+  return NextResponse.json({ ok: true, version }, { status: 201 });
 }
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string; seqId: string }> }) {
