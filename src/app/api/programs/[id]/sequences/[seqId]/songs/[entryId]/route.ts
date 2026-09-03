@@ -23,6 +23,6 @@ export async function DELETE(
   if (!entries.some((entry) => entry.sequenceSongId === Number(entryId))) {
     return NextResponse.json({ error: 'Δεν βρέθηκε' }, { status: 404 });
   }
-  await removeSongFromSequence(Number(entryId));
+  await removeSongFromSequence(sequence.id, Number(entryId));
   return NextResponse.json({ ok: true });
 }

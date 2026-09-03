@@ -1,6 +1,6 @@
 import { db } from '../client';
 import { programs, programSequences, sequenceSongs, songs, programCollaborators } from '../schema';
-import { eq, and, asc, max, inArray } from 'drizzle-orm';
+import { eq, and, asc, max, inArray, sql } from 'drizzle-orm';
 import type { ProgramRow, ProgramSequenceRow, SongRow } from '../schema';
 import type { OfflineProgram } from '@/lib/referenceData';
 import { getUserById } from './users';
@@ -33,8 +33,25 @@ export async function createProgram(ownerId: number, title: string): Promise<Pro
 }
 
 export async function updateProgram(id: number, title: string): Promise<ProgramRow | undefined> {
-  const rows = await db.update(programs).set({ title }).where(eq(programs.id, id)).returning();
+  const rows = await db
+    .update(programs)
+    .set({ title, version: sql`${programs.version} + 1` })
+    .where(eq(programs.id, id))
+    .returning();
   return rows[0];
+}
+
+export async function updateProgramIfMatch(
+  id: number,
+  title: string,
+  expectedVersion: number
+): Promise<ProgramRow | null> {
+  const rows = await db
+    .update(programs)
+    .set({ title, version: sql`${programs.version} + 1` })
+    .where(and(eq(programs.id, id), eq(programs.version, expectedVersion)))
+    .returning();
+  return rows[0] ?? null;
 }
 
 export async function deleteProgram(id: number): Promise<void> {
@@ -66,8 +83,25 @@ export async function createSequence(programId: number, title: string): Promise<
 }
 
 export async function updateSequence(id: number, title: string): Promise<ProgramSequenceRow> {
-  const rows = await db.update(programSequences).set({ title }).where(eq(programSequences.id, id)).returning();
+  const rows = await db
+    .update(programSequences)
+    .set({ title, version: sql`${programSequences.version} + 1` })
+    .where(eq(programSequences.id, id))
+    .returning();
   return rows[0];
+}
+
+export async function updateSequenceIfMatch(
+  id: number,
+  title: string,
+  expectedVersion: number
+): Promise<ProgramSequenceRow | null> {
+  const rows = await db
+    .update(programSequences)
+    .set({ title, version: sql`${programSequences.version} + 1` })
+    .where(and(eq(programSequences.id, id), eq(programSequences.version, expectedVersion)))
+    .returning();
+  return rows[0] ?? null;
 }
 
 export async function deleteSequence(id: number): Promise<void> {
@@ -90,6 +124,25 @@ export async function listSongsForSequence(sequenceId: number): Promise<Sequence
   return rows;
 }
 
+export async function bumpSequenceVersion(sequenceId: number): Promise<void> {
+  await db
+    .update(programSequences)
+    .set({ version: sql`${programSequences.version} + 1` })
+    .where(eq(programSequences.id, sequenceId));
+}
+
+export async function bumpSequenceVersionIfMatch(
+  sequenceId: number,
+  expectedVersion: number
+): Promise<number | null> {
+  const rows = await db
+    .update(programSequences)
+    .set({ version: sql`${programSequences.version} + 1` })
+    .where(and(eq(programSequences.id, sequenceId), eq(programSequences.version, expectedVersion)))
+    .returning({ version: programSequences.version });
+  return rows[0]?.version ?? null;
+}
+
 export async function addSongToSequence(sequenceId: number, songId: number): Promise<void> {
   const [{ value }] = await db
     .select({ value: max(sequenceSongs.position) })
@@ -97,10 +150,12 @@ export async function addSongToSequence(sequenceId: number, songId: number): Pro
     .where(eq(sequenceSongs.sequenceId, sequenceId));
   const nextPosition = (value ?? -1) + 1;
   await db.insert(sequenceSongs).values({ sequenceId, songId, position: nextPosition });
+  await bumpSequenceVersion(sequenceId);
 }
 
-export async function removeSongFromSequence(sequenceSongId: number): Promise<void> {
+export async function removeSongFromSequence(sequenceId: number, sequenceSongId: number): Promise<void> {
   await db.delete(sequenceSongs).where(eq(sequenceSongs.id, sequenceSongId));
+  await bumpSequenceVersion(sequenceId);
 }
 
 export async function reorderSequenceSongs(sequenceId: number, orderedSequenceSongIds: number[]): Promise<void> {
@@ -110,6 +165,7 @@ export async function reorderSequenceSongs(sequenceId: number, orderedSequenceSo
       .set({ position })
       .where(and(eq(sequenceSongs.id, sequenceSongId), eq(sequenceSongs.sequenceId, sequenceId)));
   }
+  await bumpSequenceVersion(sequenceId);
 }
 
 export async function listProgramsWithSequencesAndSongs(userId: number): Promise<OfflineProgram[]> {
