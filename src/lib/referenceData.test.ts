@@ -47,12 +47,12 @@ describe('normalizeReferenceData', () => {
     const data = referenceData();
     data.programs = [{
       id: 1, title: 'Program A', role: 'creator', sharedWithEmails: [],
-      creator: null, collaborators: [], sequences: [],
+      creator: null, collaborators: [], sequences: [], version: 1,
     }];
     const result = normalizeReferenceData(data);
     expect(result.programs).toEqual([{
       id: 1, title: 'Program A', role: 'creator', sharedWithEmails: [],
-      creator: null, collaborators: [], sequences: [],
+      creator: null, collaborators: [], sequences: [], version: 1,
     }]);
   });
 
@@ -141,8 +141,8 @@ describe('normalizeReferenceData', () => {
     const data = referenceData();
     data.programs = [{
       id: 1, title: 'A', role: 'collaborator', sharedWithEmails: ['x@y.gr'],
-      creator: { id: 9, email: 'x@y.gr' }, collaborators: [],
-      sequences: [{ id: 10, title: 'S1', songIds: [1], entries: [{ sequenceSongId: 100, songId: 1 }] }],
+      creator: { id: 9, email: 'x@y.gr' }, collaborators: [], version: 3,
+      sequences: [{ id: 10, title: 'S1', songIds: [1], entries: [{ sequenceSongId: 100, songId: 1 }], version: 2 }],
     }];
     expect(normalizeReferenceData(data).programs[0]).toEqual(data.programs[0]);
   });

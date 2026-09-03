@@ -86,7 +86,7 @@ export default function LocalEditProgramPage() {
       setTitle(data.title);
       setRole(data.role);
       const sequences = await Promise.all(
-        (data.sequences as { id: number; title: string; position: number }[]).map(async (seq) => {
+        (data.sequences as { id: number; title: string; position: number; version: number }[]).map(async (seq) => {
           const sres = await nativeApiFetch(`/api/programs/${id}/sequences/${seq.id}`);
           if (!sres.ok) throw new Error('bad status');
           const sdata = await sres.json();
@@ -98,10 +98,10 @@ export default function LocalEditProgramPage() {
             songId: e.song.id,
             title: e.song.title,
           }));
-          return { id: seq.id, title: seq.title, position: seq.position, songs };
+          return { id: seq.id, title: seq.title, position: seq.position, songs, version: seq.version };
         })
       );
-      const detail: CachedProgramDetail = { programId: id, title: data.title, role: data.role, sequences, cachedAt: '' };
+      const detail: CachedProgramDetail = { programId: id, title: data.title, role: data.role, sequences, cachedAt: '', version: data.version };
       baseSequenceDetailRef.current = detail;
       setSequencesUnavailableOffline(false);
       setDisplaySequences(mergeSequencesWithPending(detail, actions, titles));

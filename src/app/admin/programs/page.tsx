@@ -14,7 +14,7 @@ import { useSyncQueue } from '@/components/SyncQueueProvider';
 import { loadReferenceData } from '@/lib/offlineCache';
 import { mergeProgramsWithPending, isProgramQueueAction } from '@/lib/programsMerge';
 
-type ProgramListItem = { id: number; title: string; role: 'creator' | 'collaborator'; sharedWithEmails: string[] };
+type ProgramListItem = { id: number; title: string; role: 'creator' | 'collaborator'; sharedWithEmails: string[]; version: number };
 
 export default function ProgramsAdminPage() {
   const native = isNativeApp();

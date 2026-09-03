@@ -189,6 +189,7 @@ export async function listProgramsWithSequencesAndSongs(userId: number): Promise
             title: sequence.title,
             songIds: seqEntries.map((e) => e.song.id),
             entries: seqEntries.map((e) => ({ sequenceSongId: e.sequenceSongId, songId: e.song.id })),
+            version: sequence.version,
           };
         })
       );
@@ -200,6 +201,7 @@ export async function listProgramsWithSequencesAndSongs(userId: number): Promise
         creator: program.creator,
         collaborators: program.collaborators,
         sequences,
+        version: program.version,
       };
     })
   );
@@ -212,6 +214,7 @@ export interface AccessibleProgram {
   sharedWithEmails: string[];
   creator: { id: number; email: string } | null;
   collaborators: { id: number; email: string }[];
+  version: number;
 }
 
 export async function listCollaborators(programId: number): Promise<{ id: number; email: string }[]> {
@@ -277,6 +280,7 @@ export async function listAccessiblePrograms(userId: number): Promise<Accessible
       sharedWithEmails: emails,
       creator: creator ? { id: creator.id, email: creator.email } : null,
       collaborators,
+      version: program.version,
     };
   }
 

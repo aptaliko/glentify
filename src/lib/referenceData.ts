@@ -15,6 +15,7 @@ export interface OfflineSequence {
   title: string;
   songIds: number[]; // already in playback order — read by programs/local/* + sessionStore; DO NOT remove
   entries: OfflineSequenceEntry[]; // join-row ids for the offline program editor
+  version: number; // for the collaborator write-conflict If-Match guard
 }
 
 export interface OfflineProgram {
@@ -25,6 +26,7 @@ export interface OfflineProgram {
   creator: OfflineCollaborator | null;
   collaborators: OfflineCollaborator[];
   sequences: OfflineSequence[]; // already in display order (server-side orderBy position)
+  version: number; // for the collaborator write-conflict If-Match guard
 }
 
 export interface ReferenceData {
@@ -71,6 +73,7 @@ export interface CachedSequence {
   title: string;
   position: number;
   songs: CachedSequenceSong[];
+  version: number;
 }
 
 export interface CachedProgramDetail {
@@ -79,6 +82,7 @@ export interface CachedProgramDetail {
   role: 'creator' | 'collaborator';
   sequences: CachedSequence[];
   cachedAt: string;
+  version: number;
 }
 
 /**
@@ -110,7 +114,8 @@ export function normalizeReferenceData(data: ReferenceData): ReferenceData {
       sharedWithEmails: p.sharedWithEmails ?? [],
       creator: p.creator ?? null,
       collaborators: p.collaborators ?? [],
-      sequences: (p.sequences ?? []).map((s) => ({ ...s, entries: s.entries ?? [] })),
+      version: (p as OfflineProgram).version ?? 1,
+      sequences: (p.sequences ?? []).map((s) => ({ ...s, entries: s.entries ?? [], version: (s as OfflineSequence).version ?? 1 })),
     })),
     sharedSongs: data.sharedSongs ?? [],
     axisTypes: data.axisTypes ?? [],
