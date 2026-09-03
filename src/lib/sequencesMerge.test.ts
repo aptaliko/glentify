@@ -51,4 +51,25 @@ describe('mergeSequencesWithPending', () => {
     const out = mergeSequencesWithPending(detail, [action({ type: 'sequence-reorder', payload: { sequenceId: 5, orderedIds: [101, 100] } })], titles);
     expect(out[0].songs.map((s) => s.sequenceSongId)).toEqual([101, 100]);
   });
+  it('reverts a needsAttention rename to the base title', () => {
+    const d: CachedProgramDetail = {
+      programId: 1, title: 'P', role: 'creator', cachedAt: '', version: 1,
+      sequences: [{ id: 5, title: 'Βάση', position: 0, version: 2, songs: [] }],
+    };
+    const out = mergeSequencesWithPending(d, [
+      action({ id: 'a', type: 'sequence-rename', payload: { sequenceId: 5, title: 'Νέο' }, needsAttention: true }),
+    ], new Map());
+    expect(out[0].title).toBe('Βάση'); // reverted, not 'Νέο'
+  });
+  it('reverts a needsAttention reorder to the base order', () => {
+    const d: CachedProgramDetail = {
+      programId: 1, title: 'P', role: 'creator', cachedAt: '', version: 1,
+      sequences: [{ id: 5, title: 'S', position: 0, version: 2,
+        songs: [{ sequenceSongId: 100, songId: 10, title: 'A' }, { sequenceSongId: 101, songId: 11, title: 'B' }] }],
+    };
+    const out = mergeSequencesWithPending(d, [
+      action({ id: 'a', type: 'sequence-reorder', payload: { sequenceId: 5, orderedIds: [101, 100] }, needsAttention: true }),
+    ], new Map());
+    expect(out[0].songs.map((s) => s.sequenceSongId)).toEqual([100, 101]); // base order kept
+  });
 });

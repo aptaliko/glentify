@@ -64,6 +64,10 @@ export function mergeSequencesWithPending(
   for (const a of actions) {
     if (!isRecord(a.payload)) continue;
     const p = a.payload;
+    // A conflict/failed whole-value replacement (rename/reorder flagged needsAttention) must
+    // NOT be applied — keep the last-known real state, matching programsMerge's revert. Other
+    // action types aren't guarded and their needsAttention handling is out of scope here.
+    if (a.needsAttention && (a.type === 'sequence-rename' || a.type === 'sequence-reorder')) continue;
     switch (a.type) {
       case 'sequence-create': {
         if (p.programId === detail.programId && typeof p.draftId === 'number' && typeof p.title === 'string') {
