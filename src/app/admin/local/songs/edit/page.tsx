@@ -12,6 +12,9 @@ import { resolveSongForEdit } from '@/lib/songsMerge';
 import { useSyncQueue } from '@/components/SyncQueueProvider';
 import SongAxisEditor, { type AxisValueEntry } from '@/components/SongAxisEditor';
 import PageNav from '@/components/PageNav';
+import { validateImageFile, IMAGE_ACCEPT_ATTR } from '@/lib/imageValidation';
+import { putLocalImage, deleteLocalImage, getLocalImage } from '@/lib/localImageStore';
+import { mintDraftId } from '@/lib/draftIds';
 
 // Attempts a live GET of the song first, so axis values (which the offline reference-data
 // cache only ever refreshes on a manual sync tap, unlike the songs-list cache which
@@ -64,7 +67,15 @@ export default function LocalEditSongPage() {
   const [femaleKey, setFemaleKey] = useState('');
   const [axisValues, setAxisValues] = useState<AxisValueEntry[]>([]);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [pendingImageBlobId, setPendingImageBlobId] = useState<number | null>(null);
+  const [localPreviewUrl, setLocalPreviewUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (localPreviewUrl) URL.revokeObjectURL(localPreviewUrl);
+    };
+  }, [localPreviewUrl]);
 
   useEffect(() => {
     getSelectedEditSongId(preferencesStore)
@@ -95,6 +106,15 @@ export default function LocalEditSongPage() {
           setImageUrl(result.song.imageUrl);
           setAxisValues(result.song.axisValues);
           setNotFound(false);
+          const pendingId = result.song.pendingImageBlobId;
+          setPendingImageBlobId(pendingId);
+          if (pendingId != null) {
+            getLocalImage(pendingId)
+              .then((local) => {
+                if (local) setLocalPreviewUrl(URL.createObjectURL(local.blob));
+              })
+              .catch(() => {/* no preview if bytes are gone; imageUrl still shows if any */});
+          }
         } else {
           setNotFound(true);
         }
@@ -105,6 +125,43 @@ export default function LocalEditSongPage() {
         setResolved(true);
       });
   }, [songId]);
+
+  async function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setError(null);
+    const validation = validateImageFile(file);
+    if (!validation.ok) {
+      setError(validation.reason);
+      e.target.value = '';
+      return;
+    }
+    const draftId = mintDraftId();
+    try {
+      await putLocalImage(draftId, { blob: file, contentType: file.type, filename: file.name });
+    } catch {
+      setError('Αποτυχία αποθήκευσης εικόνας.');
+      return;
+    }
+    if (localPreviewUrl) URL.revokeObjectURL(localPreviewUrl);
+    setPendingImageBlobId(draftId);
+    setLocalPreviewUrl(URL.createObjectURL(file));
+    setImageUrl(null); // a fresh pending image supersedes the existing real URL
+  }
+
+  async function handleRemoveImage() {
+    if (pendingImageBlobId != null) {
+      try {
+        await deleteLocalImage(pendingImageBlobId);
+      } catch {
+        // best-effort
+      }
+    }
+    if (localPreviewUrl) URL.revokeObjectURL(localPreviewUrl);
+    setLocalPreviewUrl(null);
+    setPendingImageBlobId(null);
+    setImageUrl(null);
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -119,7 +176,8 @@ export default function LocalEditSongPage() {
         maleKey: maleKey || null,
         femaleKey: femaleKey || null,
         axisValues,
-        imageUrl, // read-only in Phase 1 — carried through unchanged, never re-picked here
+        imageUrl,
+        pendingImageBlobId,
       });
     } catch {
       setError('Αποτυχία αποθήκευσης. Δοκίμασε ξανά.');
@@ -192,9 +250,13 @@ export default function LocalEditSongPage() {
         />
         <div className="flex flex-col gap-2">
           <label className="label-text">Εικόνα παρτιτούρας (προαιρετικό, εναλλακτικά ή μαζί με τους στίχους)</label>
-          <input type="file" accept="image/png,image/jpeg,image/webp" disabled className="file-input file-input-bordered" />
-          <span className="text-xs text-base-content/50">Η αλλαγή εικόνας από τη native εφαρμογή δεν υποστηρίζεται ακόμη — χρησιμοποίησε την ιστοσελίδα διαχείρισης.</span>
-          {imageUrl && <img src={imageUrl} alt="Προεπισκόπηση παρτιτούρας" className="max-h-64 rounded-box object-contain" />}
+          <input type="file" accept={IMAGE_ACCEPT_ATTR} onChange={handleImageChange} className="file-input file-input-bordered" />
+          {(localPreviewUrl || imageUrl) && (
+            <>
+              <img src={localPreviewUrl ?? imageUrl ?? undefined} alt="Προεπισκόπηση παρτιτούρας" className="max-h-64 rounded-box object-contain" />
+              <button type="button" onClick={handleRemoveImage} className="btn btn-sm btn-outline btn-error self-start">Αφαίρεση εικόνας</button>
+            </>
+          )}
         </div>
         <SongAxisEditor value={axisValues} onChange={setAxisValues} />
         <div className="flex gap-3">
