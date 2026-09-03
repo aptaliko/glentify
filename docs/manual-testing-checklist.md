@@ -269,6 +269,17 @@ use the "Unified offline-cache priming" section's checks instead.
       cached list with "Χωρίς σύνδεση — τελευταία γνωστά δεδομένα".~~ *(retired — see Unified
       offline-cache priming)*
 
+### Offline song image upload
+- [ ] Native + offline: create a new song, pick an image, save → row appears; reconnect → image is attached after sync.
+- [ ] Native + offline: edit an existing image-less song, add an image, save → reconnect → image attached.
+- [ ] Native + offline: edit a song that has an image, replace it, save → reconnect → new image shown, old one no longer referenced.
+- [ ] Native + offline: edit a song that has an image, tap "Αφαίρεση εικόνας", save → reconnect → image removed server-side.
+- [ ] Native: reject flow — pick a >10MB file or a non-PNG/JPEG/WebP → inline Greek error, nothing stored.
+- [ ] Native: edit the same song twice offline after picking one image → reconnect → exactly one blob uploaded, both edits apply, no orphan re-upload.
+- [ ] Native: pick an image offline, save, reopen the edit page BEFORE reconnecting → the pending image still previews.
+- [ ] Native: airplane mode ON, trigger a sync, then reconnect → upload + song write complete cleanly with no duplicate.
+- [ ] Web: edit a song, remove its image, save → image removed. (Regression: add/replace still work.)
+
 ---
 
 ## Offline Sequence & Taxonomy CRUD (#6 + #7)
