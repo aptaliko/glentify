@@ -84,6 +84,14 @@ row, not a schema migration on `songs`. The suggestion engine (`src/lib/suggesti
 `getFilteredCandidates`/`rankBySharedAxes`/`getSuggestions`) is itself axis-agnostic; it
 ranks candidates by whichever axes the current song has, toggled at the call site.
 
+A new column on `programs`/`program_sequences` (e.g. the `version` conflict guard) must be
+threaded through **every** read path independently — the offline-blob builder
+(`listProgramsWithSequencesAndSongs`), the online list path
+(`listAccessiblePrograms`/`summarize`), *and* the detail `GET /api/programs/[id]` — because a
+client-side `as` cast on a fetch response asserts the field without producing it, so a missed
+projection compiles clean and passes vitest yet is `undefined` at runtime. Grep the field
+across those three sites when adding one.
+
 Every account-scoped table carries `ownerId`. On `songs`/`programs`/`sessions` it's
 `NOT NULL` — no cross-user visibility. On the taxonomy tables (`regions`, `rhythms`,
 `dromoi`, `genres`, `composers`) it's **nullable**: `NULL` means a shared baseline row,
