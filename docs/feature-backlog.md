@@ -8,17 +8,6 @@ and moves out of this file once shipped.
 
 ---
 
-## Offline image upload for songs (#5 Phase 2 remainder)
-
-Attaching a newly-picked image to a song while native and offline. Explicitly deferred at
-spec time (`docs/superpowers/specs/2026-09-01-offline-song-crud-phase1-design.md` §Non-goals):
-today the file-picker input is disabled whenever running natively (online or offline) — an
-existing image still displays read-only. Needs a draftId→realId coordination mechanism for
-the uploaded blob, similar in shape to the one `src/lib/draftIds.ts` already provides for
-offline-created taxonomy values/songs/sequences. Originally bundled with offline "+ Νέα τιμή"
-taxonomy-value creation as one "Phase 2" — that half already shipped separately
-(`bb4eb5b`, 2026-09-02), so this is now the only piece left. Not yet brainstormed/spec'd.
-
 ## Collaborator write-conflict resolution
 
 The offline write model is last-write-wins with no conflict detection: song and shared
