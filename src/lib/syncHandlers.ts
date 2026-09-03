@@ -7,6 +7,10 @@ import type { CreateProgramPayload, RenameProgramPayload, DeleteProgramPayload }
 import type { CreateSongPayload, UpdateSongPayload, DeleteSongPayload } from './songsMerge';
 import { loadDraftMap, recordResolution, resolveOne, resolveMany, isDraftId, type DraftEntity } from './draftIds';
 import { loadSyncedVersionMap, recordSyncedVersion, resolveVersion } from './syncedVersions';
+import { upload } from '@vercel/blob/client';
+import { apiUrl } from './apiClient';
+import { getAuthToken } from './authToken';
+import { getLocalImage, deleteLocalImage, recordImageResolution, loadImageResolution } from './localImageStore';
 
 interface TaxonomyCreatePayload { draftId: number; name: string; parentId: number | null }
 interface TaxonomyDeletePayload { id: number }
@@ -201,32 +205,67 @@ async function handleDeleteProgramSync(payload: unknown): Promise<SyncOutcome> {
   return 'item-error';
 }
 
+// Resolves a pending offline image to a public URL for a song write.
+//   - returns null when there is no pending image (caller sends payload.imageUrl as-is:
+//     a real URL for an untouched image, or null for an untouched-empty / removed image)
+//   - returns 'item-error' when bytes are missing AND unresolved (defensive; normally the
+//     same submit that set pendingImageBlobId also stored the bytes)
+//   - returns the URL when resolved from the map (skips re-upload) or after a fresh upload()
+// A thrown/rejected upload() propagates out to processQueueWith, which maps it to
+// systemic-error (pass stops, no attempt consumed) — correct for the offline case.
+async function resolvePendingImageUrl(pendingImageBlobId: number | null | undefined): Promise<string | null | 'item-error'> {
+  if (pendingImageBlobId === null || pendingImageBlobId === undefined) return null;
+  const alreadyUploaded = await loadImageResolution(pendingImageBlobId);
+  if (alreadyUploaded !== null) return alreadyUploaded;
+  const local = await getLocalImage(pendingImageBlobId);
+  if (local === null) return 'item-error';
+  const token = await getAuthToken();
+  const blob = await upload(local.filename, local.blob, {
+    access: 'public',
+    handleUploadUrl: apiUrl('/api/songs/image-upload'),
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  });
+  await recordImageResolution(pendingImageBlobId, blob.url);
+  return blob.url;
+}
+
 async function handleCreateSongSync(payload: unknown): Promise<SyncOutcome> {
-  const body = payload as CreateSongPayload;
+  const { pendingImageBlobId, ...rest } = payload as CreateSongPayload;
+  const resolvedImage = await resolvePendingImageUrl(pendingImageBlobId);
+  if (resolvedImage === 'item-error') return 'item-error';
+  const body = { ...rest, imageUrl: resolvedImage ?? rest.imageUrl };
   const res = await nativeApiFetch(
     '/api/songs',
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
     undefined,
     { redirectOn401: false }
   );
-  if (res.ok) return 'success';
+  if (res.ok) {
+    if (pendingImageBlobId != null) await deleteLocalImage(pendingImageBlobId);
+    return 'success';
+  }
   if (res.status === 401 || res.status >= 500) return 'systemic-error';
   return 'item-error';
 }
 
 async function handleUpdateSongSync(payload: unknown): Promise<SyncOutcome> {
-  const { songId, ...body } = payload as UpdateSongPayload;
+  const { songId, pendingImageBlobId, ...rest } = payload as UpdateSongPayload;
+  const resolvedImage = await resolvePendingImageUrl(pendingImageBlobId);
+  if (resolvedImage === 'item-error') return 'item-error';
+  const body = { ...rest, imageUrl: resolvedImage ?? rest.imageUrl };
   const res = await nativeApiFetch(
     `/api/songs/${encodeURIComponent(songId)}`,
     { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
     undefined,
     { redirectOn401: false }
   );
-  if (res.ok) return 'success';
   // Already gone (deleted elsewhere before this update synced) — the desired end state
   // can't be reached, but there's nothing left to update either; matches
   // handleDeleteProgramSync's 404-as-success precedent.
-  if (res.status === 404) return 'success';
+  if (res.ok || res.status === 404) {
+    if (pendingImageBlobId != null) await deleteLocalImage(pendingImageBlobId);
+    return 'success';
+  }
   if (res.status === 401 || res.status >= 500) return 'systemic-error';
   return 'item-error';
 }
