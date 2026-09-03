@@ -1,9 +1,10 @@
 // src/app/api/programs/[id]/sequences/[seqId]/songs/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getProgramAccess, getSequenceById, addSongToSequence, reorderSequenceSongs } from '@/db/queries/programs';
+import { getProgramAccess, getSequenceById, addSongToSequence, reorderSequenceSongs, applySequenceSongOrder, bumpSequenceVersionIfMatch } from '@/db/queries/programs';
 import { getSongById } from '@/db/queries/songs';
 import { getUserId } from '@/lib/requestUser';
+import { parseIfMatch } from '@/lib/ifMatch';
 
 const addSchema = z.object({ songId: z.number().int() });
 const reorderSchema = z.object({ orderedIds: z.array(z.number().int()) });
@@ -42,6 +43,16 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   }
   const parsed = reorderSchema.safeParse(await request.json());
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  const expected = parseIfMatch(request);
+  if (expected !== null) {
+    const newVersion = await bumpSequenceVersionIfMatch(Number(seqId), expected);
+    if (newVersion === null) {
+      const current = await getSequenceById(Number(seqId));
+      return NextResponse.json({ error: 'Άλλαξε από συνεργάτη', version: current?.version ?? null }, { status: 409 });
+    }
+    await applySequenceSongOrder(Number(seqId), parsed.data.orderedIds);
+    return NextResponse.json({ ok: true, version: newVersion });
+  }
   await reorderSequenceSongs(Number(seqId), parsed.data.orderedIds);
   return NextResponse.json({ ok: true });
 }

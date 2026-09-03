@@ -341,3 +341,16 @@ their own list page) with a single `primeOfflineData()` orchestrator that popula
   waiting for the next sync attempt.
 - **Clean up test data** when you're done — delete any test songs/programs/taxonomy entries
   created during this pass, on whichever account(s) you used.
+
+## Collaborator write-conflict resolution
+
+- [ ] Sequence rename with no If-Match header behaves as before (web edit page still works).
+- [ ] Sequence rename with a matching If-Match returns 200 and the row's version increments.
+- [ ] Sequence rename with a stale If-Match returns 409 with the current version, no title change.
+- [ ] Same three cases for reorder (PATCH .../songs) and program rename (PATCH /api/programs/[id]).
+- [ ] A collaborator's add-song bumps the sequence version, so a concurrent stale reorder 409s.
+- [ ] A malformed If-Match (e.g. "abc") is treated as no header (LWW), not a 400.
+- [ ] Reorder version accounting: the guarded reorder branch applies positions via a non-bumping
+      helper (the If-Match gate does the single bump), so the response's `version` equals the DB
+      value and a user's own consecutive offline reorders don't false-conflict. (Implementation
+      chose the non-bumping-helper option over leaving the extra bump.)

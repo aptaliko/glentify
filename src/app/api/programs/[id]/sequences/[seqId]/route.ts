@@ -5,11 +5,13 @@ import {
   getProgramAccess,
   getSequenceById,
   updateSequence,
+  updateSequenceIfMatch,
   deleteSequence,
   listSongsForSequence,
   type ProgramAccessRole,
 } from '@/db/queries/programs';
 import { getUserId } from '@/lib/requestUser';
+import { parseIfMatch } from '@/lib/ifMatch';
 
 const updateSchema = z.object({ title: z.string().min(1) });
 
@@ -38,6 +40,15 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (!role) return NextResponse.json({ error: 'Δεν βρέθηκε' }, { status: 404 });
   const parsed = updateSchema.safeParse(await request.json());
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  const expected = parseIfMatch(request);
+  if (expected !== null) {
+    const updated = await updateSequenceIfMatch(Number(seqId), parsed.data.title, expected);
+    if (!updated) {
+      const current = await getSequenceById(Number(seqId));
+      return NextResponse.json({ error: 'Άλλαξε από συνεργάτη', version: current?.version ?? null }, { status: 409 });
+    }
+    return NextResponse.json(updated);
+  }
   const updated = await updateSequence(Number(seqId), parsed.data.title);
   return NextResponse.json(updated);
 }

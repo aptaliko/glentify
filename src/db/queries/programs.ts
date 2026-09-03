@@ -158,13 +158,21 @@ export async function removeSongFromSequence(sequenceId: number, sequenceSongId:
   await bumpSequenceVersion(sequenceId);
 }
 
-export async function reorderSequenceSongs(sequenceId: number, orderedSequenceSongIds: number[]): Promise<void> {
+// Applies the positional updates without touching the sequence version. Used by the
+// guarded reorder branch, where the If-Match gate has already bumped the version — so
+// the response's version stays consistent with the DB and a user's own consecutive
+// offline reorders don't false-conflict.
+export async function applySequenceSongOrder(sequenceId: number, orderedSequenceSongIds: number[]): Promise<void> {
   for (const [position, sequenceSongId] of orderedSequenceSongIds.entries()) {
     await db
       .update(sequenceSongs)
       .set({ position })
       .where(and(eq(sequenceSongs.id, sequenceSongId), eq(sequenceSongs.sequenceId, sequenceId)));
   }
+}
+
+export async function reorderSequenceSongs(sequenceId: number, orderedSequenceSongIds: number[]): Promise<void> {
+  await applySequenceSongOrder(sequenceId, orderedSequenceSongIds);
   await bumpSequenceVersion(sequenceId);
 }
 
