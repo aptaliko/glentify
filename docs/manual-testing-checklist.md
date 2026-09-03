@@ -354,3 +354,6 @@ their own list page) with a single `primeOfflineData()` orchestrator that popula
       helper (the If-Match gate does the single bump), so the response's `version` equals the DB
       value and a user's own consecutive offline reorders don't false-conflict. (Implementation
       chose the non-bumping-helper option over leaving the extra bump.)
+- [ ] Two devices editing the same sequence offline: the second to sync surfaces «άλλαξε από συνεργάτη», the first wins.
+- [ ] Same user's two consecutive offline renames of one sequence both sync cleanly (no self-conflict) after reconnect.
+- [ ] Renaming a sequence a collaborator deleted (404) surfaces as a conflict, not a silent discard.
