@@ -16,7 +16,7 @@ function makeAction(overrides: Partial<QueuedAction>): QueuedAction {
   };
 }
 
-const emptySongFields = { imageUrl: null, notes: null, maleKey: null, femaleKey: null, axisValues: [] as AxisValueEntry[] };
+const emptySongFields = { imageUrl: null, notes: null, maleKey: null, femaleKey: null, axisValues: [] as AxisValueEntry[], pendingImageBlobId: null };
 
 describe('mergeSongsWithPending', () => {
   const base: CachedSong[] = [
@@ -155,6 +155,7 @@ describe('resolveSongForEdit', () => {
         maleKey: 'Ρε',
         femaleKey: 'Λα',
         axisValues: baseAxisValues,
+        pendingImageBlobId: null,
       },
       hasPendingEdit: false,
     });
@@ -165,11 +166,11 @@ describe('resolveSongForEdit', () => {
     const actions = [
       makeAction({
         type: 'song-update',
-        payload: { songId: 1, title: 'Νέος Τίτλος', lyrics: 'Νέοι στίχοι', imageUrl: null, notes: null, maleKey: null, femaleKey: null, axisValues: newAxisValues },
+        payload: { songId: 1, title: 'Νέος Τίτλος', lyrics: 'Νέοι στίχοι', imageUrl: null, notes: null, maleKey: null, femaleKey: null, axisValues: newAxisValues, pendingImageBlobId: null },
       }),
     ];
     expect(resolveSongForEdit(1, base, baseAxisValues, actions)).toEqual({
-      song: { title: 'Νέος Τίτλος', lyrics: 'Νέοι στίχοι', imageUrl: null, notes: null, maleKey: null, femaleKey: null, axisValues: newAxisValues },
+      song: { title: 'Νέος Τίτλος', lyrics: 'Νέοι στίχοι', imageUrl: null, notes: null, maleKey: null, femaleKey: null, axisValues: newAxisValues, pendingImageBlobId: null },
       hasPendingEdit: true,
     });
   });
@@ -191,6 +192,7 @@ describe('resolveSongForEdit', () => {
         maleKey: 'Ρε',
         femaleKey: 'Λα',
         axisValues: baseAxisValues,
+        pendingImageBlobId: null,
       },
       hasPendingEdit: false,
     });
@@ -206,16 +208,37 @@ describe('resolveSongForEdit', () => {
     const actions = [
       makeAction({
         type: 'song-update',
-        payload: { songId: 1, title: 'Πρώτη επεξεργασία', lyrics: 'Πρώτοι στίχοι', imageUrl: null, notes: null, maleKey: null, femaleKey: null, axisValues: firstAxisValues },
+        payload: { songId: 1, title: 'Πρώτη επεξεργασία', lyrics: 'Πρώτοι στίχοι', imageUrl: null, notes: null, maleKey: null, femaleKey: null, axisValues: firstAxisValues, pendingImageBlobId: null },
       }),
       makeAction({
         type: 'song-update',
-        payload: { songId: 1, title: 'Δεύτερη επεξεργασία', lyrics: 'Δεύτεροι στίχοι', imageUrl: null, notes: null, maleKey: null, femaleKey: null, axisValues: secondAxisValues },
+        payload: { songId: 1, title: 'Δεύτερη επεξεργασία', lyrics: 'Δεύτεροι στίχοι', imageUrl: null, notes: null, maleKey: null, femaleKey: null, axisValues: secondAxisValues, pendingImageBlobId: null },
       }),
     ];
     expect(resolveSongForEdit(1, base, baseAxisValues, actions)).toEqual({
-      song: { title: 'Δεύτερη επεξεργασία', lyrics: 'Δεύτεροι στίχοι', imageUrl: null, notes: null, maleKey: null, femaleKey: null, axisValues: secondAxisValues },
+      song: { title: 'Δεύτερη επεξεργασία', lyrics: 'Δεύτεροι στίχοι', imageUrl: null, notes: null, maleKey: null, femaleKey: null, axisValues: secondAxisValues, pendingImageBlobId: null },
       hasPendingEdit: true,
     });
+  });
+
+  it('carries a pending image blob id from the queued edit into the resolved song', () => {
+    const actions = [
+      makeAction({
+        type: 'song-update',
+        payload: { songId: 1, title: 'Με εικόνα', lyrics: null, imageUrl: null, notes: null, maleKey: null, femaleKey: null, axisValues: [], pendingImageBlobId: -42 },
+      }),
+    ];
+    const result = resolveSongForEdit(1, base, baseAxisValues, actions);
+    expect(result.song?.pendingImageBlobId).toBe(-42);
+    expect(result.song?.imageUrl).toBe(null);
+  });
+
+  it('when the same song is edited twice offline, the later edit\'s pending image blob id wins', () => {
+    const actions = [
+      makeAction({ type: 'song-update', payload: { songId: 1, title: 'Πρώτη', lyrics: null, imageUrl: null, notes: null, maleKey: null, femaleKey: null, axisValues: [], pendingImageBlobId: -1 } }),
+      makeAction({ type: 'song-update', payload: { songId: 1, title: 'Δεύτερη', lyrics: null, imageUrl: null, notes: null, maleKey: null, femaleKey: null, axisValues: [], pendingImageBlobId: -2 } }),
+    ];
+    const result = resolveSongForEdit(1, base, baseAxisValues, actions);
+    expect(result.song?.pendingImageBlobId).toBe(-2);
   });
 });
