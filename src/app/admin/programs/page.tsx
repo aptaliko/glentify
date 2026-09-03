@@ -164,7 +164,8 @@ export default function ProgramsAdminPage() {
       return;
     }
     try {
-      await enqueue('program-rename', { programId: id, title: editingTitle });
+      const baseVersion = programs.find((p) => p.id === id)?.version;
+      await enqueue('program-rename', { programId: id, title: editingTitle, baseVersion });
     } catch {
       setError('Αποτυχία αποθήκευσης. Δοκίμασε ξανά.');
       return;

@@ -243,7 +243,8 @@ export default function LocalEditProgramPage() {
   async function handleRenameSequence(e: React.FormEvent, seqId: number) {
     e.preventDefault();
     if (programId === null) return;
-    await enqueue('sequence-rename', { programId, sequenceId: seqId, title: editingSeqTitle });
+    const baseVersion = baseSequenceDetailRef.current?.sequences.find((s) => s.id === seqId)?.version;
+    await enqueue('sequence-rename', { programId, sequenceId: seqId, title: editingSeqTitle, baseVersion });
     setEditingSeqId(null);
     await notifyQueueChanged();
     await loadSequences(programId);
@@ -256,10 +257,12 @@ export default function LocalEditProgramPage() {
     if (toIndex < 0 || toIndex >= current.length) return;
     const reordered = [...current];
     [reordered[fromIndex], reordered[toIndex]] = [reordered[toIndex], reordered[fromIndex]];
+    const baseVersion = baseSequenceDetailRef.current?.sequences.find((s) => s.id === expandedSeqId)?.version;
     await enqueue('sequence-reorder', {
       programId,
       sequenceId: expandedSeqId,
       orderedIds: reordered.map((entry) => entry.sequenceSongId),
+      baseVersion,
     });
     await notifyQueueChanged();
     await loadSequences(programId);

@@ -8,6 +8,7 @@ export interface CreateProgramPayload {
 export interface RenameProgramPayload {
   programId: number;
   title: string;
+  baseVersion?: number;
 }
 
 export interface DeleteProgramPayload {
