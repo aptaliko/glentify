@@ -8,8 +8,8 @@ function action(overrides: Partial<QueuedAction>): QueuedAction {
 }
 const titles = new Map<number, string>([[10, 'Α'], [11, 'Β'], [12, 'Γ']]);
 const detail: CachedProgramDetail = {
-  programId: 1, title: 'Πρόγραμμα', role: 'creator', cachedAt: '2026-01-01T00:00:00.000Z',
-  sequences: [{ id: 5, title: 'Σειρά 1', position: 0, songs: [
+  programId: 1, title: 'Πρόγραμμα', role: 'creator', cachedAt: '2026-01-01T00:00:00.000Z', version: 1,
+  sequences: [{ id: 5, title: 'Σειρά 1', position: 0, version: 1, songs: [
     { sequenceSongId: 100, songId: 10, title: 'Α' },
     { sequenceSongId: 101, songId: 11, title: 'Β' },
   ] }],

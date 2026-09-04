@@ -8,6 +8,8 @@
     "build:mobile": "bash scripts/build-mobile.sh",
     "start": "next start",
     "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "setup:hooks": "git config core.hooksPath scripts/githooks",
     "test": "vitest run",
     "check:skills": "tsx scripts/check-skill-accuracy.ts",
     "db:generate": "drizzle-kit generate",

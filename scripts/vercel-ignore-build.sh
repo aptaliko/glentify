@@ -23,10 +23,11 @@ if [ -z "$changed" ]; then
   exit 1
 fi
 
-# Deploy-IRRELEVANT paths: Claude tooling, docs, IDE config, and any markdown file.
+# Deploy-IRRELEVANT paths: Claude tooling, CI config, docs, IDE config, and any markdown file.
 # Everything else — src/, scripts/, package.json, config, migrations — is code-relevant.
+# ^.github/ = CI workflows / dependabot: they run on GitHub, never affect the Vercel web build.
 relevant="$(printf '%s\n' "$changed" \
-  | grep -vE '^\.claude/|^docs/|^\.idea/|^android/\.idea/|\.md$' || true)"
+  | grep -vE '^\.claude/|^\.github/|^docs/|^\.idea/|^android/\.idea/|\.md$' || true)"
 
 if [ -z "$relevant" ]; then
   echo "Only deploy-irrelevant files changed; skipping build:"

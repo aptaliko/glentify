@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Staged mobile export + generated Capacitor native shell — not our source to lint.
+    ".mobile-build/**",
+    "android/**",
+    "ios/**",
   ]),
 ]);
 

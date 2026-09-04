@@ -156,12 +156,12 @@ describe('collectReferencedSongIds', () => {
   it('collects song ids across sequences and programs, de-duplicated', () => {
     const programs = [
       {
-        id: 1, title: 'A', role: 'creator' as const, sharedWithEmails: [], creator: null, collaborators: [],
-        sequences: [{ id: 10, title: 'S1', songIds: [1, 2], entries: [] }],
+        id: 1, title: 'A', role: 'creator' as const, sharedWithEmails: [], creator: null, collaborators: [], version: 1,
+        sequences: [{ id: 10, title: 'S1', songIds: [1, 2], entries: [], version: 1 }],
       },
       {
-        id: 2, title: 'B', role: 'creator' as const, sharedWithEmails: [], creator: null, collaborators: [],
-        sequences: [{ id: 20, title: 'S2', songIds: [2, 3], entries: [] }],
+        id: 2, title: 'B', role: 'creator' as const, sharedWithEmails: [], creator: null, collaborators: [], version: 1,
+        sequences: [{ id: 20, title: 'S2', songIds: [2, 3], entries: [], version: 1 }],
       },
     ];
     expect(collectReferencedSongIds(programs).sort()).toEqual([1, 2, 3]);

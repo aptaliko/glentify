@@ -1,0 +1,43 @@
+name: CI
+
+# The four cheap checks Vercel's build never runs. Deliberately NOT a web/mobile build:
+# Vercel already builds the web app on every push, and the mobile build needs Java 21 +
+# the Android SDK + gradle — too heavy and slow to duplicate here. CI's unique value is
+# catching the "compiles clean, passes vitest, undefined at runtime" class of bug (typecheck)
+# and skill drift (check:skills) before code reaches Vercel.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# A newer push to the same branch/PR cancels the older in-flight run.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Skill accuracy
+        run: npm run check:skills

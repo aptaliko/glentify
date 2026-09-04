@@ -1,0 +1,24 @@
+version: 2
+updates:
+  # npm deps — monthly and GROUPED so Next 16 / Capacitor 8 / Tailwind 4 / React 19
+  # don't each open their own PR every week and bury a solo maintainer. Majors are kept
+  # separate (they need a real look); everything else lands as two grouped PRs.
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 5
+    groups:
+      production-minor-patch:
+        dependency-type: production
+        update-types: [minor, patch]
+      dev-minor-patch:
+        dependency-type: development
+        update-types: [minor, patch]
+
+  # The workflow's own actions (checkout, setup-node). Rarely changes; monthly is plenty.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3

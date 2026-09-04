@@ -10,9 +10,9 @@ function song(id: number, title: string): SongRow {
 
 const program: OfflineProgram = {
   id: 7, title: 'Πρόγραμμα', role: 'collaborator', sharedWithEmails: ['a@b.gr'],
-  creator: { id: 2, email: 'a@b.gr' }, collaborators: [{ id: 3, email: 'c@d.gr' }],
+  creator: { id: 2, email: 'a@b.gr' }, collaborators: [{ id: 3, email: 'c@d.gr' }], version: 1,
   sequences: [{
-    id: 10, title: 'Σειρά 1', songIds: [1, 2],
+    id: 10, title: 'Σειρά 1', songIds: [1, 2], version: 1,
     entries: [{ sequenceSongId: 100, songId: 1 }, { sequenceSongId: 101, songId: 2 }],
   }],
 };
