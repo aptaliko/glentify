@@ -28,33 +28,68 @@ and `docs/superpowers/specs/2026-08-29-offline-sync-foundation-design.md`.
   read-through caches, no queue action).
 - **Not** for a web-only feature — the queue is a no-op on web (`isNativeApp()` is false).
 
-## The five pieces (create a todo per item)
+## The pieces (create a todo per item)
 
-1. **Register the handler** — add `registerHandler('<type>', handleXSync)` inside
+The sync queue only **replays an HTTP call**; it does not implement the write. So the
+procedure starts at the server, not the handler — pieces 0 and 1 are the two the taxonomy
+archetype hides (its route and its enqueue site already existed), and they're where most
+new actions actually break.
+
+0. **Confirm or author the server route + query FIRST.** Grep for the endpoint your
+   handler will POST/PATCH/DELETE to. If it doesn't exist, build it — the API route under
+   `src/app/api/...` plus the query in `src/db/queries/*.ts` that performs the write
+   (respecting ownership: a program a user can't access **404s, never 403s**). The route's
+   **status codes are what piece 3's SyncOutcome table maps** — design them deliberately
+   (e.g. distinguish 404-not-found from 409-conflict). A create/copy action also needs the
+   route to **return the new entity's `id`** so piece 4 can record it.
+
+1. **Enqueue from the trigger UI.** An action is inert without a call site (the taxonomy
+   example does this in `SongAxisEditor.tsx`). At the button/handler: `mintDraftId()` for
+   any entity this action *creates*, put **every id AND every field the merge needs to
+   render** into the payload (a create that shows a title must carry the title — the merge
+   is pure and sees only the payload), then `enqueue('<type>', payload)` +
+   `notifyQueueChanged()`.
+
+2. **Register the handler** — add `registerHandler('<type>', handleXSync)` inside
    `initSyncHandlers()` in `src/lib/syncHandlers.ts`. This is the single registration
    site; nowhere else calls `registerHandler`. The handler calls `nativeApiFetch(...)`
    **always with `{ redirectOn401: false }`** (a sync pass must never trigger a page
    redirect) and returns a `SyncOutcome`.
 
-2. **Map every response to a `SyncOutcome`** — this is the judgment part, see the table
+3. **Map every response to a `SyncOutcome`** — this is the judgment part, see the table
    below. Getting a code wrong is the most common defect: e.g. treating a real conflict
-   as `item-error` (silently retries then hides) instead of `conflict`.
+   as `item-error` (silently retries then hides) instead of `conflict`, or treating a
+   create/copy whose source is gone as 404-success (silently drops the user's action).
 
-3. **Resolve draft ids** — if the payload references an entity that could have been
-   created offline in the same session (a parent id, a program id, a sequence id, a
-   song id), resolve it through `loadDraftMap()` + `resolveOne`/`resolveMany` BEFORE the
-   fetch. An unresolved reference returns `'item-error'` so the dependent action waits
-   its turn behind the create ahead of it. If your action itself creates an entity, call
-   `recordResolution(entity, draftId, created.id)` on success.
+4. **Resolve draft ids (both directions).**
+   - *Inbound:* if the payload references an entity that could have been created offline in
+     the same session (a parent id, a program id, a sequence id, a song id), resolve it via
+     `loadDraftMap()` + `resolveOne`/`resolveMany` BEFORE the fetch; an unresolved reference
+     returns `'item-error'` so it waits behind the create ahead of it. **This only works if
+     the upstream create actually records a resolution** — verify it does. Some don't:
+     `handleCreateProgramSync` mints/records nothing today, so a draft *program* id can't be
+     resolved until that create is retrofitted.
+   - *Outbound:* if your action creates an entity, call
+     `recordResolution(entity, draftId, created.id)` on success (before `return`).
+     `entity` must be a member of the **closed `DraftEntity` union** in `draftIds.ts` —
+     if your entity type isn't in it (e.g. `'program'`), add it to the union first.
+   - *Multi-entity creates:* an action that creates a parent **plus children** in one call
+     (a duplicate, a bulk import) usually gets only the parent id back — the children's
+     drafts can't be resolution-recorded. Record what you can; accept the rest surfaces via
+     `needsAttention`, exactly as `handleSequenceAddSongSync` documents for its join-row id.
 
-4. **Write the optimistic merge** — add (or extend) a pure `mergeXWithPending(base,
+5. **Write the optimistic merge** — add (or extend) a pure `mergeXWithPending(base,
    actions)` in a `src/lib/xMerge.ts` file: takes the cached base list + the full queue
    snapshot, returns what to render. No network/IO — that's what makes it unit-testable.
-   Follow the status shape of `mergeTaxonomyWithPending`: pending create shows with its
-   draft id, pending delete optimistically disappears, a `needsAttention` item reverts to
-   its last-known real state instead of hiding the failure.
+   **Pick the merge sibling that matches your entity, and copy its pending-create shape** —
+   they differ: `mergeTaxonomyWithPending` surfaces the pending create with its **draft id**,
+   while `mergeProgramsWithPending`/`mergeSongsWithPending` surface it with **`id: null`**.
+   The template below is the taxonomy shape; don't paste it into a programs/songs merge. In
+   all of them a pending delete optimistically disappears and a `needsAttention` item reverts
+   to its last-known real state instead of hiding the failure. Also add your `<type>` to that
+   file's `isXQueueAction` action-type set, so the merge and the drain-count agree.
 
-5. **Unit-test the merge + add a manual-checklist row** — vitest covers the pure merge
+6. **Unit-test the merge + add a manual-checklist row** — vitest covers the pure merge
    only (see template below). Then add a row to `docs/manual-testing-checklist.md` for the
    on-device behavior, because nothing that touches IndexedDB, Capacitor, or a real API
    route has automated coverage here — by convention, not oversight.
@@ -66,7 +101,8 @@ and `docs/superpowers/specs/2026-08-29-offline-sync-foundation-design.md`.
 | Server response | Outcome | Why |
 |---|---|---|
 | `2xx` ok | `success` | Removed from queue. Record ids/versions from the body first. |
-| `404` when the desired end state is *already true* (delete of a gone thing; add/remove-collaborator when access is gone) | `success` | Nothing left to accomplish. This is the established 404-as-success precedent. |
+| `404` when the desired end state is *already true* (delete of a gone thing; add/remove-collaborator when access is gone) | `success` | Nothing left to accomplish. This is the established 404-as-success precedent — it applies ONLY to actions whose goal is *absence*. |
+| `404` on the *dependency of a create/copy* (the source being read/copied is gone) | `item-error` (or a `handleSessionSaveSync`-style fallback if the action carries unrecoverable user content) | The goal is to *make* something; it can't be made, and 404-as-success here would silently drop the user's action. **Never `success`.** |
 | `409`/`404` on a **guarded** write (If-Match) | `conflict` | Flags `needsAttention` with reason `'conflict'`, distinct from a capped failure. |
 | `409` permanent (referenced/still-in-use, e.g. song already played) | `item-error` | Retries to cap (3), then `needsAttention` reason `'failed'`. |
 | `401` or `>= 500` | `systemic-error` | **Not this item's fault.** Stops the whole pass immediately, queue untouched, no attempt consumed. |

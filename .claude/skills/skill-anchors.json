@@ -9,7 +9,9 @@
       ],
       "paths": [
         "docs/manual-testing-checklist.md",
-        "docs/superpowers/specs/2026-08-29-offline-sync-foundation-design.md"
+        "docs/superpowers/specs/2026-08-29-offline-sync-foundation-design.md",
+        "src/lib/programsMerge.ts",
+        "src/lib/songsMerge.ts"
       ],
       "symbols": [
         "initSyncHandlers",
@@ -21,6 +23,11 @@
         "recordResolution",
         "recordSyncedVersion",
         "mergeTaxonomyWithPending",
+        "mergeProgramsWithPending",
+        "mergeSongsWithPending",
+        "handleSequenceAddSongSync",
+        "handleCreateProgramSync",
+        "DraftEntity",
         "guardedHeaders",
         "SyncOutcome"
       ]
