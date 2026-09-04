@@ -1,0 +1,89 @@
+{
+  "_comment": "Single source of truth for skill freshness. `scripts/check-skill-accuracy.ts` asserts every anchorFile/path exists and every symbol still resolves in the codebase. The Stop hook in .claude/settings.json maps an edited anchorFile back to its skill and nudges a re-read. Keep symbols distinctive (real identifiers, not common words like 'version') so the grep can't false-match.",
+  "skills": {
+    "adding-offline-action": {
+      "anchorFiles": [
+        "src/lib/syncHandlers.ts",
+        "src/lib/syncQueue.ts",
+        "src/lib/draftIds.ts"
+      ],
+      "paths": [
+        "docs/manual-testing-checklist.md",
+        "docs/superpowers/specs/2026-08-29-offline-sync-foundation-design.md"
+      ],
+      "symbols": [
+        "initSyncHandlers",
+        "registerHandler",
+        "redirectOn401",
+        "loadDraftMap",
+        "resolveOne",
+        "resolveMany",
+        "recordResolution",
+        "recordSyncedVersion",
+        "mergeTaxonomyWithPending",
+        "guardedHeaders",
+        "SyncOutcome"
+      ]
+    },
+    "threading-a-programs-column": {
+      "anchorFiles": [
+        "src/db/queries/programs.ts",
+        "src/app/api/programs/route.ts",
+        "src/app/api/programs/[id]/route.ts"
+      ],
+      "paths": [
+        "src/lib/offlineProgramView.ts"
+      ],
+      "symbols": [
+        "listProgramsWithSequencesAndSongs",
+        "listAccessiblePrograms",
+        "AccessibleProgram",
+        "OfflineProgram"
+      ]
+    },
+    "adding-a-classification-axis": {
+      "anchorFiles": [
+        "src/db/schema.ts",
+        "scripts/seed-axis-types.ts",
+        "src/lib/suggestions.ts"
+      ],
+      "paths": [
+        "src/lib/referenceData.ts",
+        "src/lib/axisEditorData.ts",
+        "src/components/SongAxisEditor.tsx",
+        "src/app/api/songs/suggestions/route.ts",
+        "src/app/api/sessions/[id]/suggestions/route.ts",
+        "docs/superpowers/specs/2026-07-29-dynamic-song-tags-design.md",
+        "docs/superpowers/specs/2026-08-12-remove-genre-column-design.md"
+      ],
+      "symbols": [
+        "axisTypes",
+        "songAxisValues",
+        "rankBySharedAxes",
+        "getSuggestions",
+        "getFilteredCandidates"
+      ]
+    },
+    "adding-a-web-native-twin-route": {
+      "anchorFiles": [
+        "scripts/build-mobile.sh",
+        "src/lib/platform.ts",
+        "src/lib/adminEditStore.ts",
+        "src/lib/nativeApiFetch.ts"
+      ],
+      "paths": [
+        "src/app/admin/local/programs/edit/page.tsx",
+        "src/app/programs/local",
+        "src/app/session/local"
+      ],
+      "symbols": [
+        "isNativeApp",
+        "isNativePlatform",
+        "nativeApiFetch",
+        "setSelectedEditProgramId",
+        "getSelectedEditProgramId",
+        "clearSelectedEditProgramId"
+      ]
+    }
+  }
+}

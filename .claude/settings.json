@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/scripts/skill-anchor-hook.mjs\" 2>/dev/null || true",
+            "statusMessage": "Checking skill anchors"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -9,6 +9,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
+    "check:skills": "tsx scripts/check-skill-accuracy.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "dotenv -e .env.local -- tsx scripts/migrate.ts",
     "db:smoke": "dotenv -e .env.local -- tsx scripts/smoke-schema.ts",
