@@ -45,7 +45,11 @@
         "listProgramsWithSequencesAndSongs",
         "listAccessiblePrograms",
         "AccessibleProgram",
-        "OfflineProgram"
+        "OfflineProgram",
+        "CachedProgramDetail",
+        "mergeProgramsWithPending",
+        "DisplayProgram",
+        "listSequencesForProgram"
       ]
     },
     "adding-a-classification-axis": {
@@ -58,6 +62,9 @@
         "src/lib/referenceData.ts",
         "src/lib/axisEditorData.ts",
         "src/components/SongAxisEditor.tsx",
+        "src/lib/sessionStore.ts",
+        "src/db/queries/axisValues.ts",
+        "src/db/queries/genres.ts",
         "src/app/api/songs/suggestions/route.ts",
         "src/app/api/sessions/[id]/suggestions/route.ts",
         "docs/superpowers/specs/2026-07-29-dynamic-song-tags-design.md",
@@ -68,7 +75,15 @@
         "songAxisValues",
         "rankBySharedAxes",
         "getSuggestions",
-        "getFilteredCandidates"
+        "getFilteredCandidates",
+        "buildSuggestionsResponse",
+        "ReferenceLookups",
+        "lookupNameById",
+        "getVisibleAxisRefIds",
+        "toReferenceLookups",
+        "LOOKUP_FIELDS",
+        "LOOKUP_ENDPOINTS",
+        "DraftEntity"
       ]
     },
     "adding-a-web-native-twin-route": {
@@ -81,7 +96,9 @@
       "paths": [
         "src/app/admin/local/programs/edit/page.tsx",
         "src/app/programs/local",
-        "src/app/session/local"
+        "src/app/session/local",
+        "src/lib/localProgramsStore.ts",
+        "src/app/page.tsx"
       ],
       "symbols": [
         "isNativeApp",
@@ -89,7 +106,11 @@
         "nativeApiFetch",
         "setSelectedEditProgramId",
         "getSelectedEditProgramId",
-        "clearSelectedEditProgramId"
+        "clearSelectedEditProgramId",
+        "getSelectedProgramId",
+        "setSelectedProgramId",
+        "mergeReferencedSongs",
+        "loadReferenceData"
       ]
     }
   }

@@ -44,18 +44,38 @@ and 404s in the APK.
 | `admin/programs/[id]` | `admin/local/programs/edit` | `adminEditStore` selector |
 | `admin/songs/[id]` | `admin/local/songs/edit` | `adminEditStore` selector |
 
+## First: which family are you in? (this decides everything below)
+
+There are **two real patterns**, and the codebase splits by feature family — don't assume
+the admin one:
+
+- **Surviving-list + internal gate (admin family):** `admin/songs/page.tsx` /
+  `admin/programs/page.tsx` exist in *both* builds and gate per-item navigation internally
+  with `isNativeApp()` → `router.push('/admin/local/...')`. Selector: `adminEditStore.ts`.
+- **Deleted-web-list + fork-at-entry (programs / session family):** the web list
+  (`programs/page.tsx`) is **`rm`'d from the native bundle**; a *separate* `programs/local/page.tsx`
+  exists, and the web/native fork happens **once at the entry point** (`src/app/page.tsx`:
+  `native ? /programs/local : /programs`), not per-item. Selector: **`localProgramsStore.ts`**
+  (`getSelectedProgramId`, key `glentify:selected-program-id`) — a *different* store and key
+  from `adminEditStore`'s `glentify:admin-edit-program-id`. Reaching for the admin selector
+  here loads the wrong id.
+
+Read `build-mobile.sh` + `src/app/page.tsx` to see which family your route joins before wiring
+navigation.
+
 ## The selector handoff
 
-`src/lib/adminEditStore.ts` is the pattern for "which id": the **list page writes the
-selection right before navigating**, the **twin reads it on mount**.
+The **source page writes the selection right before navigating**, the **twin reads it on
+mount** — using the store for *your family* (above).
 
-- List page (e.g. `admin/programs/page.tsx`) calls
-  `setSelectedEditProgramId(storage, id)` then navigates to the local twin.
-- Twin (`admin/local/programs/edit/page.tsx`) calls `getSelectedEditProgramId(storage)` on
-  mount to know what to load; `clearSelectedEditProgramId` when done.
+- Admin: `setSelectedEditProgramId` → twin reads `getSelectedEditProgramId`, `clear…` when done.
+- Programs: `setSelectedProgramId` → twin reads `getSelectedProgramId`.
 
-For read-only detail pages, the twin can instead read the entity straight from the offline
-cache (`*DetailCache.ts`) by the selected id — no URL param either way.
+For a read-only viewer twin the id comes from the selector but the *data* comes from the
+whole-blob offline cache (`loadReferenceData()`), not a `*DetailCache`. **Program/sequence
+viewers must resolve songs across both `referenceData.songs` AND `referenceData.sharedSongs`
+via `mergeReferencedSongs`** — skip it and a collaborator's shared program renders with songs
+silently missing.
 
 ## Checklist (create a todo per item)
 
@@ -66,18 +86,21 @@ cache (`*DetailCache.ts`) by the selected id — no URL param either way.
    offline cache (read-only pages).
 3. **Selector write**: in the list/source page, persist the id via the appropriate
    `setSelected...Id` **before** `router.push` to the twin.
-4. **Platform gate navigation**: route to `[id]` on web and to the twin on native using
-   `isNativeApp()` from `src/lib/platform.ts` — **not** `isNativePlatform()` directly.
-   `isNativeApp()` is a build-time constant (`NEXT_PUBLIC_MOBILE_BUILD=1`), so
-   server-prerendered HTML and first client render agree; the raw runtime check is `false`
-   during prerender and hydration-mismatches a native-only UI.
-5. **Native data fetch**: any API call the twin makes must go through
-   `nativeApiFetch` (`src/lib/nativeApiFetch.ts`), not bare `fetch` — it resolves the
-   absolute API URL and attaches the bearer token. Background/sync callers pass
-   `{ redirectOn401: false }`.
-6. **Verify staging strips cleanly**: the twin must be reachable in the exported bundle and
-   the `[id]` route must be one the build script removes. Run `npm run build:mobile` and
-   confirm it doesn't hard-fail on a surviving stripped path.
+4. **Wire navigation per your family** (see the two patterns above). Admin family: gate the
+   per-item link with `isNativeApp()` from `src/lib/platform.ts` (**not** `isNativePlatform()`
+   — that's `false` during prerender and hydration-mismatches native-only UI). Programs/session
+   family: no per-item gate — add the affordance to each family's existing viewer, already on
+   the correct side of the entry fork.
+5. **Native data fetch** (only if the twin hits the API): go through `nativeApiFetch`
+   (`src/lib/nativeApiFetch.ts`), not bare `fetch` — absolute URL + bearer token;
+   background/sync callers pass `{ redirectOn401: false }`. A cache-served viewer twin makes
+   no API call at all.
+6. **Verify staging by inspecting `out/`, not by trusting a hard-fail.** `build-mobile.sh`
+   `rm`'s the stripped paths, but its `exit 1` survival guards only cover `api/`,
+   `session/[id]`, and the two `admin/*/[id]` dirs — there is **no guard for `programs/[id]`**.
+   So confirm directly: after staging, `grep .mobile-build/src/app/programs` shows `[id]` gone,
+   and `out/.../local/.../index.html` for your twin was emitted. If you add a newly-stripped
+   `[id]` family, add its own `if [ -d … ]; then … exit 1; fi` guard.
 
 ## Common mistakes
 
@@ -89,3 +112,8 @@ cache (`*DetailCache.ts`) by the selected id — no URL param either way.
   `isNativeApp()`.
 - **Bare `fetch` in the twin.** No base URL, no token → fails on device (which has no
   `proxy.ts`). Use `nativeApiFetch`.
+- **Twin links back to `/programs/${id}`.** A twin's own back/next links must target twin
+  routes (`PageNav backHref="/programs/local..."`) — an `[id]` link 404s on device.
+- **Wrong selector store.** `adminEditStore` (`glentify:admin-edit-program-id`) and
+  `localProgramsStore` (`glentify:selected-program-id`) are near-identical names for different
+  families. Use the one your family uses.
