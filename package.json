@@ -4,6 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:up": "bash scripts/dev-up.sh",
+    "dev:down": "docker compose down",
     "build": "next build",
     "build:mobile": "bash scripts/build-mobile.sh",
     "start": "next start",
@@ -17,7 +19,7 @@
     "db:smoke": "dotenv -e .env.local -- tsx scripts/smoke-schema.ts",
     "db:seed:axis-types": "dotenv -e .env.local -- tsx scripts/seed-axis-types.ts",
     "db:migrate-to-multiuser": "dotenv -e .env.local -- tsx scripts/migrate-to-multiuser.ts",
-    "db:migrate:finalize": "dotenv -e .env.local -- tsx scripts/migrate-finalize.ts"
+    "db:seed:dev": "dotenv -e .env.local -- tsx scripts/seed-dev.ts"
   },
   "dependencies": {
     "@capacitor/core": "^8.5.0",

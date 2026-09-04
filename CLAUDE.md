@@ -29,16 +29,27 @@ npm test                    # vitest run — full suite, non-watch
 npx vitest run src/lib/suggestions.test.ts   # single test file
 npx vitest run -t "test name substring"        # single test by name
 
+npm run dev:up             # local dev: (re)start Docker Postgres + neon-http proxy, migrate, seed. `-- --reset` wipes data
+npm run dev:down            # stop the local Docker stack
 npm run db:generate        # drizzle-kit generate — after editing src/db/schema.ts
 npm run db:migrate          # apply migrations (needs .env.local / DATABASE_URL)
 npm run build:mobile        # stage + static-export the native (Capacitor) bundle into out/, `cap sync`, then build a debug APK
 ```
 
-There is no `db:migrate:finalize`-free path for a fresh multi-user database: migrations
-must run in the order `db:migrate` → `db:migrate-to-multiuser` (creates the admin account,
-backfills `owner_id`) → `db:migrate:finalize` (adds the `owner_id NOT NULL` constraint,
-kept in a separate `drizzle-finalize/` folder specifically so it never runs before the
-backfill). See `README.md` for full local setup and the equivalent production sequence.
+**Local dev runs against Docker, not prod.** `npm run dev:up` (`scripts/dev-up.sh`) tears
+down any previous run, starts Postgres + a neon-http proxy (`docker-compose.yml`), then runs
+migrate → `db:migrate-to-multiuser` (admin `admin@local`/`admin`, backfills `owner_id`) →
+`seed-axis-types` → `seed-dev` (Greek test data). The proxy exists so local keeps the SAME
+`drizzle-orm/neon-http` driver as prod (identical behaviour, incl. no interactive
+transactions) instead of swapping to `pg`. `NEON_LOCAL=1` in `.env.local` flips the app +
+scripts to the proxy via `src/db/neonConfig.ts` (a no-op in prod).
+
+Setup order for a fresh database (any environment) is `db:migrate` → `db:migrate-to-multiuser`.
+The `owner_id NOT NULL` constraint is migration `0012` in the normal `./drizzle` folder — safe
+on a fresh, empty DB and a harmless no-op on already-finalized prod. (Historically it lived in a
+separate `drizzle-finalize/` folder run as a third `db:migrate:finalize` step, to avoid tightening
+before the one-time single→multi-user backfill; that folder/step was removed once prod was
+migrated, since every new DB now starts empty and multi-user.) See `README.md` for full setup.
 
 **Installable debug APK**: `npm run build:mobile` (`scripts/build-mobile.sh`) ends by
 running `cd android && ./gradlew assembleDebug` itself, so every run leaves a fresh

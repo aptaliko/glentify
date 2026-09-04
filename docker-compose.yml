@@ -1,0 +1,48 @@
+# Local development backing stack for Glentify.
+#
+# Two containers, started together by `npm run dev:up`:
+#   - postgres:  the actual local database (data lives in the named volume below)
+#   - neon-proxy: a neon-http proxy so the app can keep using the SAME driver as
+#                 production (drizzle-orm/neon-http). The app talks neon-http to
+#                 this proxy on :4444; the proxy re-speaks plain Postgres to the
+#                 postgres container. This is what keeps local behaviour identical
+#                 to prod (including neon-http's no-interactive-transaction limit),
+#                 instead of swapping to the `pg` driver only on your machine.
+#
+# Nothing here runs in production — prod is Neon's cloud, hit over neon-http directly.
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: glentify-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: glentify
+    ports:
+      - '5432:5432'
+    volumes:
+      - glentify-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d glentify']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  neon-proxy:
+    # Community neon-http proxy: accepts the neon serverless HTTP/WS protocol and
+    # forwards to the plain-Postgres container above. Pinned by digest-less tag on
+    # purpose so `dev:up` can pull a fresh build; if you want to pin harder, replace
+    # `:main` with a specific SHA tag from the package's GHCR page.
+    image: ghcr.io/timowilhelm/local-neon-http-proxy:main
+    container_name: glentify-neon-proxy
+    environment:
+      PG_CONNECTION_STRING: postgres://postgres:postgres@postgres:5432/glentify
+    ports:
+      - '4444:4444'
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  glentify-pgdata:
