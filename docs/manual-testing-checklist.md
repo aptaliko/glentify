@@ -381,3 +381,22 @@ their own list page) with a single `primeOfflineData()` orchestrator that popula
 - [ ] `If-Match: ""` (empty) and `If-Match: "3"` (quoted) — empty is treated as no header (LWW), quoted is unwrapped to 3.
 
 **Known limitation (not fixed — documented):** a guarded reorder/rename whose HTTP response is lost *after* the server committed (dropped connection, or a 5xx after the write) is retried as `systemic-error`; the replay sends the same `If-Match` and now 409s (the old pre-`If-Match` path was idempotent via `404/ok → success`). The UI then reverts the displayed value while the server actually holds the change, flagged as a phantom conflict. A proper fix needs a per-action idempotency key on the guarded writes — out of scope for this feature; revisit if it bites in practice.
+
+## CI/Deploy auto-fix responder
+
+Run each on a throwaway PR branch (never main). After each, confirm the responder run in the
+Actions tab behaved as noted.
+
+- [ ] **Lockfile drift** → edit `package-lock.json` out of sync, push. Responder pushes a
+      lockfile fix; CI re-runs green.
+- [ ] **Lint** → introduce a lint error, push. Responder pushes a fix; CI re-runs green.
+- [ ] **Typecheck** → introduce a type error, push. Responder pushes a fix; CI re-runs green.
+- [ ] **Test** → break a tested behavior, push. Responder pushes a fix; CI re-runs green.
+- [ ] **Skill drift** → desync a skill anchor, push. Responder pushes a fix; CI re-runs green.
+- [ ] **Config/secret (simulated)** → force a CI step to echo a `No token` error, push.
+      Responder posts a diagnostic comment, pushes NO fix commit.
+- [ ] **Deploy-stage** → observe a real Deploy failure (or simulate). Responder comments only.
+- [ ] **Loop guard** → force two consecutive failed auto-fixes on one branch. Responder stops
+      at the 2nd, comments, does not attempt a 3rd.
+- [ ] **Cancelled run** → push twice in quick succession. The superseded (`cancelled`) CI run
+      does NOT wake the responder; only the real `failure` does.
