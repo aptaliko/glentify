@@ -7,6 +7,8 @@ updates:
     directory: "/"
     schedule:
       interval: monthly
+      time: "01:00"
+      timezone: "Europe/Athens"
     open-pull-requests-limit: 5
     groups:
       production-minor-patch:
@@ -21,4 +23,6 @@ updates:
     directory: "/"
     schedule:
       interval: monthly
+      time: "01:00"
+      timezone: "Europe/Athens"
     open-pull-requests-limit: 3
