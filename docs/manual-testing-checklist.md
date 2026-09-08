@@ -400,3 +400,12 @@ Actions tab behaved as noted.
       at the 2nd, comments, does not attempt a 3rd.
 - [ ] **Cancelled run** → push twice in quick succession. The superseded (`cancelled`) CI run
       does NOT wake the responder; only the real `failure` does.
+
+## Performance lyrics reader (native)
+
+- [ ] A−/A+ resize the lyrics text; the size persists across app restarts and across songs
+- [ ] Tapping the bottom of the lyrics pages down, the top pages up (~15% overlap, no cut lines)
+- [ ] Dragging the middle of the lyrics still scrolls freely
+- [ ] Screen stays awake for the whole song while the session view is open (device auto-lock does not fire)
+- [ ] After locking and unlocking the device, the screen-awake behaviour resumes
+- [ ] Songs with a παρτιτούρα image show no reader controls (unchanged image view)
