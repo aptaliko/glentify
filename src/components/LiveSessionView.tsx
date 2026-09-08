@@ -1,11 +1,19 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import PageNav from '@/components/PageNav';
 import SongPicker from '@/components/SongPicker';
 import type { SessionStore } from '@/lib/sessionStore';
 import type { SuggestionsResponsePayload, SuggestedSong } from '@/lib/suggestions';
 import type { SongPickerDataSource } from '@/lib/songPickerData';
+import { preferencesStore } from '@/lib/preferencesStore';
+import {
+  loadFontScale,
+  saveFontScale,
+  stepFontScale,
+  FONT_SCALE_MIN,
+  FONT_SCALE_MAX,
+} from '@/lib/lyricsReaderSettings';
 
 function SongButton({ song, onPick }: { song: SuggestedSong; onPick: (songId: number) => void }) {
   return (
@@ -36,19 +44,75 @@ function LyricsCard({
   imageUrl,
   maleKey,
   femaleKey,
+  scrollRef,
 }: {
   lyrics: string | null;
   imageUrl: string | null;
   maleKey: string | null;
   femaleKey: string | null;
+  scrollRef: React.RefObject<HTMLDivElement | null>;
 }) {
+  // null until the persisted scale resolves — avoids a first-paint size jump on stage
+  const [scale, setScale] = useState<number | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    loadFontScale(preferencesStore).then((s) => {
+      if (alive) setScale(s);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  function adjust(direction: 1 | -1) {
+    setScale((current) => {
+      const next = stepFontScale(current ?? 1, direction);
+      void saveFontScale(preferencesStore, next);
+      return next;
+    });
+  }
+
   return (
-    <div className="card flex flex-col gap-3 bg-base-100 p-6 shadow sm:p-8">
+    <div className="card relative flex flex-col gap-3 bg-base-100 p-6 shadow sm:p-8">
       <KeyBadges maleKey={maleKey} femaleKey={femaleKey} />
       {imageUrl ? (
         <img src={imageUrl} alt="Παρτιτούρα" className="mx-auto max-h-[70vh] w-auto object-contain" />
       ) : lyrics ? (
-        <pre className="whitespace-pre-wrap text-center font-sans text-xl sm:text-2xl leading-relaxed text-base-content">{lyrics}</pre>
+        <>
+          <div className="absolute right-2 top-2 z-10 flex gap-1">
+            <button
+              type="button"
+              aria-label="Μικρότερα γράμματα"
+              onClick={() => adjust(-1)}
+              disabled={scale !== null && scale <= FONT_SCALE_MIN}
+              className="btn btn-circle btn-sm btn-outline"
+            >
+              A−
+            </button>
+            <button
+              type="button"
+              aria-label="Μεγαλύτερα γράμματα"
+              onClick={() => adjust(1)}
+              disabled={scale !== null && scale >= FONT_SCALE_MAX}
+              className="btn btn-circle btn-sm btn-outline"
+            >
+              A+
+            </button>
+          </div>
+          <div ref={scrollRef} className="max-h-[70vh] overflow-y-auto">
+            {scale === null ? (
+              <div className="min-h-[8rem]" aria-hidden />
+            ) : (
+              <pre
+                className="whitespace-pre-wrap text-center font-sans leading-relaxed text-base-content"
+                style={{ fontSize: `${scale * 1.5}rem` }}
+              >
+                {lyrics}
+              </pre>
+            )}
+          </div>
+        </>
       ) : (
         <p className="text-lg italic text-base-content/50">Δεν έχουν προστεθεί ακόμη στίχοι ή παρτιτούρα για αυτό το τραγούδι.</p>
       )}
@@ -80,6 +144,7 @@ export default function LiveSessionView({
   const [data, setData] = useState<SuggestionsResponsePayload | null>(null);
   const [showPlayed, setShowPlayed] = useState(false);
   const [manualActiveAxisTypes, setManualActiveAxisTypes] = useState<string[] | null>(null);
+  const lyricsScrollRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
     setData(await store.load(showPlayed, manualActiveAxisTypes));
@@ -177,6 +242,7 @@ export default function LiveSessionView({
             imageUrl={currentSong.imageUrl}
             maleKey={currentSong.maleKey}
             femaleKey={currentSong.femaleKey}
+            scrollRef={lyricsScrollRef}
           />
           <div className="card overflow-hidden bg-base-100 shadow">
             <h2 className="border-b border-base-300 bg-base-200 px-4 py-2 text-sm font-semibold tracking-wide text-base-content/70 uppercase">
