@@ -24,6 +24,9 @@ rm -rf ".mobile-build/src/app/programs/[id]"
 rm -f ".mobile-build/src/app/programs/page.tsx"
 rm -rf .mobile-build/src/app/session/\[id\]
 rm -f .mobile-build/src/proxy.ts
+# proxy.test.ts imports ./proxy, which we just stripped — remove the orphaned
+# test too or the staged `next build` type-check fails to resolve the module.
+rm -f .mobile-build/src/proxy.test.ts
 
 if [ -d .mobile-build/src/app/api ]; then
   echo "build-mobile: src/app/api survived staging, aborting" >&2
