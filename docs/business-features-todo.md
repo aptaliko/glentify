@@ -20,9 +20,9 @@ song-review burden.
 - [x] Auto-fill on create: when a user adds a song that matches a known one (admin's reference set), propose prefilling classification (and lyrics) — shares knowledge without shared ownership or review. **Shipped** — `src/app/admin/songs/new/page.tsx` + `/api/songs/suggestions` (source scoped to admin-owned songs, axis values filtered to the requester's visibility, source ids stripped from the payload)
 - [ ] Lyrics per song, performance-formatted (large, scrollable, dark-stage-readable) — model is already "user-entered, we host". Current: single centered `<pre>` fixed at `text-xl sm:text-2xl` in `LyricsCard` (`src/components/LiveSessionView.tsx:51`). Proposed **performance reader**, tiered:
   - **Tier 1 (ship first, one pass):**
-    - [ ] Adjustable text size, persisted per device (localStorage)
-    - [ ] Keep-awake / screen wake lock (web: Screen Wake Lock API; native: Capacitor keep-awake plugin — the one web/native divergence)
-    - [ ] Hands-free advance via **tap zones** (bottom = page down, top = page up) — *decided 2026-09-08*; Bluetooth pedal deferred (reuses the same page-down)
+    - [x] Adjustable text size, persisted per device (localStorage)
+    - [x] Keep-awake / screen wake lock — web via Screen Wake Lock API; **native pending on-device spike** (see plan Task 6)
+    - [x] Hands-free advance via **tap zones** (bottom = page down, top = page up)
   - **Tier 2 (readability polish):**
     - [ ] Left-align verses + respect blank-line stanza breaks (drop center-align for long text)
     - [ ] Dedicated high-contrast stage mode (max contrast, overrides for lyrics view only)
