@@ -1,0 +1,101 @@
+name: Autofix Responder
+
+# Reacts to a FAILED CI or Deploy run. workflow_run runs in the default-branch context with
+# full secrets + write access, even when the underlying run was a Dependabot PR (whose own
+# token is read-only). This file only takes effect once merged to main.
+on:
+  workflow_run:
+    workflows: [CI, Deploy]
+    types: [completed]
+
+concurrency:
+  # One responder at a time per originating branch; a newer failure supersedes an older run.
+  group: autofix-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write        # push the fix
+  pull-requests: write   # comment / open a fix PR
+  actions: read          # read the failed run's logs
+  id-token: write        # claude-code-action default GitHub App auth
+
+jobs:
+  respond:
+    # Only real failures. Ignore cancelled (CI cancel-in-progress) and success.
+    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20   # hard ceiling on a runaway fix run
+    env:
+      GH_TOKEN: ${{ github.token }}
+      HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+      HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+      SOURCE_WORKFLOW: ${{ github.event.workflow_run.name }}
+      RUN_ID: ${{ github.event.workflow_run.id }}
+    steps:
+      - name: Check out the failing commit
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0   # need branch history for the bot-commit loop guard
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci || true   # a lockfile failure must not abort triage itself
+
+      - name: Download failed run log
+        run: gh run view "$RUN_ID" --log-failed > failed.log || gh run view "$RUN_ID" --log > failed.log
+
+      - name: Triage
+        id: triage
+        run: npx tsx scripts/ci-triage.ts failed.log "$SOURCE_WORKFLOW"
+
+      # ---- Loop guard: stop if the bot has already tried >= 2 fixes on this branch ----
+      - name: Count prior bot fix commits
+        id: guard
+        run: |
+          COUNT=$(git log origin/"$HEAD_BRANCH" --author='claude' --oneline 2>/dev/null | wc -l | tr -d ' ')
+          echo "count=$COUNT" >> "$GITHUB_OUTPUT"
+          echo "Prior bot fix commits on $HEAD_BRANCH: $COUNT"
+
+      - name: Diagnose-only comment (not fixable, or loop guard tripped)
+        if: ${{ steps.triage.outputs.fixable != 'true' || steps.guard.outputs.count >= 2 }}
+        run: |
+          echo "Class=${{ steps.triage.outputs.class }}; fixable=${{ steps.triage.outputs.fixable }}; priorFixes=${{ steps.guard.outputs.count }}."
+          echo "Diagnose-only: no Claude fix attempted. (Deploy-stage / config-secret / unknown, or loop guard tripped.)"
+          # A PR comment is posted here when a PR exists for HEAD_BRANCH; see manual test task
+          # for the gh pr comment invocation. Config/secret failures name the dashboard knob.
+
+      - name: Claude auto-fix
+        if: ${{ steps.triage.outputs.fixable == 'true' && steps.guard.outputs.count < 2 }}
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # NOTE: github_token is deliberately omitted so pushes are made as the Claude GitHub
+          # App and DO re-trigger CI (the default GITHUB_TOKEN would not).
+          claude_args: '--max-turns 12'
+          prompt: |
+            The GitHub Actions run ${{ env.RUN_ID }} for workflow "${{ env.SOURCE_WORKFLOW }}"
+            failed on branch ${{ env.HEAD_BRANCH }} (commit ${{ env.HEAD_SHA }}).
+            The failure was classified as: ${{ steps.triage.outputs.class }}.
+            The failed log is in ./failed.log in the checkout.
+
+            Do exactly this:
+            1. Read ./failed.log and reproduce the specific ${{ steps.triage.outputs.class }}
+               failure locally in this checkout.
+            2. Make the SMALLEST fix that resolves it:
+               - lockfile: run `npm install` to resync package-lock.json (do not change versions
+                 beyond what package.json requires).
+               - lint: run `npm run lint` and fix the reported errors.
+               - typecheck: run `npm run typecheck` and fix the type errors.
+               - test: run `npm test`, fix the failing behavior (never delete/skip a test to pass).
+               - skill-drift: run `npm run check:skills` and update the skill anchors it flags.
+            3. Re-run the relevant check and confirm it now passes.
+            4. Commit with a message like "fix(ci): auto-fix ${{ steps.triage.outputs.class }}"
+               and push to branch ${{ env.HEAD_BRANCH }}.
+            If you cannot produce a confident fix, DO NOT push — instead post a comment on the
+            PR (or the commit) explaining the failure and the suggested manual fix, and stop.
+            NEVER push to main. Only ever push to ${{ env.HEAD_BRANCH }}.
