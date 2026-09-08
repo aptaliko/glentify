@@ -73,6 +73,13 @@ function LyricsCard({
     });
   }
 
+  function page(direction: 1 | -1) {
+    const el = scrollRef.current;
+    if (!el) return;
+    // 0.85 of the visible height overlaps pages by ~15% so no line is bisected across a turn
+    el.scrollBy({ top: direction * el.clientHeight * 0.85, behavior: 'smooth' });
+  }
+
   return (
     <div className="card relative flex flex-col gap-3 bg-base-100 p-6 shadow sm:p-8">
       <KeyBadges maleKey={maleKey} femaleKey={femaleKey} />
@@ -112,6 +119,18 @@ function LyricsCard({
               </pre>
             )}
           </div>
+          <button
+            type="button"
+            aria-label="Προηγούμενη σελίδα στίχων"
+            onClick={() => page(-1)}
+            className="absolute inset-x-0 top-0 h-[20%] cursor-pointer bg-transparent"
+          />
+          <button
+            type="button"
+            aria-label="Επόμενη σελίδα στίχων"
+            onClick={() => page(1)}
+            className="absolute inset-x-0 bottom-0 h-[20%] cursor-pointer bg-transparent"
+          />
         </>
       ) : (
         <p className="text-lg italic text-base-content/50">Δεν έχουν προστεθεί ακόμη στίχοι ή παρτιτούρα για αυτό το τραγούδι.</p>
