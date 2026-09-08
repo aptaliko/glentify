@@ -14,6 +14,7 @@ import {
   FONT_SCALE_MIN,
   FONT_SCALE_MAX,
 } from '@/lib/lyricsReaderSettings';
+import { useKeepScreenAwake } from '@/lib/useKeepScreenAwake';
 
 function SongButton({ song, onPick }: { song: SuggestedSong; onPick: (songId: number) => void }) {
   return (
@@ -160,6 +161,8 @@ export default function LiveSessionView({
    * could otherwise strand the user with no way out once `data.currentSong` is null. */
   sameRouteExit?: boolean;
 }) {
+  useKeepScreenAwake();
+
   const [data, setData] = useState<SuggestionsResponsePayload | null>(null);
   const [showPlayed, setShowPlayed] = useState(false);
   const [manualActiveAxisTypes, setManualActiveAxisTypes] = useState<string[] | null>(null);
