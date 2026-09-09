@@ -113,7 +113,7 @@ function LyricsCard({
               <div className="min-h-[8rem]" aria-hidden />
             ) : (
               <pre
-                className="whitespace-pre-wrap text-center font-sans leading-relaxed text-base-content"
+                className="mx-auto max-w-[50ch] whitespace-pre-wrap text-left font-sans leading-relaxed text-base-content"
                 style={{ fontSize: `${scale * 1.5}rem` }}
               >
                 {lyrics}
