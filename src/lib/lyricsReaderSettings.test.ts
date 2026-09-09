@@ -8,6 +8,8 @@ import {
   stepFontScale,
   loadFontScale,
   saveFontScale,
+  loadStageMode,
+  saveStageMode,
 } from './lyricsReaderSettings';
 
 function fakeStore(initial: Record<string, unknown> = {}): KeyValueStore {
@@ -64,5 +66,27 @@ describe('loadFontScale', () => {
     const store = fakeStore();
     await saveFontScale(store, 1.5);
     expect(await loadFontScale(store)).toBe(1.5);
+  });
+});
+
+describe('stage mode', () => {
+  it('defaults to off when nothing is stored', async () => {
+    expect(await loadStageMode(fakeStore())).toBe(false);
+  });
+  it('reads a stored true', async () => {
+    expect(await loadStageMode(fakeStore({ 'glentify:lyrics-stage-mode': true }))).toBe(true);
+  });
+  it('reads a stored false', async () => {
+    expect(await loadStageMode(fakeStore({ 'glentify:lyrics-stage-mode': false }))).toBe(false);
+  });
+  it('coerces a non-boolean stored value to a boolean', async () => {
+    expect(await loadStageMode(fakeStore({ 'glentify:lyrics-stage-mode': 1 }))).toBe(true);
+  });
+  it('round-trips a saved value', async () => {
+    const store = fakeStore();
+    await saveStageMode(store, true);
+    expect(await loadStageMode(store)).toBe(true);
+    await saveStageMode(store, false);
+    expect(await loadStageMode(store)).toBe(false);
   });
 });

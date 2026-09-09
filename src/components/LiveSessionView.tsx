@@ -11,6 +11,8 @@ import {
   loadFontScale,
   saveFontScale,
   stepFontScale,
+  loadStageMode,
+  saveStageMode,
   FONT_SCALE_MIN,
   FONT_SCALE_MAX,
 } from '@/lib/lyricsReaderSettings';
@@ -46,12 +48,16 @@ function LyricsCard({
   maleKey,
   femaleKey,
   scrollRef,
+  stageMode,
+  onToggleStageMode,
 }: {
   lyrics: string | null;
   imageUrl: string | null;
   maleKey: string | null;
   femaleKey: string | null;
   scrollRef: React.RefObject<HTMLDivElement | null>;
+  stageMode: boolean;
+  onToggleStageMode: () => void;
 }) {
   // null until the persisted scale resolves — avoids a first-paint size jump on stage
   const [scale, setScale] = useState<number | null>(null);
@@ -82,13 +88,26 @@ function LyricsCard({
   }
 
   return (
-    <div className="card relative flex flex-col gap-3 bg-base-100 p-6 shadow sm:p-8">
-      <KeyBadges maleKey={maleKey} femaleKey={femaleKey} />
+    <div
+      className={`relative flex flex-col gap-3 bg-base-100 ${
+        stageMode ? 'p-2' : 'card p-6 shadow sm:p-8'
+      }`}
+    >
+      {!stageMode && <KeyBadges maleKey={maleKey} femaleKey={femaleKey} />}
       {imageUrl ? (
         <img src={imageUrl} alt="Παρτιτούρα" className="mx-auto max-h-[70vh] w-auto object-contain" />
       ) : lyrics ? (
         <>
           <div className="absolute right-2 top-2 z-10 flex gap-1">
+            <button
+              type="button"
+              aria-label={stageMode ? 'Έξοδος από τη λειτουργία σκηνής' : 'Λειτουργία σκηνής'}
+              aria-pressed={stageMode}
+              onClick={onToggleStageMode}
+              className={`btn btn-circle btn-sm ${stageMode ? 'btn-primary' : 'btn-outline'}`}
+            >
+              🎤
+            </button>
             <button
               type="button"
               aria-label="Μικρότερα γράμματα"
@@ -108,12 +127,14 @@ function LyricsCard({
               A+
             </button>
           </div>
-          <div ref={scrollRef} className="max-h-[70vh] overflow-y-auto">
+          <div ref={scrollRef} className={stageMode ? 'max-h-[86vh] overflow-y-auto' : 'max-h-[70vh] overflow-y-auto'}>
             {scale === null ? (
               <div className="min-h-[8rem]" aria-hidden />
             ) : (
               <pre
-                className="mx-auto max-w-[50ch] whitespace-pre-wrap text-left font-sans leading-relaxed text-base-content"
+                className={`mx-auto max-w-[50ch] whitespace-pre-wrap text-left font-sans leading-relaxed text-base-content ${
+                  stageMode ? 'font-semibold' : ''
+                }`}
                 style={{ fontSize: `${scale * 1.5}rem` }}
               >
                 {lyrics}
@@ -166,7 +187,26 @@ export default function LiveSessionView({
   const [data, setData] = useState<SuggestionsResponsePayload | null>(null);
   const [showPlayed, setShowPlayed] = useState(false);
   const [manualActiveAxisTypes, setManualActiveAxisTypes] = useState<string[] | null>(null);
+  const [stageMode, setStageMode] = useState(false);
   const lyricsScrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let alive = true;
+    loadStageMode(preferencesStore).then((on) => {
+      if (alive) setStageMode(on);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  function toggleStageMode() {
+    setStageMode((current) => {
+      const next = !current;
+      void saveStageMode(preferencesStore, next);
+      return next;
+    });
+  }
 
   const load = useCallback(async () => {
     setData(await store.load(showPlayed, manualActiveAxisTypes));
@@ -226,27 +266,31 @@ export default function LiveSessionView({
       <header className="sticky top-0 z-10 flex flex-col items-center gap-3 border-b border-base-300 bg-base-100 px-4 py-3 sm:px-6">
         <PageNav backHref="/" onBack={sameRouteExit ? handleEndSession : undefined} />
         <div className="flex flex-wrap items-center justify-center gap-2">
-          <label className="label cursor-pointer gap-2">
-            <input
-              type="checkbox"
-              className="checkbox checkbox-sm"
-              checked={showPlayed}
-              onChange={(e) => setShowPlayed(e.target.checked)}
-            />
-            <span className="label-text">Δείξε τα ειπωμένα</span>
-          </label>
-          {data.availableAxisTypes.map((axis) => {
-            const isActive = data.activeAxisTypes.includes(axis.key);
-            return (
-              <button
-                key={axis.key}
-                onClick={() => toggleAxis(axis.key)}
-                className={`btn btn-sm rounded-full ${isActive ? 'btn-primary' : 'btn-outline'}`}
-              >
-                {axis.label}: {axis.value}
-              </button>
-            );
-          })}
+          {!stageMode && (
+            <>
+              <label className="label cursor-pointer gap-2">
+                <input
+                  type="checkbox"
+                  className="checkbox checkbox-sm"
+                  checked={showPlayed}
+                  onChange={(e) => setShowPlayed(e.target.checked)}
+                />
+                <span className="label-text">Δείξε τα ειπωμένα</span>
+              </label>
+              {data.availableAxisTypes.map((axis) => {
+                const isActive = data.activeAxisTypes.includes(axis.key);
+                return (
+                  <button
+                    key={axis.key}
+                    onClick={() => toggleAxis(axis.key)}
+                    className={`btn btn-sm rounded-full ${isActive ? 'btn-primary' : 'btn-outline'}`}
+                  >
+                    {axis.label}: {axis.value}
+                  </button>
+                );
+              })}
+            </>
+          )}
           <button onClick={handleEndSequence} className="btn btn-sm btn-outline">
             Τέλος σειράς
           </button>
@@ -257,15 +301,22 @@ export default function LiveSessionView({
         <h1 className="text-center text-xl font-bold sm:text-2xl">{currentSong.title}</h1>
       </header>
 
-      <div className="flex-1 p-4 sm:p-6">
-        <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,320px)]">
+      <div className={`flex-1 ${stageMode ? 'p-0' : 'p-4 sm:p-6'}`}>
+        <div
+          className={`grid grid-cols-1 items-start gap-4 ${
+            stageMode ? '' : 'lg:grid-cols-[minmax(0,1fr)_minmax(0,320px)]'
+          }`}
+        >
           <LyricsCard
             lyrics={currentSong.lyrics}
             imageUrl={currentSong.imageUrl}
             maleKey={currentSong.maleKey}
             femaleKey={currentSong.femaleKey}
             scrollRef={lyricsScrollRef}
+            stageMode={stageMode}
+            onToggleStageMode={toggleStageMode}
           />
+          {!stageMode && (
           <div className="card overflow-hidden bg-base-100 shadow">
             <h2 className="border-b border-base-300 bg-base-200 px-4 py-2 text-sm font-semibold tracking-wide text-base-content/70 uppercase">
               {data.mode === 'filtered' ? data.listTitle : 'Όλα τα τραγούδια'}
@@ -285,6 +336,7 @@ export default function LiveSessionView({
                 ))}
             </div>
           </div>
+          )}
         </div>
       </div>
     </main>
