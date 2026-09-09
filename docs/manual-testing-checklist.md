@@ -419,8 +419,8 @@ paths of `useKeepScreenAwake()`.
 
 ### Tier 2 — readability polish (added 2026-09-09)
 
-- [ ] Lyrics are left-aligned (not centred) and blank lines between stanzas show as blank lines
-- [ ] The 🎤 stage-mode toggle (top-right of the lyrics card) hides the suggestions panel and the axis-filter row, goes full-bleed dark, and bolds the lyrics; tapping it again restores the normal view
-- [ ] Stage mode persists across app restarts and across songs
-- [ ] A−/A+ and tap-zone paging still work while stage mode is on
-- [ ] **Score image zoom (the touch-action risk — must be checked on-device, not in `npm run dev`):** pinch-zoom and drag-pan the παρτιτούρα image work smoothly, and the gesture is NOT stolen by page scroll; double-tap resets to fit
+- [x] Lyrics are left-aligned (not centred) and blank lines between stanzas show as blank lines
+- [x] The 🎤 stage-mode toggle (top-right of the lyrics card) hides the suggestions panel and the axis-filter row, goes full-bleed dark, and bolds the lyrics; tapping it again restores the normal view
+- [x] Stage mode persists across app restarts and across songs
+- [x] A−/A+ and tap-zone paging still work while stage mode is on
+- [x] **Score image zoom (the touch-action risk — must be checked on-device, not in `npm run dev`):** pinch-zoom and drag-pan the παρτιτούρα image work smoothly, and the gesture is NOT stolen by page scroll; double-tap resets to fit — verified on Pixel 6, 2026-09-09
