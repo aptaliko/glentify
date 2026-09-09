@@ -23,10 +23,10 @@ song-review burden.
     - [x] Adjustable text size, persisted per device (localStorage)
     - [x] Keep-awake / screen wake lock via the Screen Wake Lock API — confirmed working on both web and the Android WebView (Pixel 6 on-device spike, 2026-09-09; no native plugin needed)
     - [x] Hands-free advance via **tap zones** (bottom = page down, top = page up)
-  - **Tier 2 (readability polish):**
-    - [ ] Left-align verses + respect blank-line stanza breaks (drop center-align for long text)
-    - [ ] Dedicated high-contrast stage mode (max contrast, overrides for lyrics view only)
-    - [ ] Pinch-zoom + pan for the παρτιτούρα image (currently `max-h-[70vh] object-contain`, unreadable for dense scores)
+  - **Tier 2 (readability polish) — shipped 2026-09-09:**
+    - [x] Left-align verses + respect blank-line stanza breaks — `<pre>` is now `text-left` at a ~50ch measure; stanza breaks needed no code (blank lines already render via `whitespace-pre-wrap`)
+    - [x] Dedicated high-contrast stage mode (🎤 toggle, per-device) — hides the suggestions panel + axis-filter row, full-bleed dark surface, bolded lyrics. The theme is already ~14.7:1 (past WCAG AAA), so the readability win is chrome-removal + weight, not a colour change (no theme authoring; text stays on `base-content`)
+    - [x] Pinch-zoom + pan for the παρτιτούρα image — via `react-zoom-pan-pinch` (pinch/wheel zoom, drag pan, double-tap reset); `touch-none` stops the WebView hijacking the gesture
   - **Explicitly skipped:** karaoke line-highlight / timed beat-scroll — no per-song timing/structure metadata, authoring friction not worth it
 - [ ] Chords / δρόμος annotations per song
 - [ ] Lyrics compliance scaffolding (see `docs/legal-compliance-prep.md`): DMCA/takedown contact + mechanism, ToS "you have the rights" affirmation, UGC reporting — needed before public Play release, lawyer-reviewed

@@ -415,4 +415,12 @@ paths of `useKeepScreenAwake()`.
 - [x] Dragging the middle of the lyrics still scrolls freely
 - [x] Screen stays awake for the whole song while the session view is open (device auto-lock does not fire) — verified via `KEEP_SCREEN_ON` window flag (see spike outcome above)
 - [x] After locking and unlocking the device, the screen-awake behaviour resumes
-- [x] Songs with a παρτιτούρα image show no reader controls (unchanged image view)
+- [x] Songs with a παρτιτούρα image show no lyrics-reader controls (no A−/A+, tap strips, or stage toggle — but see the pinch-zoom check below)
+
+### Tier 2 — readability polish (added 2026-09-09)
+
+- [ ] Lyrics are left-aligned (not centred) and blank lines between stanzas show as blank lines
+- [ ] The 🎤 stage-mode toggle (top-right of the lyrics card) hides the suggestions panel and the axis-filter row, goes full-bleed dark, and bolds the lyrics; tapping it again restores the normal view
+- [ ] Stage mode persists across app restarts and across songs
+- [ ] A−/A+ and tap-zone paging still work while stage mode is on
+- [ ] **Score image zoom (the touch-action risk — must be checked on-device, not in `npm run dev`):** pinch-zoom and drag-pan the παρτιτούρα image work smoothly, and the gesture is NOT stolen by page scroll; double-tap resets to fit
