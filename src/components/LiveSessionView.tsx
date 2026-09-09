@@ -17,6 +17,7 @@ import {
   FONT_SCALE_MAX,
 } from '@/lib/lyricsReaderSettings';
 import { useKeepScreenAwake } from '@/lib/useKeepScreenAwake';
+import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 
 function SongButton({ song, onPick }: { song: SuggestedSong; onPick: (songId: number) => void }) {
   return (
@@ -95,7 +96,16 @@ function LyricsCard({
     >
       {!stageMode && <KeyBadges maleKey={maleKey} femaleKey={femaleKey} />}
       {imageUrl ? (
-        <img src={imageUrl} alt="Παρτιτούρα" className="mx-auto max-h-[70vh] w-auto object-contain" />
+        // Pinch/wheel to zoom, drag to pan; double-tap resets. `touch-none` keeps
+        // the WebView from hijacking the pinch/pan gesture for page scroll.
+        <TransformWrapper doubleClick={{ mode: 'reset' }} minScale={1} centerOnInit>
+          <TransformComponent
+            wrapperClass="!w-full !max-h-[70vh] touch-none"
+            contentClass="!w-full !justify-center"
+          >
+            <img src={imageUrl} alt="Παρτιτούρα" className="max-h-[70vh] w-auto object-contain" />
+          </TransformComponent>
+        </TransformWrapper>
       ) : lyrics ? (
         <>
           <div className="absolute right-2 top-2 z-10 flex gap-1">
