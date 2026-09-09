@@ -403,9 +403,16 @@ Actions tab behaved as noted.
 
 ## Performance lyrics reader (native)
 
-- [ ] A−/A+ resize the lyrics text; the size persists across app restarts and across songs
-- [ ] Tapping the bottom of the lyrics pages down, the top pages up (~15% overlap, no cut lines)
-- [ ] Dragging the middle of the lyrics still scrolls freely
-- [ ] Screen stays awake for the whole song while the session view is open (device auto-lock does not fire)
-- [ ] After locking and unlocking the device, the screen-awake behaviour resumes
-- [ ] Songs with a παρτιτούρα image show no reader controls (unchanged image view)
+**Wake-lock spike outcome (2026-09-09, plan Task 6):** the Web Wake Lock API **works** in
+the Android WebView — **no native plugin needed**. Verified on a Pixel 6 (oriole), Android
+17, WebView 152.0.7977.87 via `adb shell dumpsys window windows`: the app window carries
+`fl=KEEP_SCREEN_ON` only while the live-session/lyrics view is open (absent before entering
+and after ending the session), confirming both the acquire-on-mount and release-on-unmount
+paths of `useKeepScreenAwake()`.
+
+- [x] A−/A+ resize the lyrics text; the size persists across app restarts and across songs
+- [x] Tapping the bottom of the lyrics pages down, the top pages up (~15% overlap, no cut lines)
+- [x] Dragging the middle of the lyrics still scrolls freely
+- [x] Screen stays awake for the whole song while the session view is open (device auto-lock does not fire) — verified via `KEEP_SCREEN_ON` window flag (see spike outcome above)
+- [x] After locking and unlocking the device, the screen-awake behaviour resumes
+- [x] Songs with a παρτιτούρα image show no reader controls (unchanged image view)

@@ -21,7 +21,7 @@ song-review burden.
 - [ ] Lyrics per song, performance-formatted (large, scrollable, dark-stage-readable) — model is already "user-entered, we host". Current: single centered `<pre>` fixed at `text-xl sm:text-2xl` in `LyricsCard` (`src/components/LiveSessionView.tsx:51`). Proposed **performance reader**, tiered:
   - **Tier 1 (ship first, one pass):**
     - [x] Adjustable text size, persisted per device (localStorage)
-    - [x] Keep-awake / screen wake lock — web via Screen Wake Lock API; **native pending on-device spike** (see plan Task 6)
+    - [x] Keep-awake / screen wake lock via the Screen Wake Lock API — confirmed working on both web and the Android WebView (Pixel 6 on-device spike, 2026-09-09; no native plugin needed)
     - [x] Hands-free advance via **tap zones** (bottom = page down, top = page up)
   - **Tier 2 (readability polish):**
     - [ ] Left-align verses + respect blank-line stanza breaks (drop center-align for long text)
