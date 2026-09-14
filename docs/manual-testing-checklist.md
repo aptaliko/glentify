@@ -442,3 +442,9 @@ paths of `useKeepScreenAwake()`.
 - [ ] Offline remove a song → it's gone from the lyrics viewer and its list
 - [ ] Suggestions ("επόμενο τραγούδι") treat the overlaid songs as already-played (no already-in-σειρά song suggested)
 - [ ] A σειρά whose only added song was itself created offline (draft song, no cached lyrics) → that song is skipped in the lyrics viewer (documented out-of-scope), no crash
+
+### Offline viewer — post-sync auto-refresh (added 2026-09-14)
+
+- [ ] Make an offline edit via Διαχείριση, open the program view (shows it overlaid), then reconnect and background the app briefly; returning to the foreground on the program view shows the SERVER-reconciled state with NO manual "Προετοιμασία για offline"
+- [ ] Backgrounding and foregrounding the program view does NOT flash a loading spinner (data updates in place)
+- [ ] The sequence (lyrics) viewer is unaffected by foreground/background — your current song position is preserved (it stays mount-only by design)

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
@@ -42,15 +42,31 @@ export default function LocalProgramPage() {
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
 
-  useEffect(() => {
-    Promise.all([loadReferenceData(), getSelectedProgramId(preferencesStore), getQueuedActions()])
-      .then(([data, id, actions]) => {
-        setReferenceData(data);
-        setProgramId(id);
-        setPendingActions(actions);
-      })
-      .finally(() => setChecked(true));
+  const load = useCallback(async () => {
+    const [data, id, actions] = await Promise.all([
+      loadReferenceData(),
+      getSelectedProgramId(preferencesStore),
+      getQueuedActions(),
+    ]);
+    setReferenceData(data);
+    setProgramId(id);
+    setPendingActions(actions);
+    setChecked(true);
   }, []);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    load();
+    // Post-sync freshness: the overlay is computed at read time, but if the queue drains and
+    // the blob re-primes (SyncQueueProvider, on reconnect) while this page is open, the page
+    // keeps showing the read-time snapshot. Re-read whenever the app returns to the foreground
+    // so a just-synced change appears without a manual "Προετοιμασία για offline". Scoped to
+    // this overview only — the sequence viewer holds live index/exploration state a refresh
+    // would reset, so it stays mount-only per the spec.
+    const onVisible = () => { if (document.visibilityState === 'visible') load(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [load]);
 
   async function handleSelectSequence(sequence: DisplaySequence) {
     await setSelectedSequenceId(preferencesStore, sequence.id);
