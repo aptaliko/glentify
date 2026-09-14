@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useSwipeable } from 'react-swipeable';
 import PageNav from '@/components/PageNav';
 import LiveSessionView from '@/components/LiveSessionView';
@@ -11,40 +12,65 @@ import { getSelectedProgramId, getSelectedSequenceId } from '@/lib/localPrograms
 import { mergeReferencedSongs } from '@/lib/referenceData';
 import { getSequenceSuggestions, ExplorationSessionStore } from '@/lib/sessionStore';
 import { createLocalSongPickerDataSource } from '@/lib/songPickerData';
-import type { ReferenceData } from '@/lib/referenceData';
+import { getQueuedActions } from '@/lib/syncQueue';
+import type { QueuedAction } from '@/lib/syncQueue';
+import { buildSongTitleMap, toProgramDetail } from '@/lib/offlineProgramView';
+import { mergeSequencesWithPending } from '@/lib/sequencesMerge';
+import type { CachedReferenceData } from '@/lib/referenceData';
 import type { SongRow } from '@/db/schema';
 
 export default function LocalSequencePage() {
-  const [referenceData, setReferenceData] = useState<ReferenceData | null>(null);
+  const [referenceData, setReferenceData] = useState<CachedReferenceData | null>(null);
   const [programId, setProgramId] = useState<number | null>(null);
   const [sequenceId, setSequenceId] = useState<number | null>(null);
   const [checked, setChecked] = useState(false);
   const [index, setIndex] = useState(0);
   const [activeAxisTypes, setActiveAxisTypes] = useState<string[] | null>(null);
   const [exploringSongId, setExploringSongId] = useState<number | null>(null);
+  const [pendingActions, setPendingActions] = useState<QueuedAction[]>([]);
 
   useEffect(() => {
     Promise.all([
       loadReferenceData(),
       getSelectedProgramId(preferencesStore),
       getSelectedSequenceId(preferencesStore),
+      getQueuedActions(),
     ])
-      .then(([data, pId, sId]) => {
+      .then(([data, pId, sId, actions]) => {
         setReferenceData(data);
         setProgramId(pId);
         setSequenceId(sId);
+        setPendingActions(actions);
       })
       .finally(() => setChecked(true));
   }, []);
 
-  const program = referenceData?.programs.find((p) => p.id === programId) ?? null;
-  const sequence = program?.sequences.find((s) => s.id === sequenceId) ?? null;
-  const songsById = new Map<number, SongRow>(
-    mergeReferencedSongs(referenceData?.songs ?? [], referenceData?.sharedSongs ?? []).map((s) => [s.id, s])
+  // Memoized because every swipe/goToIndex re-renders this page during a live gig, and the
+  // overlay pipeline (title map + toProgramDetail + mergeSequencesWithPending + the songsById
+  // Map) is a pure function of inputs that only change at mount.
+  const program = useMemo(
+    () => referenceData?.programs.find((p) => p.id === programId) ?? null,
+    [referenceData, programId],
   );
-  const songs = sequence
-    ? sequence.songIds.map((id) => songsById.get(id)).filter((s): s is SongRow => s !== undefined)
-    : [];
+  const displaySequence = useMemo(() => {
+    if (!program || !referenceData) return null;
+    const songTitles = buildSongTitleMap(referenceData.songs, referenceData.sharedSongs);
+    const displaySequences = mergeSequencesWithPending(
+      toProgramDetail(program, songTitles),
+      pendingActions,
+      songTitles,
+    );
+    return displaySequences.find((s) => s.id === sequenceId) ?? null;
+  }, [program, referenceData, pendingActions, sequenceId]);
+  const songs = useMemo(() => {
+    if (!displaySequence || !referenceData) return [];
+    const songsById = new Map<number, SongRow>(
+      mergeReferencedSongs(referenceData.songs, referenceData.sharedSongs).map((s) => [s.id, s]),
+    );
+    return displaySequence.songs
+      .map((s) => songsById.get(s.songId))
+      .filter((s): s is SongRow => s !== undefined);
+  }, [displaySequence, referenceData]);
 
   const hasPrevious = index > 0;
   const hasNext = index < songs.length - 1;
@@ -92,7 +118,22 @@ export default function LocalSequencePage() {
     );
   }
 
-  if (!referenceData || !program || !sequence) {
+  // A blob primed before the `entries` field existed carries `primedAt === null` and empty
+  // `entries`, so the overlay yields no σειρές. Ask for a re-prime instead of a misleading
+  // "σειρά δεν βρέθηκε" — matches the editor's contract and the program overview guard.
+  if (referenceData && referenceData.primedAt === null) {
+    return (
+      <main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-base-200 p-4 text-center">
+        <PageNav backHref="/programs/local/program" />
+        <p className="text-lg">
+          Απαιτείται προετοιμασία για offline για να εμφανιστεί αυτή η σειρά.{' '}
+          <Link href="/" className="link">Προετοιμασία για offline</Link>
+        </p>
+      </main>
+    );
+  }
+
+  if (!referenceData || !program || !displaySequence) {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-base-200 p-4 text-center">
         <PageNav backHref="/programs/local/program" />
@@ -105,14 +146,19 @@ export default function LocalSequencePage() {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center gap-6 bg-base-200 p-4">
         <PageNav backHref="/programs/local/program" />
-        <h1 className="text-2xl font-bold">{sequence.title}</h1>
+        <h1 className="text-2xl font-bold">{displaySequence.title}</h1>
         <p className="text-base-content/60">Δεν έχουν προστεθεί τραγούδια σε αυτή τη σειρά.</p>
       </main>
     );
   }
 
   const current = songs[Math.min(index, songs.length - 1)];
-  const suggestions = getSequenceSuggestions(referenceData, current.id, new Set(sequence.songIds), activeAxisTypes);
+  const suggestions = getSequenceSuggestions(
+    referenceData,
+    current.id,
+    new Set(displaySequence.songs.map((s) => s.songId)),
+    activeAxisTypes,
+  );
 
   function toggleSuggestionAxis(key: string) {
     const currentlyActive = activeAxisTypes ?? suggestions.activeAxisTypes;

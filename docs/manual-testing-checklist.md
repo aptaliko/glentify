@@ -445,3 +445,31 @@ paths of `useKeepScreenAwake()`.
 
 - [ ] Προγράμματα list (`admin/programs`) on a phone: a program with a long title and/or a "μοιράζεται με …" badge keeps "Μετονομασία"/"Διαγραφή" as horizontal buttons on one line — no vertical character-stacking or overlap; the title shrinks/wraps instead
 - [ ] Σειρές list in the offline editor (`admin/local/programs/edit`): a long σειρά title truncates with "…" and "Μετονομασία"/"Διαγραφή σειράς" stay full-width on one line, never squeezed
+
+### Offline viewer pending-edit overlay — program view (added 2026-09-14)
+
+- [ ] Offline (airplane mode), via Διαχείριση add an existing (cached) song to a σειρά, then open Σταθερά προγράμματα → that program: the new song shows in the σειρά preview immediately (before any sync)
+- [ ] Offline reorder a σειρά's songs in Διαχείριση → the program preview shows the new order
+- [ ] Offline remove a song → gone from the preview
+- [ ] Offline rename a σειρά → new title shown in the program view
+- [ ] Offline add a NEW σειρά → it appears in the program view marked "(εκκρεμεί)" and is NOT tappable
+- [ ] A forced needsAttention reorder (version conflict) → the program view shows the last-known order, not the phantom change
+- [ ] Εξαγωγή PDF from the overlaid program view includes the overlaid songs/σειρές (a pending-create σειρά appears as an empty section)
+
+### Offline viewer pending-edit overlay — sequence (lyrics) view (added 2026-09-14)
+
+- [ ] Offline, add an existing song to a σειρά via Διαχείριση → open that σειρά in the viewer: the added song appears at the correct position and its lyrics/keys load
+- [ ] Offline reorder → the lyrics viewer's song order and "Λίστα σειράς" match the new order
+- [ ] Offline remove a song → it's gone from the lyrics viewer and its list
+- [ ] Suggestions ("επόμενο τραγούδι") treat the overlaid songs as already-played (no already-in-σειρά song suggested)
+- [ ] A σειρά whose only added song was itself created offline (draft song, no cached lyrics) → that song is skipped in the lyrics viewer (documented out-of-scope), no crash
+
+### Offline viewer — post-sync auto-refresh (added 2026-09-14)
+
+- [ ] Make an offline edit via Διαχείριση, open the program view (shows it overlaid), then reconnect and background the app briefly; returning to the foreground on the program view shows the SERVER-reconciled state with NO manual "Προετοιμασία για offline"
+- [ ] Backgrounding and foregrounding the program view does NOT flash a loading spinner (data updates in place)
+- [ ] The sequence (lyrics) viewer is unaffected by foreground/background — your current song position is preserved (it stays mount-only by design)
+
+### Offline viewer — legacy un-primed blob guard (added 2026-09-14)
+
+- [ ] A blob primed by an app version before the `entries` field existed (`primedAt === null`, populated `songIds`, empty `entries`): opening the program view AND a σειρά shows an "Απαιτείται προετοιμασία για offline" message with a working link, not empty σειρές or a misleading "δεν βρέθηκε" — and re-priming once ("Προετοιμασία για offline") then renders them normally

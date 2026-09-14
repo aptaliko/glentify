@@ -3,6 +3,7 @@ import type { CachedProgramDetail } from './referenceData';
 
 export interface DisplaySequenceSong {
   sequenceSongId: number;
+  songId: number;
   title: string;
 }
 
@@ -80,7 +81,7 @@ export function mergeSequencesWithPending(
     id: s.id,
     title: s.title,
     status: 'active',
-    songs: s.songs.map((e) => ({ sequenceSongId: e.sequenceSongId, title: e.title })),
+    songs: s.songs.map((e) => ({ sequenceSongId: e.sequenceSongId, songId: e.songId, title: e.title })),
   }));
 
   for (const a of actions) {
@@ -111,7 +112,7 @@ export function mergeSequencesWithPending(
         if (typeof p.sequenceId === 'number' && typeof p.draftId === 'number' && typeof p.songId === 'number') {
           const title = songTitleById.get(p.songId) ?? '—';
           sequences = sequences.map((s) =>
-            s.id === p.sequenceId ? { ...s, songs: [...s.songs, { sequenceSongId: p.draftId as number, title }] } : s
+            s.id === p.sequenceId ? { ...s, songs: [...s.songs, { sequenceSongId: p.draftId as number, songId: p.songId as number, title }] } : s
           );
         }
         break;

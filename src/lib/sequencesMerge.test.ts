@@ -51,6 +51,30 @@ describe('mergeSequencesWithPending', () => {
     const out = mergeSequencesWithPending(detail, [action({ type: 'sequence-reorder', payload: { sequenceId: 5, orderedIds: [101, 100] } })], titles);
     expect(out[0].songs.map((s) => s.sequenceSongId)).toEqual([101, 100]);
   });
+  it('carries songId onto base songs from the cached detail', () => {
+    const out = mergeSequencesWithPending(detail, [], titles);
+    expect(out[0].songs.map((s) => ({ ssid: s.sequenceSongId, sid: s.songId }))).toEqual([
+      { ssid: 100, sid: 10 },
+      { ssid: 101, sid: 11 },
+    ]);
+  });
+  it('carries songId onto a pending sequence-add-song entry from its payload', () => {
+    const out = mergeSequencesWithPending(
+      detail,
+      [action({ type: 'sequence-add-song', payload: { draftId: -9, sequenceId: 5, songId: 12 } })],
+      titles,
+    );
+    const added = out[0].songs.find((s) => s.sequenceSongId === -9);
+    expect(added).toMatchObject({ songId: 12, title: 'Γ' });
+  });
+  it('preserves songId across a reorder', () => {
+    const out = mergeSequencesWithPending(
+      detail,
+      [action({ type: 'sequence-reorder', payload: { sequenceId: 5, orderedIds: [101, 100] } })],
+      titles,
+    );
+    expect(out[0].songs.map((s) => s.songId)).toEqual([11, 10]);
+  });
   it('reverts a needsAttention rename to the base title', () => {
     const d: CachedProgramDetail = {
       programId: 1, title: 'P', role: 'creator', cachedAt: '', version: 1,
