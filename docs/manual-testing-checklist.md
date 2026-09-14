@@ -473,3 +473,14 @@ paths of `useKeepScreenAwake()`.
 ### Offline viewer — legacy un-primed blob guard (added 2026-09-14)
 
 - [ ] A blob primed by an app version before the `entries` field existed (`primedAt === null`, populated `songIds`, empty `entries`): opening the program view AND a σειρά shows an "Απαιτείται προετοιμασία για offline" message with a working link, not empty σειρές or a misleading "δεν βρέθηκε" — and re-priming once ("Προετοιμασία για offline") then renders them normally
+
+### Offline viewer — blob re-prime after an already-online sync (added 2026-09-14)
+
+Root cause of a real multi-device bug: the reference blob used to re-prime ONLY on a network
+reconnect, so an edit made and synced while already online never refreshed the blob, and the
+read-only viewer (which reads the blob) stayed stale until a manual "Προετοιμασία για offline".
+
+- [ ] While ONLINE (no airplane-mode toggling), reorder/rename a σειρά in Διαχείριση; wait for the sync badge to clear, then open Σταθερά προγράμματα → that program: the main program view reflects the change WITHOUT a manual "Προετοιμασία για offline"
+- [ ] Same on a second device that only VIEWS: after the first device's online edit syncs, the second device's viewer shows the change once it foregrounds (no manual re-prime)
+- [ ] An edit that FAILS to sync (forced version conflict → "N αλλαγές δεν εφαρμόστηκαν") does NOT trigger a blob re-prime that would leak the phantom change — the viewer shows the last-known server order, matching Διαχείριση
+- [ ] A live gig in the sequence (lyrics) viewer is NOT disrupted by a background re-prime — your current song position/index is preserved while a sync completes in the background

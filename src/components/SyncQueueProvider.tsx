@@ -49,6 +49,15 @@ export default function SyncQueueProvider({ children }: { children: ReactNode })
     // Re-arm the notice: once a pass is no longer blocked, a *future* stall should surface
     // again even if the user had closed the previous one.
     if (!result.blocked) setBlockedDismissed(false);
+    // If any queued write actually synced this pass (processed counts only successes), the
+    // server has moved past what the blob last captured — re-pull it so the blob-reading
+    // offline viewers (programs/local/*) don't show stale data. Before this, the blob was
+    // ONLY re-primed on a networkStatusChange(connected) below, so an edit made and synced
+    // while already online (no connectivity transition — the common case: reorder/rename in
+    // Διαχείριση with a live connection) left the viewer stale until a manual
+    // "Προετοιμασία για offline". The sequence viewer is mount-only, so a background re-prime
+    // never disrupts a live gig; the program overview re-reads on foreground and picks it up.
+    if (result.processed > 0) await primeOfflineData();
   }, []);
 
   useEffect(() => {
@@ -58,8 +67,10 @@ export default function SyncQueueProvider({ children }: { children: ReactNode })
     refresh();
     const listenerPromise = Network.addListener('networkStatusChange', async (status) => {
       if (!status.connected) return;
-      await refresh(); // drain the write queue first
-      await primeOfflineData(); // then re-pull server truth into the blob
+      await refresh(); // drain the write queue first (this re-primes if anything synced)
+      // Always re-pull on a fresh reconnect, even when we synced nothing: a collaborator (or
+      // this user on another device) may have changed shared data while we were offline.
+      await primeOfflineData();
     });
     // App-resume retry. The queue is otherwise only drained on mount, a
     // networkStatusChange(connected), or a page's notifyQueueChanged() — there is no timer
