@@ -427,9 +427,9 @@ paths of `useKeepScreenAwake()`.
 
 ### Dismissable conflict/attention indicators (added 2026-09-14)
 
-- [ ] After an offline reorder/rename loses a version conflict, the σειρά shows "Άλλαξε αλλού — η αλλαγή δεν εφαρμόστηκε." (not "από συνεργάτη"), with a ✕ next to it
+- [x] After an offline reorder/rename loses a version conflict, the σειρά shows "Άλλαξε αλλού — η αλλαγή δεν εφαρμόστηκε." (not "από συνεργάτη"), with a ✕ next to it — verified on tablet 2026-09-14
 - [ ] Tapping that ✕ removes the note for that σειρά and it does not reappear on reload
-- [ ] The bottom-right badge reads "N αλλαγές δεν εφαρμόστηκαν" (conflict) or "N χρειάζεται προσοχή" (failed) with a ✕, and is tappable
+- [x] The bottom-right badge reads "N αλλαγές δεν εφαρμόστηκαν" (conflict) or "N χρειάζεται προσοχή" (failed) with a ✕, and is tappable — badge text verified on tablet 2026-09-14 ("2 αλλαγές δεν εφαρμόστηκαν"); tap-to-clear still to confirm
 - [ ] Tapping the badge clears ALL needsAttention items at once (σειρά notes and program-rename notes disappear too); the badge goes away
 - [ ] The badge is NOT tappable/dismissable while it only shows pending sync ("N εκκρεμεί συγχρονισμός") — that isn't a dead item
 - [ ] The blocked badge "Ο συγχρονισμός σταμάτησε προσωρινά" shows a ✕ and is tappable; tapping it hides the notice
