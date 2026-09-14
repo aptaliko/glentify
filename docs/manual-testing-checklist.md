@@ -484,3 +484,13 @@ read-only viewer (which reads the blob) stayed stale until a manual "Προετ�
 - [ ] Same on a second device that only VIEWS: after the first device's online edit syncs, the second device's viewer shows the change once it foregrounds (no manual re-prime)
 - [ ] An edit that FAILS to sync (forced version conflict → "N αλλαγές δεν εφαρμόστηκαν") does NOT trigger a blob re-prime that would leak the phantom change — the viewer shows the last-known server order, matching Διαχείριση
 - [ ] A live gig in the sequence (lyrics) viewer is NOT disrupted by a background re-prime — your current song position/index is preserved while a sync completes in the background
+
+### Offline sync — transient blip does not flash the "σταμάτησε" notice (added 2026-09-14)
+
+A single systemic-error pass (dropped request / cold serverless function / momentary CORS/5xx)
+used to immediately show the alarming "Ο συγχρονισμός σταμάτησε προσωρινά" even though the very
+next pass cleared it and the data synced fine. Now it only shows after 2 consecutive blocked passes.
+
+- [ ] Reorder/rename a σειρά in Διαχείριση with a live connection: it syncs (visible on another device) WITHOUT the red "σταμάτησε" notice flashing; at most the neutral "N εκκρεμεί συγχρονισμός" appears briefly
+- [ ] A genuinely stuck sync (airplane mode with a queued edit, then foreground a couple of times) STILL shows "Ο συγχρονισμός σταμάτησε προσωρινά" — the threshold delays it by one pass, it does not suppress it
+- [ ] Force-quitting and reopening while sync is still genuinely stuck re-shows the notice (the consecutive-blip counter resets on restart, so a real stall re-alarms)

@@ -1,12 +1,20 @@
 // src/components/SyncQueueProvider.tsx
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Network } from '@capacitor/network';
 import { isNativeApp } from '@/lib/platform';
 import { primeOfflineData } from '@/lib/offlineCache';
 import { processQueue, dismissNeedsAttention } from '@/lib/syncQueue';
 import { initSyncHandlers } from '@/lib/syncHandlers';
+
+// A single systemic-error pass is almost always a transient blip — a dropped request, a cold
+// serverless function, a momentary CORS/5xx — that the very next pass clears, with the queued
+// work intact and still retrying. Showing the alarming "Ο συγχρονισμός σταμάτησε προσωρινά"
+// notice for one blip is misleading (verified: an already-online reorder that syncs fine still
+// flashed it). Only surface the notice once sync has stayed blocked across this many
+// consecutive passes; any non-blocked pass resets the streak.
+const BLOCKED_NOTICE_THRESHOLD = 2;
 
 interface SyncQueueContextValue {
   pendingCount: number;
@@ -38,6 +46,10 @@ export default function SyncQueueProvider({ children }: { children: ReactNode })
   // will retry — closing the badge only hides the notice, it never drops work. Kept as
   // component state so an app restart re-shows it if sync is still genuinely stuck.
   const [blockedDismissed, setBlockedDismissed] = useState(false);
+  // Consecutive systemic-error passes. Deliberately a ref, not persisted: a genuinely stuck
+  // sync re-alarms after the same streak on a fresh app start (matching blockedDismissed's
+  // "re-show on restart" contract), while a transient blip never trips the notice at all.
+  const consecutiveBlockedRef = useRef(0);
 
   const refresh = useCallback(async () => {
     if (!isNativeApp()) return;
@@ -45,10 +57,15 @@ export default function SyncQueueProvider({ children }: { children: ReactNode })
     setPendingCount(result.remaining);
     setNeedsAttentionCount(result.needsAttention);
     setConflictCount(result.conflict);
-    setBlocked(result.blocked);
-    // Re-arm the notice: once a pass is no longer blocked, a *future* stall should surface
-    // again even if the user had closed the previous one.
-    if (!result.blocked) setBlockedDismissed(false);
+    // Escalate to the "σταμάτησε" notice only after BLOCKED_NOTICE_THRESHOLD consecutive
+    // blocked passes — a lone blip resets the streak and falls through to the ordinary
+    // "N εκκρεμεί συγχρονισμός" pending indicator instead. See BLOCKED_NOTICE_THRESHOLD above.
+    consecutiveBlockedRef.current = result.blocked ? consecutiveBlockedRef.current + 1 : 0;
+    const showBlocked = result.blocked && consecutiveBlockedRef.current >= BLOCKED_NOTICE_THRESHOLD;
+    setBlocked(showBlocked);
+    // Re-arm the notice: once sync is no longer showing as blocked, a *future* stall should
+    // surface again even if the user had closed the previous one.
+    if (!showBlocked) setBlockedDismissed(false);
     // If any queued write actually synced this pass (processed counts only successes), the
     // server has moved past what the blob last captured — re-pull it so the blob-reading
     // offline viewers (programs/local/*) don't show stale data. Before this, the blob was
