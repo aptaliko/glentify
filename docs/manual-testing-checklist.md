@@ -431,7 +431,10 @@ paths of `useKeepScreenAwake()`.
 - [ ] Tapping that ✕ removes the note for that σειρά and it does not reappear on reload
 - [ ] The bottom-right badge reads "N αλλαγές δεν εφαρμόστηκαν" (conflict) or "N χρειάζεται προσοχή" (failed) with a ✕, and is tappable
 - [ ] Tapping the badge clears ALL needsAttention items at once (σειρά notes and program-rename notes disappear too); the badge goes away
-- [ ] The badge is NOT tappable/dismissable while it only shows pending sync ("N εκκρεμεί συγχρονισμός") or the blocked state — those aren't dead items
+- [ ] The badge is NOT tappable/dismissable while it only shows pending sync ("N εκκρεμεί συγχρονισμός") — that isn't a dead item
+- [ ] The blocked badge "Ο συγχρονισμός σταμάτησε προσωρινά" shows a ✕ and is tappable; tapping it hides the notice
+- [ ] Closing the blocked badge does NOT drop the queued edits — they still sync once connectivity is genuinely restored (the notice hiding is cosmetic only)
+- [ ] After closing it, force-quitting and reopening the app re-shows "Ο συγχρονισμός σταμάτησε προσωρινά" if sync is still stuck (dismissal is not persisted)
 
 ### Responsive admin list rows (added 2026-09-14)
 

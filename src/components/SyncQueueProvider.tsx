@@ -33,6 +33,11 @@ export default function SyncQueueProvider({ children }: { children: ReactNode })
   const [needsAttentionCount, setNeedsAttentionCount] = useState(0);
   const [conflictCount, setConflictCount] = useState(0);
   const [blocked, setBlocked] = useState(false);
+  // UI-only acknowledgement of the "sync paused" notice. Deliberately NOT persisted and
+  // NOT written to the queue: the blocked state means the pending edits are still live and
+  // will retry — closing the badge only hides the notice, it never drops work. Kept as
+  // component state so an app restart re-shows it if sync is still genuinely stuck.
+  const [blockedDismissed, setBlockedDismissed] = useState(false);
 
   const refresh = useCallback(async () => {
     if (!isNativeApp()) return;
@@ -41,6 +46,9 @@ export default function SyncQueueProvider({ children }: { children: ReactNode })
     setNeedsAttentionCount(result.needsAttention);
     setConflictCount(result.conflict);
     setBlocked(result.blocked);
+    // Re-arm the notice: once a pass is no longer blocked, a *future* stall should surface
+    // again even if the user had closed the previous one.
+    if (!result.blocked) setBlockedDismissed(false);
   }, []);
 
   useEffect(() => {
@@ -83,15 +91,22 @@ export default function SyncQueueProvider({ children }: { children: ReactNode })
               : `${needsAttentionCount} χρειάζεται προσοχή`}
             <span className="ml-2 opacity-80">✕</span>
           </button>
+        ) : blocked ? (
+          // Closeable: hides the notice only (queue untouched, still retrying). Reappears on
+          // the next stall or app restart via the blockedDismissed reset in refresh().
+          blockedDismissed ? null : (
+            <button
+              type="button"
+              onClick={() => setBlockedDismissed(true)}
+              className="fixed bottom-4 right-4 z-50 rounded-full bg-warning px-3 py-1 text-sm text-warning-content shadow"
+            >
+              Ο συγχρονισμός σταμάτησε προσωρινά
+              <span className="ml-2 opacity-80">✕</span>
+            </button>
+          )
         ) : (
-          <div
-            className={`fixed bottom-4 right-4 z-50 rounded-full px-3 py-1 text-sm shadow ${
-              blocked ? 'bg-warning text-warning-content' : 'bg-info text-info-content'
-            }`}
-          >
-            {blocked
-              ? 'Ο συγχρονισμός σταμάτησε προσωρινά'
-              : `${pendingCount} εκκρεμεί συγχρονισμός`}
+          <div className="fixed bottom-4 right-4 z-50 rounded-full bg-info px-3 py-1 text-sm text-info-content shadow">
+            {`${pendingCount} εκκρεμεί συγχρονισμός`}
           </div>
         )
       )}
