@@ -146,7 +146,9 @@ export default function SyncQueueProvider({ children }: { children: ReactNode })
           )
         ) : (
           <div className="fixed bottom-4 right-4 z-50 rounded-full bg-info px-3 py-1 text-sm text-info-content shadow">
-            {`${pendingCount} εκκρεμεί συγχρονισμός`}
+            {pendingCount === 1
+              ? '1 συγχρονισμός εκκρεμεί'
+              : `${pendingCount} συγχρονισμοί εκκρεμούν`}
           </div>
         )
       )}
