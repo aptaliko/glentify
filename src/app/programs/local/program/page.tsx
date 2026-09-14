@@ -8,11 +8,14 @@ import PageNav from '@/components/PageNav';
 import { loadReferenceData } from '@/lib/offlineCache';
 import { preferencesStore } from '@/lib/preferencesStore';
 import { getSelectedProgramId, setSelectedSequenceId } from '@/lib/localProgramsStore';
-import { mergeReferencedSongs } from '@/lib/referenceData';
 import { sanitizeFilename } from '@/lib/pdfFilename';
 import { generateProgramPdfLocal } from '@/lib/programPdfLocal';
-import type { ReferenceData, OfflineSequence } from '@/lib/referenceData';
-import type { SongRow } from '@/db/schema';
+import { getQueuedActions } from '@/lib/syncQueue';
+import type { QueuedAction } from '@/lib/syncQueue';
+import { buildSongTitleMap, toProgramDetail } from '@/lib/offlineProgramView';
+import { mergeSequencesWithPending } from '@/lib/sequencesMerge';
+import type { DisplaySequence } from '@/lib/sequencesMerge';
+import type { ReferenceData } from '@/lib/referenceData';
 
 const PREVIEW_COUNT = 7;
 
@@ -34,20 +37,22 @@ export default function LocalProgramPage() {
   const router = useRouter();
   const [referenceData, setReferenceData] = useState<ReferenceData | null>(null);
   const [programId, setProgramId] = useState<number | null>(null);
+  const [pendingActions, setPendingActions] = useState<QueuedAction[]>([]);
   const [checked, setChecked] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
 
   useEffect(() => {
-    Promise.all([loadReferenceData(), getSelectedProgramId(preferencesStore)])
-      .then(([data, id]) => {
+    Promise.all([loadReferenceData(), getSelectedProgramId(preferencesStore), getQueuedActions()])
+      .then(([data, id, actions]) => {
         setReferenceData(data);
         setProgramId(id);
+        setPendingActions(actions);
       })
       .finally(() => setChecked(true));
   }, []);
 
-  async function handleSelectSequence(sequence: OfflineSequence) {
+  async function handleSelectSequence(sequence: DisplaySequence) {
     await setSelectedSequenceId(preferencesStore, sequence.id);
     router.push('/programs/local/sequence');
   }
@@ -94,16 +99,16 @@ export default function LocalProgramPage() {
     );
   }
 
-  const songsById = new Map<number, SongRow>(
-    mergeReferencedSongs(referenceData.songs, referenceData.sharedSongs).map((s) => [s.id, s])
+  const songTitles = buildSongTitleMap(referenceData.songs, referenceData.sharedSongs);
+  const displaySequences: DisplaySequence[] = mergeSequencesWithPending(
+    toProgramDetail(program, songTitles),
+    pendingActions,
+    songTitles,
   );
 
-  const pdfSequences = program.sequences.map((seq) => ({
+  const pdfSequences = displaySequences.map((seq) => ({
     title: seq.title,
-    songs: seq.songIds
-      .map((id) => songsById.get(id))
-      .filter((s): s is SongRow => s !== undefined)
-      .map((s) => s.title),
+    songs: seq.songs.map((s) => s.title),
   }));
 
   return (
@@ -121,19 +126,26 @@ export default function LocalProgramPage() {
         {exportError && <p className="text-sm text-error">{exportError}</p>}
       </div>
       <div className="grid w-full max-w-3xl grid-cols-1 gap-4 md:grid-cols-2">
-        {program.sequences.map((seq) => {
-          const songs = seq.songIds.map((id) => songsById.get(id)).filter((s): s is SongRow => s !== undefined);
+        {displaySequences.map((seq) => {
+          const isPending = seq.status === 'pending-create';
+          const songs = seq.songs;
           const remaining = songs.length - PREVIEW_COUNT;
           return (
             <div key={seq.id} className="card flex h-72 flex-col bg-base-100 shadow">
               <div className="card-body flex flex-1 flex-col gap-2 overflow-hidden p-4">
-                <button onClick={() => handleSelectSequence(seq)} className="btn btn-outline btn-sm w-full shrink-0">
-                  {seq.title}
-                </button>
+                {isPending ? (
+                  <span className="btn btn-outline btn-sm w-full shrink-0 no-animation pointer-events-none opacity-70">
+                    {seq.title} (εκκρεμεί)
+                  </span>
+                ) : (
+                  <button onClick={() => handleSelectSequence(seq)} className="btn btn-outline btn-sm w-full shrink-0">
+                    {seq.title}
+                  </button>
+                )}
                 <div className="flex-1 overflow-y-auto">
                   <ul className="flex flex-col gap-1 text-sm text-base-content/60">
-                    {songs.slice(0, PREVIEW_COUNT).map((s, i) => (
-                      <li key={s.id}>{i + 1}. {s.title}</li>
+                    {songs.slice(0, PREVIEW_COUNT).map((s) => (
+                      <li key={s.sequenceSongId}>{s.title}</li>
                     ))}
                   </ul>
                   {remaining > 0 && (
@@ -144,7 +156,7 @@ export default function LocalProgramPage() {
             </div>
           );
         })}
-        {program.sequences.length === 0 && (
+        {displaySequences.length === 0 && (
           <p className="col-span-full p-3 text-center text-sm text-base-content/50">Καμία σειρά ακόμη</p>
         )}
       </div>

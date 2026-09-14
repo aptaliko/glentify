@@ -424,3 +424,13 @@ paths of `useKeepScreenAwake()`.
 - [x] Stage mode persists across app restarts and across songs
 - [x] A−/A+ and tap-zone paging still work while stage mode is on
 - [x] **Score image zoom (the touch-action risk — must be checked on-device, not in `npm run dev`):** pinch-zoom and drag-pan the παρτιτούρα image work smoothly, and the gesture is NOT stolen by page scroll; double-tap resets to fit — verified on Pixel 6, 2026-09-09
+
+### Offline viewer pending-edit overlay — program view (added 2026-09-14)
+
+- [ ] Offline (airplane mode), via Διαχείριση add an existing (cached) song to a σειρά, then open Σταθερά προγράμματα → that program: the new song shows in the σειρά preview immediately (before any sync)
+- [ ] Offline reorder a σειρά's songs in Διαχείριση → the program preview shows the new order
+- [ ] Offline remove a song → gone from the preview
+- [ ] Offline rename a σειρά → new title shown in the program view
+- [ ] Offline add a NEW σειρά → it appears in the program view marked "(εκκρεμεί)" and is NOT tappable
+- [ ] A forced needsAttention reorder (version conflict) → the program view shows the last-known order, not the phantom change
+- [ ] Εξαγωγή PDF from the overlaid program view includes the overlaid songs/σειρές (a pending-create σειρά appears as an empty section)
