@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
@@ -15,7 +16,7 @@ import type { QueuedAction } from '@/lib/syncQueue';
 import { buildSongTitleMap, toProgramDetail } from '@/lib/offlineProgramView';
 import { mergeSequencesWithPending } from '@/lib/sequencesMerge';
 import type { DisplaySequence } from '@/lib/sequencesMerge';
-import type { ReferenceData } from '@/lib/referenceData';
+import type { CachedReferenceData } from '@/lib/referenceData';
 
 const PREVIEW_COUNT = 7;
 
@@ -35,7 +36,7 @@ function blobToBase64(blob: Blob): Promise<string> {
 
 export default function LocalProgramPage() {
   const router = useRouter();
-  const [referenceData, setReferenceData] = useState<ReferenceData | null>(null);
+  const [referenceData, setReferenceData] = useState<CachedReferenceData | null>(null);
   const [programId, setProgramId] = useState<number | null>(null);
   const [pendingActions, setPendingActions] = useState<QueuedAction[]>([]);
   const [checked, setChecked] = useState(false);
@@ -115,6 +116,22 @@ export default function LocalProgramPage() {
     );
   }
 
+  // A blob primed before the `entries` field existed carries `primedAt === null` and empty
+  // `entries` (backfilled by normalizeReferenceData); rendering the overlay off those empty
+  // entries would show empty σειρές. Match the editor's contract and ask for a re-prime
+  // instead — the next prime rewrites the blob with real entries + primedAt.
+  if (referenceData.primedAt === null) {
+    return (
+      <main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-base-200 p-4 text-center">
+        <PageNav backHref="/programs/local" />
+        <p className="text-lg">
+          Απαιτείται προετοιμασία για offline για να εμφανιστεί αυτό το πρόγραμμα.{' '}
+          <Link href="/" className="link">Προετοιμασία για offline</Link>
+        </p>
+      </main>
+    );
+  }
+
   const songTitles = buildSongTitleMap(referenceData.songs, referenceData.sharedSongs);
   const displaySequences: DisplaySequence[] = mergeSequencesWithPending(
     toProgramDetail(program, songTitles),
@@ -160,8 +177,8 @@ export default function LocalProgramPage() {
                 )}
                 <div className="flex-1 overflow-y-auto">
                   <ul className="flex flex-col gap-1 text-sm text-base-content/60">
-                    {songs.slice(0, PREVIEW_COUNT).map((s) => (
-                      <li key={s.sequenceSongId}>{s.title}</li>
+                    {songs.slice(0, PREVIEW_COUNT).map((s, i) => (
+                      <li key={s.sequenceSongId}>{i + 1}. {s.title}</li>
                     ))}
                   </ul>
                   {remaining > 0 && (

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useSwipeable } from 'react-swipeable';
 import PageNav from '@/components/PageNav';
 import LiveSessionView from '@/components/LiveSessionView';
@@ -15,11 +16,11 @@ import { getQueuedActions } from '@/lib/syncQueue';
 import type { QueuedAction } from '@/lib/syncQueue';
 import { buildSongTitleMap, toProgramDetail } from '@/lib/offlineProgramView';
 import { mergeSequencesWithPending } from '@/lib/sequencesMerge';
-import type { ReferenceData } from '@/lib/referenceData';
+import type { CachedReferenceData } from '@/lib/referenceData';
 import type { SongRow } from '@/db/schema';
 
 export default function LocalSequencePage() {
-  const [referenceData, setReferenceData] = useState<ReferenceData | null>(null);
+  const [referenceData, setReferenceData] = useState<CachedReferenceData | null>(null);
   const [programId, setProgramId] = useState<number | null>(null);
   const [sequenceId, setSequenceId] = useState<number | null>(null);
   const [checked, setChecked] = useState(false);
@@ -44,20 +45,32 @@ export default function LocalSequencePage() {
       .finally(() => setChecked(true));
   }, []);
 
-  const program = referenceData?.programs.find((p) => p.id === programId) ?? null;
-  const songTitles = program && referenceData
-    ? buildSongTitleMap(referenceData.songs, referenceData.sharedSongs)
-    : new Map<number, string>();
-  const displaySequences = program && referenceData
-    ? mergeSequencesWithPending(toProgramDetail(program, songTitles), pendingActions, songTitles)
-    : [];
-  const displaySequence = displaySequences.find((s) => s.id === sequenceId) ?? null;
-  const songsById = new Map<number, SongRow>(
-    mergeReferencedSongs(referenceData?.songs ?? [], referenceData?.sharedSongs ?? []).map((s) => [s.id, s])
+  // Memoized because every swipe/goToIndex re-renders this page during a live gig, and the
+  // overlay pipeline (title map + toProgramDetail + mergeSequencesWithPending + the songsById
+  // Map) is a pure function of inputs that only change at mount.
+  const program = useMemo(
+    () => referenceData?.programs.find((p) => p.id === programId) ?? null,
+    [referenceData, programId],
   );
-  const songs = displaySequence
-    ? displaySequence.songs.map((s) => songsById.get(s.songId)).filter((s): s is SongRow => s !== undefined)
-    : [];
+  const displaySequence = useMemo(() => {
+    if (!program || !referenceData) return null;
+    const songTitles = buildSongTitleMap(referenceData.songs, referenceData.sharedSongs);
+    const displaySequences = mergeSequencesWithPending(
+      toProgramDetail(program, songTitles),
+      pendingActions,
+      songTitles,
+    );
+    return displaySequences.find((s) => s.id === sequenceId) ?? null;
+  }, [program, referenceData, pendingActions, sequenceId]);
+  const songs = useMemo(() => {
+    if (!displaySequence || !referenceData) return [];
+    const songsById = new Map<number, SongRow>(
+      mergeReferencedSongs(referenceData.songs, referenceData.sharedSongs).map((s) => [s.id, s]),
+    );
+    return displaySequence.songs
+      .map((s) => songsById.get(s.songId))
+      .filter((s): s is SongRow => s !== undefined);
+  }, [displaySequence, referenceData]);
 
   const hasPrevious = index > 0;
   const hasNext = index < songs.length - 1;
@@ -101,6 +114,21 @@ export default function LocalSequencePage() {
       <main className="flex min-h-screen flex-col items-center justify-center bg-base-200">
         <PageNav backHref="/programs/local/program" />
         <span className="loading loading-spinner loading-lg text-primary" />
+      </main>
+    );
+  }
+
+  // A blob primed before the `entries` field existed carries `primedAt === null` and empty
+  // `entries`, so the overlay yields no σειρές. Ask for a re-prime instead of a misleading
+  // "σειρά δεν βρέθηκε" — matches the editor's contract and the program overview guard.
+  if (referenceData && referenceData.primedAt === null) {
+    return (
+      <main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-base-200 p-4 text-center">
+        <PageNav backHref="/programs/local/program" />
+        <p className="text-lg">
+          Απαιτείται προετοιμασία για offline για να εμφανιστεί αυτή η σειρά.{' '}
+          <Link href="/" className="link">Προετοιμασία για offline</Link>
+        </p>
       </main>
     );
   }

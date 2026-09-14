@@ -448,3 +448,7 @@ paths of `useKeepScreenAwake()`.
 - [ ] Make an offline edit via Διαχείριση, open the program view (shows it overlaid), then reconnect and background the app briefly; returning to the foreground on the program view shows the SERVER-reconciled state with NO manual "Προετοιμασία για offline"
 - [ ] Backgrounding and foregrounding the program view does NOT flash a loading spinner (data updates in place)
 - [ ] The sequence (lyrics) viewer is unaffected by foreground/background — your current song position is preserved (it stays mount-only by design)
+
+### Offline viewer — legacy un-primed blob guard (added 2026-09-14)
+
+- [ ] A blob primed by an app version before the `entries` field existed (`primedAt === null`, populated `songIds`, empty `entries`): opening the program view AND a σειρά shows an "Απαιτείται προετοιμασία για offline" message with a working link, not empty σειρές or a misleading "δεν βρέθηκε" — and re-priming once ("Προετοιμασία για offline") then renders them normally
