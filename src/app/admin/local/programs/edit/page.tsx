@@ -569,16 +569,16 @@ export default function LocalEditProgramPage() {
                     ) : (
                       <div className="flex items-center gap-2">
                         {isPending ? (
-                          <span className="flex-1">{seq.title} (εκκρεμεί)</span>
+                          <span className="min-w-0 flex-1 truncate">{seq.title} (εκκρεμεί)</span>
                         ) : (
-                          <button onClick={() => handleToggleExpand(seq.id)} className="btn btn-ghost btn-sm flex-1 justify-start">
-                            {expandedSeqId === seq.id ? '▾' : '▸'} {seq.title}
+                          <button onClick={() => handleToggleExpand(seq.id)} className="btn btn-ghost btn-sm min-w-0 flex-1 justify-start">
+                            <span className="truncate">{expandedSeqId === seq.id ? '▾' : '▸'} {seq.title}</span>
                           </button>
                         )}
                         {!isPending && (
-                          <button onClick={() => startEditingSequence(seq)} className="btn btn-ghost btn-sm">Μετονομασία</button>
+                          <button onClick={() => startEditingSequence(seq)} className="btn btn-ghost btn-sm shrink-0 whitespace-nowrap">Μετονομασία</button>
                         )}
-                        <button onClick={() => handleDeleteSequence(seq.id)} className="btn btn-ghost btn-sm text-error">Διαγραφή σειράς</button>
+                        <button onClick={() => handleDeleteSequence(seq.id)} className="btn btn-ghost btn-sm shrink-0 whitespace-nowrap text-error">Διαγραφή σειράς</button>
                       </div>
                     )}
 

@@ -432,3 +432,8 @@ paths of `useKeepScreenAwake()`.
 - [ ] The bottom-right badge reads "N αλλαγές δεν εφαρμόστηκαν" (conflict) or "N χρειάζεται προσοχή" (failed) with a ✕, and is tappable
 - [ ] Tapping the badge clears ALL needsAttention items at once (σειρά notes and program-rename notes disappear too); the badge goes away
 - [ ] The badge is NOT tappable/dismissable while it only shows pending sync ("N εκκρεμεί συγχρονισμός") or the blocked state — those aren't dead items
+
+### Responsive admin list rows (added 2026-09-14)
+
+- [ ] Προγράμματα list (`admin/programs`) on a phone: a program with a long title and/or a "μοιράζεται με …" badge keeps "Μετονομασία"/"Διαγραφή" as horizontal buttons on one line — no vertical character-stacking or overlap; the title shrinks/wraps instead
+- [ ] Σειρές list in the offline editor (`admin/local/programs/edit`): a long σειρά title truncates with "…" and "Μετονομασία"/"Διαγραφή σειράς" stay full-width on one line, never squeezed

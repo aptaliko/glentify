@@ -229,7 +229,7 @@ export default function ProgramsAdminPage() {
                   </form>
                 ) : (
                   <>
-                    <div className="flex flex-1 flex-col gap-1">
+                    <div className="list-col-grow flex min-w-0 flex-col gap-1">
                       {p.id === null ? (
                         <span className="text-base-content/50">{p.title}</span>
                       ) : native ? (
@@ -260,12 +260,12 @@ export default function ProgramsAdminPage() {
                       <>
                         <button
                           onClick={() => startEditing({ id: p.id as number, title: p.title })}
-                          className="btn btn-ghost btn-sm"
+                          className="btn btn-ghost btn-sm whitespace-nowrap"
                         >
                           Μετονομασία
                         </button>
                         {p.role === 'creator' && (
-                          <button onClick={() => handleDelete(p.id as number)} className="btn btn-ghost btn-sm text-error">
+                          <button onClick={() => handleDelete(p.id as number)} className="btn btn-ghost btn-sm whitespace-nowrap text-error">
                             Διαγραφή
                           </button>
                         )}
