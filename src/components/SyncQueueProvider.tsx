@@ -61,8 +61,20 @@ export default function SyncQueueProvider({ children }: { children: ReactNode })
       await refresh(); // drain the write queue first
       await primeOfflineData(); // then re-pull server truth into the blob
     });
+    // App-resume retry. The queue is otherwise only drained on mount, a
+    // networkStatusChange(connected), or a page's notifyQueueChanged() — there is no timer
+    // or polling. If the device reconnects while the app is backgrounded, or Android reports
+    // "connected" during a hotspot handoff before routing is actually usable (one failed
+    // attempt → sticky `blocked` state), nothing ever retries and the user is stuck until a
+    // manual force-quit. `visibilitychange` fires `visible` whenever the Capacitor WebView
+    // returns to the foreground, giving us that missing retry without a new native plugin.
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') refresh();
+    };
+    document.addEventListener('visibilitychange', onVisible);
     return () => {
       listenerPromise.then((listener) => listener.remove());
+      document.removeEventListener('visibilitychange', onVisible);
     };
   }, [refresh]);
 

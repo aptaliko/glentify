@@ -436,6 +436,11 @@ paths of `useKeepScreenAwake()`.
 - [ ] Closing the blocked badge does NOT drop the queued edits — they still sync once connectivity is genuinely restored (the notice hiding is cosmetic only)
 - [ ] After closing it, force-quitting and reopening the app re-shows "Ο συγχρονισμός σταμάτησε προσωρινά" if sync is still stuck (dismissal is not persisted)
 
+### App-resume sync retry (added 2026-09-14)
+
+- [ ] Make an offline edit, then reconnect while the app is BACKGROUNDED (switch to another app first, then re-enable network); bringing Glentify back to the foreground drains the queue without needing a force-quit
+- [ ] A sync that got stuck in "Ο συγχρονισμός σταμάτησε προσωρινά" during a hotspot handoff clears the next time the app is foregrounded (no manual force-quit needed)
+
 ### Responsive admin list rows (added 2026-09-14)
 
 - [ ] Προγράμματα list (`admin/programs`) on a phone: a program with a long title and/or a "μοιράζεται με …" badge keeps "Μετονομασία"/"Διαγραφή" as horizontal buttons on one line — no vertical character-stacking or overlap; the title shrinks/wraps instead
