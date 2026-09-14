@@ -59,6 +59,19 @@ describe('proxy', () => {
     expect(res.headers.get('access-control-allow-origin')).toBe('capacitor://localhost');
   });
 
+  it('allows the If-Match version-guard header in the preflight (native sequence reorder/rename)', () => {
+    // Regression: offline reorder/rename actions send an If-Match header (guardedHeaders).
+    // If it is not in Access-Control-Allow-Headers, the browser blocks the request, the
+    // sync-queue fetch rejects, and processQueue treats it as a systemic-error that wedges
+    // the whole queue ("Ο συγχρονισμός σταμάτησε προσωρινά" forever).
+    const req = new NextRequest('https://example.com/api/programs/10/sequences/30/songs', {
+      method: 'OPTIONS',
+      headers: { origin: 'capacitor://localhost' },
+    });
+    const res = proxy(req);
+    expect(res.headers.get('access-control-allow-headers')?.toLowerCase()).toContain('if-match');
+  });
+
   it('allows an /api/* request carrying only a valid cookie (no bearer token)', () => {
     const cookieValue = createSessionToken(42);
     const cookieName = getAuthCookieName();

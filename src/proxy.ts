@@ -19,7 +19,11 @@ function corsHeaders(origin: string | null): Record<string, string> {
   if (!origin || !MOBILE_ORIGINS.has(origin)) return {};
   return {
     'Access-Control-Allow-Origin': origin,
-    'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+    // If-Match carries the optimistic-concurrency version guard on native sequence/program
+    // reorder & rename syncs (see guardedHeaders in syncHandlers.ts). It MUST be allowed here
+    // or the CORS preflight blocks the request, the sync fetch rejects, and processQueue
+    // wedges on a systemic-error ("Ο συγχρονισμός σταμάτησε προσωρινά" that never clears).
+    'Access-Control-Allow-Headers': 'Authorization, Content-Type, If-Match',
     'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
   };
 }
