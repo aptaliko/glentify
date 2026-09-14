@@ -11,6 +11,10 @@ import { getSelectedProgramId, getSelectedSequenceId } from '@/lib/localPrograms
 import { mergeReferencedSongs } from '@/lib/referenceData';
 import { getSequenceSuggestions, ExplorationSessionStore } from '@/lib/sessionStore';
 import { createLocalSongPickerDataSource } from '@/lib/songPickerData';
+import { getQueuedActions } from '@/lib/syncQueue';
+import type { QueuedAction } from '@/lib/syncQueue';
+import { buildSongTitleMap, toProgramDetail } from '@/lib/offlineProgramView';
+import { mergeSequencesWithPending } from '@/lib/sequencesMerge';
 import type { ReferenceData } from '@/lib/referenceData';
 import type { SongRow } from '@/db/schema';
 
@@ -22,28 +26,37 @@ export default function LocalSequencePage() {
   const [index, setIndex] = useState(0);
   const [activeAxisTypes, setActiveAxisTypes] = useState<string[] | null>(null);
   const [exploringSongId, setExploringSongId] = useState<number | null>(null);
+  const [pendingActions, setPendingActions] = useState<QueuedAction[]>([]);
 
   useEffect(() => {
     Promise.all([
       loadReferenceData(),
       getSelectedProgramId(preferencesStore),
       getSelectedSequenceId(preferencesStore),
+      getQueuedActions(),
     ])
-      .then(([data, pId, sId]) => {
+      .then(([data, pId, sId, actions]) => {
         setReferenceData(data);
         setProgramId(pId);
         setSequenceId(sId);
+        setPendingActions(actions);
       })
       .finally(() => setChecked(true));
   }, []);
 
   const program = referenceData?.programs.find((p) => p.id === programId) ?? null;
-  const sequence = program?.sequences.find((s) => s.id === sequenceId) ?? null;
+  const songTitles = program && referenceData
+    ? buildSongTitleMap(referenceData.songs, referenceData.sharedSongs)
+    : new Map<number, string>();
+  const displaySequences = program && referenceData
+    ? mergeSequencesWithPending(toProgramDetail(program, songTitles), pendingActions, songTitles)
+    : [];
+  const displaySequence = displaySequences.find((s) => s.id === sequenceId) ?? null;
   const songsById = new Map<number, SongRow>(
     mergeReferencedSongs(referenceData?.songs ?? [], referenceData?.sharedSongs ?? []).map((s) => [s.id, s])
   );
-  const songs = sequence
-    ? sequence.songIds.map((id) => songsById.get(id)).filter((s): s is SongRow => s !== undefined)
+  const songs = displaySequence
+    ? displaySequence.songs.map((s) => songsById.get(s.songId)).filter((s): s is SongRow => s !== undefined)
     : [];
 
   const hasPrevious = index > 0;
@@ -92,7 +105,7 @@ export default function LocalSequencePage() {
     );
   }
 
-  if (!referenceData || !program || !sequence) {
+  if (!referenceData || !program || !displaySequence) {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-base-200 p-4 text-center">
         <PageNav backHref="/programs/local/program" />
@@ -105,14 +118,19 @@ export default function LocalSequencePage() {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center gap-6 bg-base-200 p-4">
         <PageNav backHref="/programs/local/program" />
-        <h1 className="text-2xl font-bold">{sequence.title}</h1>
+        <h1 className="text-2xl font-bold">{displaySequence.title}</h1>
         <p className="text-base-content/60">Δεν έχουν προστεθεί τραγούδια σε αυτή τη σειρά.</p>
       </main>
     );
   }
 
   const current = songs[Math.min(index, songs.length - 1)];
-  const suggestions = getSequenceSuggestions(referenceData, current.id, new Set(sequence.songIds), activeAxisTypes);
+  const suggestions = getSequenceSuggestions(
+    referenceData,
+    current.id,
+    new Set(displaySequence.songs.map((s) => s.songId)),
+    activeAxisTypes,
+  );
 
   function toggleSuggestionAxis(key: string) {
     const currentlyActive = activeAxisTypes ?? suggestions.activeAxisTypes;

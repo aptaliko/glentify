@@ -434,3 +434,11 @@ paths of `useKeepScreenAwake()`.
 - [ ] Offline add a NEW σειρά → it appears in the program view marked "(εκκρεμεί)" and is NOT tappable
 - [ ] A forced needsAttention reorder (version conflict) → the program view shows the last-known order, not the phantom change
 - [ ] Εξαγωγή PDF from the overlaid program view includes the overlaid songs/σειρές (a pending-create σειρά appears as an empty section)
+
+### Offline viewer pending-edit overlay — sequence (lyrics) view (added 2026-09-14)
+
+- [ ] Offline, add an existing song to a σειρά via Διαχείριση → open that σειρά in the viewer: the added song appears at the correct position and its lyrics/keys load
+- [ ] Offline reorder → the lyrics viewer's song order and "Λίστα σειράς" match the new order
+- [ ] Offline remove a song → it's gone from the lyrics viewer and its list
+- [ ] Suggestions ("επόμενο τραγούδι") treat the overlaid songs as already-played (no already-in-σειρά song suggested)
+- [ ] A σειρά whose only added song was itself created offline (draft song, no cached lyrics) → that song is skipped in the lyrics viewer (documented out-of-scope), no crash
