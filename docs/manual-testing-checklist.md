@@ -424,3 +424,11 @@ paths of `useKeepScreenAwake()`.
 - [x] Stage mode persists across app restarts and across songs
 - [x] A−/A+ and tap-zone paging still work while stage mode is on
 - [x] **Score image zoom (the touch-action risk — must be checked on-device, not in `npm run dev`):** pinch-zoom and drag-pan the παρτιτούρα image work smoothly, and the gesture is NOT stolen by page scroll; double-tap resets to fit — verified on Pixel 6, 2026-09-09
+
+### Dismissable conflict/attention indicators (added 2026-09-14)
+
+- [ ] After an offline reorder/rename loses a version conflict, the σειρά shows "Άλλαξε αλλού — η αλλαγή δεν εφαρμόστηκε." (not "από συνεργάτη"), with a ✕ next to it
+- [ ] Tapping that ✕ removes the note for that σειρά and it does not reappear on reload
+- [ ] The bottom-right badge reads "N αλλαγές δεν εφαρμόστηκαν" (conflict) or "N χρειάζεται προσοχή" (failed) with a ✕, and is tappable
+- [ ] Tapping the badge clears ALL needsAttention items at once (σειρά notes and program-rename notes disappear too); the badge goes away
+- [ ] The badge is NOT tappable/dismissable while it only shows pending sync ("N εκκρεμεί συγχρονισμός") or the blocked state — those aren't dead items

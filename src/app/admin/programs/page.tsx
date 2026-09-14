@@ -253,7 +253,7 @@ export default function ProgramsAdminPage() {
                         <span className="text-xs text-error">Απέτυχε η μετονομασία.</span>
                       )}
                       {p.status === 'conflict-rename' && (
-                        <span className="text-xs text-error">Άλλαξε από συνεργάτη — η μετονομασία δεν εφαρμόστηκε.</span>
+                        <span className="text-xs text-error">Άλλαξε αλλού — η μετονομασία δεν εφαρμόστηκε.</span>
                       )}
                     </div>
                     {p.id !== null && (

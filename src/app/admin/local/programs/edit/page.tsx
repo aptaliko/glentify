@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { nativeApiFetch } from '@/lib/nativeApiFetch';
 import { preferencesStore } from '@/lib/preferencesStore';
 import { getSelectedEditProgramId, clearSelectedEditProgramId } from '@/lib/adminEditStore';
-import { enqueue, getQueuedActions } from '@/lib/syncQueue';
+import { enqueue, getQueuedActions, dismissNeedsAttention } from '@/lib/syncQueue';
 import type { QueuedAction } from '@/lib/syncQueue';
 import { useSyncQueue } from '@/components/SyncQueueProvider';
 import { mergeCollaboratorsWithPending, isCollaboratorQueueActionForProgram } from '@/lib/collaboratorsMerge';
@@ -266,6 +266,17 @@ export default function LocalEditProgramPage() {
     });
     await notifyQueueChanged();
     await loadSequences(programId);
+  }
+
+  // Acknowledge & clear this σειρά's conflict/failed indicator so it stops showing (the
+  // flagged queue item is dead — permanently skipped, never retried — so removing it
+  // loses nothing beyond the sticky note).
+  async function handleDismissSeqAttention(seqId: number) {
+    await dismissNeedsAttention(
+      (a) => typeof a.payload === 'object' && a.payload !== null && (a.payload as { sequenceId?: number }).sequenceId === seqId
+    );
+    await notifyQueueChanged();
+    if (programId !== null) await loadSequences(programId);
   }
 
   async function handleToggleExpand(seqId: number) {
@@ -571,11 +582,21 @@ export default function LocalEditProgramPage() {
                       </div>
                     )}
 
-                    {seqAttentionReason.get(seq.id) === 'conflict' && (
-                      <span className="text-xs text-error">Άλλαξε από συνεργάτη — η αλλαγή δεν εφαρμόστηκε.</span>
-                    )}
-                    {seqAttentionReason.get(seq.id) === 'failed' && (
-                      <span className="text-xs text-error">Απέτυχε η αλλαγή.</span>
+                    {seqAttentionReason.has(seq.id) && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-error">
+                          {seqAttentionReason.get(seq.id) === 'conflict'
+                            ? 'Άλλαξε αλλού — η αλλαγή δεν εφαρμόστηκε.'
+                            : 'Απέτυχε η αλλαγή.'}
+                        </span>
+                        <button
+                          onClick={() => handleDismissSeqAttention(seq.id)}
+                          className="btn btn-ghost btn-xs"
+                          aria-label="Κλείσιμο ειδοποίησης"
+                        >
+                          ✕
+                        </button>
+                      </div>
                     )}
 
                     {!isPending && expandedSeqId === seq.id && (

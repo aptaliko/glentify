@@ -5,7 +5,7 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import { Network } from '@capacitor/network';
 import { isNativeApp } from '@/lib/platform';
 import { primeOfflineData } from '@/lib/offlineCache';
-import { processQueue } from '@/lib/syncQueue';
+import { processQueue, dismissNeedsAttention } from '@/lib/syncQueue';
 import { initSyncHandlers } from '@/lib/syncHandlers';
 
 interface SyncQueueContextValue {
@@ -58,27 +58,42 @@ export default function SyncQueueProvider({ children }: { children: ReactNode })
     };
   }, [refresh]);
 
+  // Dismiss every needsAttention item the user has acknowledged, then recount. These
+  // items are dead (permanently skipped, never retried), so clearing them loses nothing
+  // beyond the sticky badge itself — and is what makes it not "visible all the time".
+  const dismissAll = useCallback(async () => {
+    await dismissNeedsAttention();
+    await refresh();
+  }, [refresh]);
+
   return (
     <SyncQueueContext.Provider value={{ pendingCount, needsAttentionCount, conflictCount, blocked, notifyQueueChanged: refresh }}>
       {children}
       {isNativeApp() && pendingCount > 0 && (
-        <div
-          className={`fixed bottom-4 right-4 z-50 rounded-full px-3 py-1 text-sm shadow ${
-            needsAttentionCount > 0
-              ? 'bg-error text-error-content'
-              : blocked
-                ? 'bg-warning text-warning-content'
-                : 'bg-info text-info-content'
-          }`}
-        >
-          {needsAttentionCount > 0
-            ? (conflictCount > 0
-                ? `${conflictCount} άλλαξαν από συνεργάτη`
-                : `${needsAttentionCount} χρειάζεται προσοχή`)
-            : blocked
+        needsAttentionCount > 0 ? (
+          // Tappable: acknowledging clears the flagged items so the badge (and the
+          // per-item notes it mirrors) stop showing.
+          <button
+            type="button"
+            onClick={dismissAll}
+            className="fixed bottom-4 right-4 z-50 rounded-full bg-error px-3 py-1 text-sm text-error-content shadow"
+          >
+            {conflictCount > 0
+              ? `${conflictCount} αλλαγές δεν εφαρμόστηκαν`
+              : `${needsAttentionCount} χρειάζεται προσοχή`}
+            <span className="ml-2 opacity-80">✕</span>
+          </button>
+        ) : (
+          <div
+            className={`fixed bottom-4 right-4 z-50 rounded-full px-3 py-1 text-sm shadow ${
+              blocked ? 'bg-warning text-warning-content' : 'bg-info text-info-content'
+            }`}
+          >
+            {blocked
               ? 'Ο συγχρονισμός σταμάτησε προσωρινά'
               : `${pendingCount} εκκρεμεί συγχρονισμός`}
-        </div>
+          </div>
+        )
       )}
     </SyncQueueContext.Provider>
   );

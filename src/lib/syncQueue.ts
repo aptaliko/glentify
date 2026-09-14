@@ -129,6 +129,26 @@ export async function processQueueWith(storage: QueueStorage, handlers: Map<stri
   };
 }
 
+// Pure. Drops needsAttention items the user has acknowledged — optionally only those
+// matching `predicate` (e.g. one sequence's items). Items that are NOT needsAttention are
+// never removed: they may still sync, so a dismiss must never silently discard live work.
+// A needsAttention conflict/failed item is dead (permanently skipped, no retry), so
+// removing it loses nothing beyond the sticky indicator the user chose to close.
+export function removeNeedsAttention(
+  actions: QueuedAction[],
+  predicate?: (action: QueuedAction) => boolean
+): QueuedAction[] {
+  return actions.filter((a) => !(a.needsAttention && (predicate ? predicate(a) : true)));
+}
+
+export async function dismissNeedsAttentionFrom(
+  storage: QueueStorage,
+  predicate?: (action: QueuedAction) => boolean
+): Promise<void> {
+  const actions = await storage.get();
+  await storage.set(removeNeedsAttention(actions, predicate));
+}
+
 import { indexedDbQueueStorage } from './syncQueueStorage';
 
 const handlerRegistry = new Map<string, SyncHandler>();
@@ -158,6 +178,15 @@ export async function enqueue(type: string, payload: unknown): Promise<void> {
 
 export async function processQueue(): Promise<ProcessResult> {
   return serialize(() => processQueueWith(indexedDbQueueStorage, handlerRegistry));
+}
+
+// Removes needsAttention items the user dismissed (all, or just those matching
+// `predicate`). Serialized against enqueue/processQueue so it never races the queue's
+// read-modify-write cycle. Callers refresh the badge afterwards via notifyQueueChanged().
+export async function dismissNeedsAttention(
+  predicate?: (action: QueuedAction) => boolean
+): Promise<void> {
+  return serialize(() => dismissNeedsAttentionFrom(indexedDbQueueStorage, predicate));
 }
 
 // Read-only introspection for consumers that need to render pending/failed items

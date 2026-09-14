@@ -1,6 +1,6 @@
 // src/lib/syncQueue.test.ts
 import { describe, it, expect, vi } from 'vitest';
-import { enqueueTo, processQueueWith, serialize } from './syncQueue';
+import { enqueueTo, processQueueWith, serialize, removeNeedsAttention, dismissNeedsAttentionFrom } from './syncQueue';
 import type { QueuedAction, QueueStorage, SyncHandler } from './syncQueue';
 
 function inMemoryQueueStorage(): QueueStorage {
@@ -231,5 +231,47 @@ describe('serialize', () => {
     // A must fully complete (both its start AND end) before B's start appears — proving
     // no interleaving occurred, regardless of each operation's own internal delay.
     expect(events).toEqual(['A-start', 'A-end', 'B-start', 'B-end']);
+  });
+});
+
+describe('removeNeedsAttention', () => {
+  it('removes all needsAttention items when no predicate is given', () => {
+    const actions = [
+      action({ id: '1', type: 'sequence-reorder', needsAttention: true, needsAttentionReason: 'conflict' }),
+      action({ id: '2', type: 'sequence-reorder', needsAttention: false }),
+      action({ id: '3', type: 'sequence-rename', needsAttention: true, needsAttentionReason: 'failed' }),
+    ];
+    expect(removeNeedsAttention(actions).map((a) => a.id)).toEqual(['2']);
+  });
+
+  it('never removes a non-needsAttention item (still-syncable work is preserved)', () => {
+    const actions = [
+      action({ id: '1', type: 'sequence-reorder', needsAttention: false }),
+      action({ id: '2', type: 'sequence-add-song', needsAttention: false }),
+    ];
+    expect(removeNeedsAttention(actions).map((a) => a.id)).toEqual(['1', '2']);
+  });
+
+  it('with a predicate, removes only matching needsAttention items', () => {
+    const actions = [
+      action({ id: '1', type: 'sequence-reorder', needsAttention: true, needsAttentionReason: 'conflict', payload: { sequenceId: 30 } }),
+      action({ id: '2', type: 'sequence-rename', needsAttention: true, needsAttentionReason: 'conflict', payload: { sequenceId: 99 } }),
+      action({ id: '3', type: 'sequence-reorder', needsAttention: false, payload: { sequenceId: 30 } }),
+    ];
+    const predicate = (a: QueuedAction) =>
+      typeof a.payload === 'object' && a.payload !== null && (a.payload as { sequenceId?: number }).sequenceId === 30;
+    // Only id '1' matches (needsAttention AND sequenceId 30). '2' is another sequence; '3' isn't needsAttention.
+    expect(removeNeedsAttention(actions, predicate).map((a) => a.id)).toEqual(['2', '3']);
+  });
+});
+
+describe('dismissNeedsAttentionFrom', () => {
+  it('persists the queue with the dismissed needsAttention items gone', async () => {
+    const storage = makeStorage([
+      action({ id: '1', type: 'sequence-reorder', needsAttention: true, needsAttentionReason: 'conflict' }),
+      action({ id: '2', type: 'sequence-add-song', needsAttention: false }),
+    ]);
+    await dismissNeedsAttentionFrom(storage);
+    expect((await storage.get()).map((a) => a.id)).toEqual(['2']);
   });
 });
