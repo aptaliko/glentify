@@ -169,12 +169,25 @@ export async function removeSongFromSequence(sequenceId: number, sequenceSongId:
 // the response's version stays consistent with the DB and a user's own consecutive
 // offline reorders don't false-conflict.
 export async function applySequenceSongOrder(sequenceId: number, orderedSequenceSongIds: number[]): Promise<void> {
-  for (const [position, sequenceSongId] of orderedSequenceSongIds.entries()) {
-    await db
-      .update(sequenceSongs)
-      .set({ position })
-      .where(and(eq(sequenceSongs.id, sequenceSongId), eq(sequenceSongs.sequenceId, sequenceId)));
-  }
+  if (orderedSequenceSongIds.length === 0) return;
+  // One atomic UPDATE ... FROM (VALUES ...) instead of N sequential per-song updates. Over
+  // neon-http every query is its own HTTP round-trip with no interactive transaction, so the
+  // old loop was N cold round-trips AND non-atomic: a single mid-loop failure left the σειρά
+  // half-reordered and threw, and — because the guarded PATCH bumps the version *before*
+  // applying the order — a thrown route returns a 500 that carries none of proxy.ts's CORS
+  // headers, so native sync saw a CORS "Failed to fetch" (systemic-error) on a write that had
+  // already partly applied, then 409'd on retry. Collapsing to one statement fixes both the
+  // latency and the atomicity.
+  const rows = sql.join(
+    orderedSequenceSongIds.map((id, position) => sql`(${id}::int, ${position}::int)`),
+    sql`, `
+  );
+  await db.execute(sql`
+    UPDATE ${sequenceSongs} AS s
+    SET position = v.position
+    FROM (VALUES ${rows}) AS v(id, position)
+    WHERE s.id = v.id AND s.sequence_id = ${sequenceId}
+  `);
 }
 
 export async function reorderSequenceSongs(sequenceId: number, orderedSequenceSongIds: number[]): Promise<void> {
