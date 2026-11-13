@@ -41,7 +41,9 @@ export default function NativeAuthGuard({ children }: { children: ReactNode }) {
   const [checked, setChecked] = useState(!native || isPublic);
 
   useEffect(() => {
-    if (checked) return;
+    // Public routes are never gated, so there is nothing to check there. Skipping them also
+    // stops this from clearing the token again every time /login re-renders.
+    if (checked || isPublic) return;
     let cancelled = false;
     getAuthToken().then(async (token) => {
       if (cancelled) return;
@@ -59,8 +61,10 @@ export default function NativeAuthGuard({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [checked, router]);
+  }, [checked, isPublic, router]);
 
-  if (!checked) return null;
+  // Public routes always render. Only a protected route waits for the token check, so a
+  // redirect to /login after a failed check lands on a visible page instead of a blank one.
+  if (!checked && !isPublic) return null;
   return <>{children}</>;
 }
