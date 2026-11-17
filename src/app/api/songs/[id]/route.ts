@@ -4,7 +4,7 @@ import { getSongWithAxisValues, getSongById, updateSong, deleteSong } from '@/db
 import { getUserId } from '@/lib/requestUser';
 
 const axisValueSchema = z.object({
-  axisType: z.enum(['genre', 'region', 'rhythm', 'dromos', 'composer', 'year']),
+  axisType: z.enum(['genre', 'region', 'rhythm', 'dromos', 'dance', 'composer', 'year']),
   refId: z.number().int().nullable(),
   yearValue: z.number().int().nullable(),
 });

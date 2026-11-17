@@ -10,6 +10,7 @@ function makeReferenceData(overrides: Partial<ReferenceData> = {}): ReferenceDat
     regions: [],
     rhythms: [],
     dromoi: [],
+    dances: [],
     composers: [],
     genres: [],
     axisTypes: [],
@@ -58,6 +59,7 @@ describe('resolveAxisEditorData', () => {
       ],
       rhythms: [{ id: 30, name: 'Συρτός', ownerId: null }],
       dromoi: [{ id: 40, name: 'Ουσάκ', ownerId: null }],
+      dances: [],
       composers: [{ id: 50, name: 'Ανώνυμος', ownerId: null }],
     });
     expect(resolveAxisEditorData(referenceData).optionsByAxis).toEqual({

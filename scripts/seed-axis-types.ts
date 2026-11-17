@@ -7,6 +7,7 @@ const AXIS_TYPES: { key: string; label: string; lookupTable: string | null; hier
   { key: 'genre', label: 'Είδος', lookupTable: 'genres', hierarchical: false },
   { key: 'rhythm', label: 'Ρυθμός', lookupTable: 'rhythms', hierarchical: false },
   { key: 'dromos', label: 'Δρόμος', lookupTable: 'dromoi', hierarchical: false },
+  { key: 'dance', label: 'Χορός', lookupTable: 'dances', hierarchical: false },
   { key: 'composer', label: 'Συνθέτης', lookupTable: 'composers', hierarchical: false },
   { key: 'year', label: 'Χρονολογία', lookupTable: null, hierarchical: false },
 ];

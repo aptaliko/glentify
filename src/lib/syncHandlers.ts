@@ -15,7 +15,7 @@ import { getLocalImage, deleteLocalImage, recordImageResolution, loadImageResolu
 interface TaxonomyCreatePayload { draftId: number; name: string; parentId: number | null }
 interface TaxonomyDeletePayload { id: number }
 
-const TAXONOMY_ENTITIES: DraftEntity[] = ['regions', 'genres', 'rhythms', 'dromoi', 'composers'];
+const TAXONOMY_ENTITIES: DraftEntity[] = ['regions', 'genres', 'rhythms', 'dromoi', 'dances', 'composers'];
 
 export function makeTaxonomyCreateHandler(entity: DraftEntity) {
   return async function (payload: unknown): Promise<SyncOutcome> {

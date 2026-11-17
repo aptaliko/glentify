@@ -10,7 +10,7 @@ import {
   type AxisValue,
   type SongWithAxes,
 } from './suggestions';
-import type { SongRow, RegionRow, RhythmRow, DromosRow, ComposerRow, AxisTypeRow, GenreRow } from '@/db/schema';
+import type { SongRow, RegionRow, RhythmRow, DromosRow, DanceRow, ComposerRow, AxisTypeRow, GenreRow } from '@/db/schema';
 
 function makeSong(id: number, title: string): SongRow {
   return {
@@ -176,13 +176,14 @@ describe('getSuggestions', () => {
 describe('buildSuggestionsResponse', () => {
   const rhythms: RhythmRow[] = [{ id: 1, name: 'Καλαματιανός', ownerId: null }];
   const dromoi: DromosRow[] = [{ id: 1, name: 'Ραστ', ownerId: null }];
+  const dances: DanceRow[] = [];
   const composers: ComposerRow[] = [];
   const axisTypes: AxisTypeRow[] = [
     { id: 1, key: 'region', label: 'Περιοχή', lookupTable: 'regions', hierarchical: true },
     { id: 2, key: 'rhythm', label: 'Ρυθμός', lookupTable: 'rhythms', hierarchical: false },
   ];
   const genres: GenreRow[] = [{ id: 1, name: 'Παραδοσιακό', ownerId: null }];
-  const lookups = { regions, rhythms, dromoi, composers, axisTypes, genres };
+  const lookups = { regions, rhythms, dromoi, dances, composers, axisTypes, genres };
 
   it('returns an empty ungrouped response when there is no current song', () => {
     const result = buildSuggestionsResponse({
@@ -226,6 +227,28 @@ describe('buildSuggestionsResponse', () => {
     ]);
     expect(result.candidates).toEqual([{ id: 2, title: 'Τραγούδι Β', played: false }]);
     expect(result.listTitle).toBe('Άλλα τραγούδια με τα ίδια: Περιοχή, Ρυθμός');
+  });
+
+  it('ranks and labels a dance axis value with its Greek name, not "?"', () => {
+    const danceLookups = {
+      ...lookups,
+      dances: [{ id: 1, name: 'Τσάμικος', ownerId: null }],
+      axisTypes: [...axisTypes, { id: 7, key: 'dance', label: 'Χορός', lookupTable: 'dances', hierarchical: false }],
+    };
+    const allSongs = [
+      { song: makeSong(1, 'Τραγούδι Α'), axisValues: [av('dance', 1)] },
+      { song: makeSong(2, 'Τραγούδι Β'), axisValues: [av('dance', 1)] },
+    ];
+    const result = buildSuggestionsResponse({
+      currentSongWithAxes: { id: 1, title: 'Τραγούδι Α', lyrics: null, imageUrl: null, maleKey: null, femaleKey: null, axisValues: [av('dance', 1)] },
+      allSongs,
+      playedSongIds: new Set(),
+      showPlayed: false,
+      requestedActive: null,
+      lookups: danceLookups,
+    });
+    expect(result.availableAxisTypes).toEqual([{ key: 'dance', label: 'Χορός', value: 'Τσάμικος' }]);
+    expect(result.candidates).toEqual([{ id: 2, title: 'Τραγούδι Β', played: false }]);
   });
 
   it('builds a populated ungrouped response when the current song has no active axis filters', () => {

@@ -1,4 +1,4 @@
-import type { SongRow, SongAxisValueRow, RegionRow, RhythmRow, DromosRow, ComposerRow, AxisTypeRow, GenreRow } from '@/db/schema';
+import type { SongRow, SongAxisValueRow, RegionRow, RhythmRow, DromosRow, DanceRow, ComposerRow, AxisTypeRow, GenreRow } from '@/db/schema';
 
 export interface OfflineCollaborator {
   id: number;
@@ -36,6 +36,7 @@ export interface ReferenceData {
   regions: RegionRow[];
   rhythms: RhythmRow[];
   dromoi: DromosRow[];
+  dances: DanceRow[];
   composers: ComposerRow[];
   axisTypes: AxisTypeRow[];
   genres: GenreRow[];
@@ -123,6 +124,7 @@ export function normalizeReferenceData(data: ReferenceData): ReferenceData {
     })),
     sharedSongs: data.sharedSongs ?? [],
     axisTypes: data.axisTypes ?? [],
+    dances: data.dances ?? [],
     currentUser: data.currentUser ?? null,
   };
 }

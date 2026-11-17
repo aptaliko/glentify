@@ -23,7 +23,7 @@ export interface AxisValueEntry {
 // The five lookup tables an axis type can point at — same set SongAxisEditor's web
 // branch fetches individually (see LOOKUP_ENDPOINTS there), and, not by coincidence,
 // exactly the field names ReferenceData already carries them under.
-const LOOKUP_FIELDS = ['regions', 'genres', 'rhythms', 'dromoi', 'composers'] as const;
+const LOOKUP_FIELDS = ['regions', 'genres', 'rhythms', 'dromoi', 'dances', 'composers'] as const;
 type LookupField = (typeof LOOKUP_FIELDS)[number];
 
 function isLookupField(value: string): value is LookupField {

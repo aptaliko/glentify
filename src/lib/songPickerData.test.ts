@@ -31,6 +31,7 @@ function referenceData(): ReferenceData {
     regions,
     rhythms: [],
     dromoi: [],
+    dances: [],
     composers: [],
     axisTypes: [],
     genres: [],

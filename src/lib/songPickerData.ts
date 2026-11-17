@@ -22,6 +22,11 @@ export interface SongPickerDromos {
   name: string;
 }
 
+export interface SongPickerDance {
+  id: number;
+  name: string;
+}
+
 export interface SongPickerComposer {
   id: number;
   name: string;
@@ -37,6 +42,7 @@ export interface SongPickerFilters {
   regionId?: number;
   rhythmId?: number;
   dromosId?: number;
+  danceId?: number;
   composerId?: number;
   year?: number;
   search?: string;
@@ -47,6 +53,7 @@ export interface SongPickerDataSource {
   listRegions(): Promise<SongPickerRegion[]>;
   listRhythms(): Promise<SongPickerRhythm[]>;
   listDromoi(): Promise<SongPickerDromos[]>;
+  listDances(): Promise<SongPickerDance[]>;
   listComposers(): Promise<SongPickerComposer[]>;
   listSongs(filters: SongPickerFilters): Promise<SongPickerSong[]>;
   /** All songs, unfiltered — used by the new SongPicker's default paginated view. */
@@ -70,6 +77,10 @@ export const remoteSongPickerDataSource: SongPickerDataSource = {
     const res = await fetch('/api/dromoi');
     return res.json();
   },
+  async listDances() {
+    const res = await fetch('/api/dances');
+    return res.json();
+  },
   async listComposers() {
     const res = await fetch('/api/composers');
     return res.json();
@@ -80,6 +91,7 @@ export const remoteSongPickerDataSource: SongPickerDataSource = {
     if (filters.regionId) params.set('regionId', String(filters.regionId));
     if (filters.rhythmId) params.set('rhythmId', String(filters.rhythmId));
     if (filters.dromosId) params.set('dromosId', String(filters.dromosId));
+    if (filters.danceId) params.set('danceId', String(filters.danceId));
     if (filters.composerId) params.set('composerId', String(filters.composerId));
     if (filters.year) params.set('year', String(filters.year));
     if (filters.search) params.set('search', filters.search);
@@ -115,6 +127,12 @@ export function filterSongsLocal(data: ReferenceData, filters: SongPickerFilters
       data.axisValues.filter((av) => av.axisType === 'dromos' && av.refId === filters.dromosId).map((av) => av.songId)
     );
     results = results.filter((s) => dromosSongIds.has(s.id));
+  }
+  if (filters.danceId) {
+    const danceSongIds = new Set(
+      data.axisValues.filter((av) => av.axisType === 'dance' && av.refId === filters.danceId).map((av) => av.songId)
+    );
+    results = results.filter((s) => danceSongIds.has(s.id));
   }
   if (filters.composerId) {
     const composerSongIds = new Set(
@@ -153,6 +171,9 @@ export function createLocalSongPickerDataSource(data: ReferenceData): SongPicker
     },
     async listDromoi() {
       return data.dromoi.map((d) => ({ id: d.id, name: d.name }));
+    },
+    async listDances() {
+      return data.dances.map((d) => ({ id: d.id, name: d.name }));
     },
     async listComposers() {
       return data.composers.map((c) => ({ id: c.id, name: c.name }));

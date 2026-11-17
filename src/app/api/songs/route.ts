@@ -4,7 +4,7 @@ import { listSongs, createSong } from '@/db/queries/songs';
 import { getUserId } from '@/lib/requestUser';
 
 const axisValueSchema = z.object({
-  axisType: z.enum(['genre', 'region', 'rhythm', 'dromos', 'composer', 'year']),
+  axisType: z.enum(['genre', 'region', 'rhythm', 'dromos', 'dance', 'composer', 'year']),
   refId: z.number().int().nullable(),
   yearValue: z.number().int().nullable(),
 });
@@ -28,6 +28,7 @@ export async function GET(request: NextRequest) {
     regionId: params.get('regionId') ? Number(params.get('regionId')) : undefined,
     rhythmId: params.get('rhythmId') ? Number(params.get('rhythmId')) : undefined,
     dromosId: params.get('dromosId') ? Number(params.get('dromosId')) : undefined,
+    danceId: params.get('danceId') ? Number(params.get('danceId')) : undefined,
     composerId: params.get('composerId') ? Number(params.get('composerId')) : undefined,
     year: params.get('year') ? Number(params.get('year')) : undefined,
   });

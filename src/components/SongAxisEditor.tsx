@@ -18,6 +18,7 @@ const LOOKUP_ENDPOINTS: Record<string, string> = {
   genres: '/api/genres',
   rhythms: '/api/rhythms',
   dromoi: '/api/dromoi',
+  dances: '/api/dances',
   composers: '/api/composers',
 };
 

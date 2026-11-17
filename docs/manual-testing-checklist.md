@@ -287,13 +287,14 @@ use the "Unified offline-cache priming" section's checks instead.
 
 Preconditions: native build installed; tap "Προετοιμασία για offline" on the home page once while online so `referenceData` (taxonomy + programs) is cached; open the target program's edit page once while online so its detail is cached.
 
-### Taxonomy admin offline (regions/genres/rhythms/dromoi/composers)
+### Taxonomy admin offline (regions/genres/rhythms/dromoi/dances/composers)
 - [ ] Go offline (airplane mode). Open Περιοχές — the list renders from cache with an "Χωρίς σύνδεση" notice.
 - [ ] Create a value offline → it appears immediately tagged "(εκκρεμεί)"; the sync badge increments.
 - [ ] Delete a cached value offline → it disappears immediately.
 - [ ] Repeat create for Είδη, Ρυθμοί, Δρόμοι, Συνθέτες.
 - [ ] Go online → badge drains; reopen each page → pending values are now real (no "(εκκρεμεί)"), deletes stuck.
 - [ ] Offline-delete a value that IS used by a song, then go online → it lands in needsAttention (still referenced / 409); the row reappears.
+- [ ] Χοροί (dances axis, added 2026-11-17): offline, create a dance → it appears "(εκκρεμεί)"; go online → it syncs, the pending label clears; in Άξονες pick "Χορός" → the dance values list, and a song tagged with a dance keeps it after sync.
 
 ### Create-and-assign inside a song (SongAxisEditor)
 - [ ] Offline, edit a song → Άξονες → pick an axis → "+ Νέα τιμή" is now enabled → create a value → it's selected → Προσθήκη → Αποθήκευση.
