@@ -54,16 +54,71 @@ export function regionMatchesFilter(candidateRegionId: number, currentRegionId: 
   if (candidateRegionId === currentRegionId) return true;
   if (getRegionAncestorIds(currentRegionId, regions).includes(candidateRegionId)) return true;
   if (getRegionDescendantIds(currentRegionId, regions).includes(candidateRegionId)) return true;
-  return getRegionSiblingIds(currentRegionId, regions).includes(candidateRegionId);
+  return false;
 }
 
-// Direct siblings only: other regions sharing the same parent (not cousins, not the parent's siblings).
-export function getRegionSiblingIds(regionId: number, regions: RegionRow[]): number[] {
-  const current = regions.find((r) => r.id === regionId);
-  if (!current || current.parentId === null) return [];
-  return regions
-    .filter((r) => r.parentId === current.parentId && r.id !== regionId)
-    .map((r) => r.id);
+export interface FilterValue {
+  axisType: string;
+  refId: number | null;
+  yearValue: number | null;
+}
+
+// Default filters: the song's region followed by its ancestors (current first), then one value per other axis.
+// Ancestor ids missing from `regions` are dropped, so a dangling parentId never becomes a phantom chip.
+export function defaultFilters(current: AxisValue[], regions: RegionRow[]): FilterValue[] {
+  const known = new Set(regions.map((r) => r.id));
+  const result: FilterValue[] = [];
+  const region = current.find((v) => v.axisType === 'region');
+  if (region && region.refId !== null) {
+    result.push({ axisType: 'region', refId: region.refId, yearValue: null });
+    for (const id of getRegionAncestorIds(region.refId, regions)) {
+      if (known.has(id)) result.push({ axisType: 'region', refId: id, yearValue: null });
+    }
+  }
+  for (const v of current) {
+    if (v.axisType === 'region') continue;
+    result.push({ axisType: v.axisType, refId: v.refId, yearValue: v.yearValue });
+  }
+  return result;
+}
+
+export function filterKey(v: FilterValue): string {
+  return `${v.axisType}:${v.refId ?? v.yearValue}`;
+}
+
+// Stable sort by position in axisOrder; axes not in axisOrder go last, keeping insertion order.
+export function orderFilters(filters: FilterValue[], axisOrder: string[]): FilterValue[] {
+  const rank = (f: FilterValue) => {
+    const i = axisOrder.indexOf(f.axisType);
+    return i === -1 ? axisOrder.length : i;
+  };
+  return [...filters].sort((a, b) => rank(a) - rank(b));
+}
+
+function valueMatchesFilter(v: AxisValue, f: FilterValue): boolean {
+  if (v.axisType !== f.axisType) return false;
+  if (f.axisType === 'year') return v.yearValue === f.yearValue;
+  return v.refId === f.refId;
+}
+
+// Every filtered axis must be satisfied by one of its selected values (OR within an axis, AND across axes).
+export function matchesFilters(candidate: AxisValue[], filters: FilterValue[]): boolean {
+  const byAxis = new Map<string, FilterValue[]>();
+  for (const f of filters) {
+    const list = byAxis.get(f.axisType) ?? [];
+    list.push(f);
+    byAxis.set(f.axisType, list);
+  }
+  for (const fs of byAxis.values()) {
+    if (!fs.some((f) => candidate.some((v) => valueMatchesFilter(v, f)))) return false;
+  }
+  return true;
+}
+
+// Index in orderedFilters of the first filter the candidate satisfies, or MAX_SAFE_INTEGER if none does.
+export function firstMatchIndex(candidate: AxisValue[], orderedFilters: FilterValue[]): number {
+  const i = orderedFilters.findIndex((f) => candidate.some((v) => valueMatchesFilter(v, f)));
+  return i === -1 ? Number.MAX_SAFE_INTEGER : i;
 }
 
 export interface FilteredCandidatesParams {

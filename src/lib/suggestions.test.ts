@@ -2,8 +2,11 @@ import { describe, it, expect } from 'vitest';
 import {
   getRegionAncestorIds,
   getRegionDescendantIds,
-  getRegionSiblingIds,
   regionMatchesFilter,
+  defaultFilters,
+  matchesFilters,
+  orderFilters,
+  firstMatchIndex,
   getFilteredCandidates,
   rankBySharedAxes,
   getSuggestions,
@@ -76,25 +79,13 @@ describe('regionMatchesFilter', () => {
     expect(regionMatchesFilter(6, 5, regions)).toBe(false); // Κύθηρα vs Απείρανθος share only the "Νησιά" great-ancestor via Νησιά(1), but 6's parent is 1 directly, not on the Απείρανθος branch
   });
 
-  it('matches a sibling region (same parent)', () => {
-    expect(regionMatchesFilter(6, 2, regions)).toBe(true); // Κύθηρα and Νησιά Αιγαίου both sit directly under Νησιά(1)
-    expect(regionMatchesFilter(2, 6, regions)).toBe(true);
+  it('does not match a sibling region (same parent)', () => {
+    expect(regionMatchesFilter(6, 2, regions)).toBe(false); // Κύθηρα and Νησιά Αιγαίου both sit under Νησιά(1); siblings no longer match
+    expect(regionMatchesFilter(2, 6, regions)).toBe(false);
   });
 
   it('does not match a cousin (sibling of an ancestor)', () => {
     expect(regionMatchesFilter(6, 3, regions)).toBe(false); // Κύθηρα(6) is a sibling of Νησιά Αιγαίου(2), not of Κυκλάδες(3)
-  });
-});
-
-describe('getRegionSiblingIds', () => {
-  it('returns regions sharing the same parent, excluding itself', () => {
-    expect(getRegionSiblingIds(2, regions)).toEqual([6]);
-    expect(getRegionSiblingIds(6, regions)).toEqual([2]);
-  });
-
-  it('returns an empty array for a root region or an only child', () => {
-    expect(getRegionSiblingIds(1, regions)).toEqual([]);
-    expect(getRegionSiblingIds(3, regions)).toEqual([]);
   });
 });
 
@@ -292,5 +283,53 @@ describe('buildSuggestionsResponse', () => {
     expect(result.songs).toEqual([{ id: 2, title: 'Τραγούδι Β', played: false }]);
     expect(result.candidates).toEqual([]);
     expect(result.listTitle).toBe('');
+  });
+});
+
+describe('defaultFilters', () => {
+  it('puts the current region first, then its ancestors, then the other axes', () => {
+    const f = defaultFilters([av('region', 5), av('rhythm', 10)], regions);
+    expect(f.map((x) => x.refId)).toEqual([5, 4, 3, 2, 1, 10]);
+  });
+  it('gives only the other axes for a song without a region', () => {
+    expect(defaultFilters([av('rhythm', 10)], regions)).toEqual([{ axisType: 'rhythm', refId: 10, yearValue: null }]);
+  });
+  it('stops at a missing ancestor without throwing and without a phantom chip', () => {
+    const broken: RegionRow[] = [{ id: 7, name: 'x', parentId: 999, ownerId: null }];
+    expect(defaultFilters([av('region', 7)], broken).map((x) => x.refId)).toEqual([7]);
+  });
+});
+
+describe('matchesFilters', () => {
+  it('requires every filtered axis to match', () => {
+    const song = [av('region', 4), av('rhythm', 10)];
+    expect(matchesFilters(song, [{ axisType: 'region', refId: 4, yearValue: null }, { axisType: 'rhythm', refId: 10, yearValue: null }])).toBe(true);
+    expect(matchesFilters(song, [{ axisType: 'region', refId: 4, yearValue: null }, { axisType: 'rhythm', refId: 99, yearValue: null }])).toBe(false);
+  });
+  it('ORs multiple values on one axis', () => {
+    const f = [{ axisType: 'region', refId: 4, yearValue: null }, { axisType: 'region', refId: 5, yearValue: null }];
+    expect(matchesFilters([av('region', 5)], f)).toBe(true);
+    expect(matchesFilters([av('region', 3)], f)).toBe(false);
+  });
+  it('matches region exactly, with no parent or child matching', () => {
+    expect(matchesFilters([av('region', 1)], [{ axisType: 'region', refId: 5, yearValue: null }])).toBe(false);
+  });
+  it('excludes a song with no value on a filtered axis', () => {
+    expect(matchesFilters([av('rhythm', 10)], [{ axisType: 'region', refId: 4, yearValue: null }])).toBe(false);
+  });
+  it('treats no filters as matching everything', () => {
+    expect(matchesFilters([], [])).toBe(true);
+  });
+});
+
+describe('firstMatchIndex and orderFilters', () => {
+  it('orders filters by axis order, keeping insertion order within an axis', () => {
+    const f = [{ axisType: 'rhythm', refId: 10, yearValue: null }, { axisType: 'region', refId: 5, yearValue: null }, { axisType: 'region', refId: 4, yearValue: null }];
+    expect(orderFilters(f, ['region', 'rhythm']).map((x) => x.refId)).toEqual([5, 4, 10]);
+  });
+  it('returns the earliest matching filter in on-screen order', () => {
+    const ordered = [{ axisType: 'region', refId: 5, yearValue: null }, { axisType: 'region', refId: 4, yearValue: null }];
+    expect(firstMatchIndex([av('region', 4)], ordered)).toBe(1);
+    expect(firstMatchIndex([av('region', 5), av('region', 4)], ordered)).toBe(0);
   });
 });
