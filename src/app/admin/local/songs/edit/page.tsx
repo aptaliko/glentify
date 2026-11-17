@@ -13,6 +13,7 @@ import { useSyncQueue } from '@/components/SyncQueueProvider';
 import SongAxisEditor, { type AxisValueEntry } from '@/components/SongAxisEditor';
 import PageNav from '@/components/PageNav';
 import { validateImageFile, IMAGE_ACCEPT_ATTR } from '@/lib/imageValidation';
+import { validatePdfFile, ALLOWED_PDF_TYPE } from '@/lib/pdfValidation';
 import { putLocalImage, deleteLocalImage, getLocalImage } from '@/lib/localImageStore';
 import { mintDraftId } from '@/lib/draftIds';
 
@@ -74,6 +75,12 @@ export default function LocalEditSongPage() {
   // queued update unresolvable on reconnect. null when this session picked the image.
   const [loadedBlobId, setLoadedBlobId] = useState<number | null>(null);
   const [localPreviewUrl, setLocalPreviewUrl] = useState<string | null>(null);
+  // PDF mirrors the image: a real URL, a queued draft id for bytes picked offline, and the
+  // seeded id from an earlier queued update, which must never be deleted here (same rule as images).
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [pendingPdfBlobId, setPendingPdfBlobId] = useState<number | null>(null);
+  const [loadedPdfBlobId, setLoadedPdfBlobId] = useState<number | null>(null);
+  const [pendingPdfName, setPendingPdfName] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -109,6 +116,10 @@ export default function LocalEditSongPage() {
           setMaleKey(result.song.maleKey ?? '');
           setFemaleKey(result.song.femaleKey ?? '');
           setImageUrl(result.song.imageUrl);
+          setPdfUrl(result.song.pdfUrl ?? null);
+          setPendingPdfBlobId(result.song.pendingPdfBlobId ?? null);
+          setLoadedPdfBlobId(result.song.pendingPdfBlobId ?? null);
+          setPendingPdfName(result.song.pendingPdfBlobId != null ? 'PDF σε αναμονή' : null);
           setAxisValues(result.song.axisValues);
           setNotFound(false);
           const pendingId = result.song.pendingImageBlobId;
@@ -162,6 +173,47 @@ export default function LocalEditSongPage() {
     input.value = ''; // let the same filename be re-picked later (e.g. after Remove)
   }
 
+  async function handlePdfChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const input = e.target;
+    const file = input.files?.[0];
+    if (!file) return;
+    setError(null);
+    const validation = validatePdfFile(file);
+    if (!validation.ok) {
+      setError(validation.reason);
+      input.value = '';
+      return;
+    }
+    const draftId = mintDraftId();
+    try {
+      await putLocalImage(draftId, { blob: file, contentType: ALLOWED_PDF_TYPE, filename: file.name });
+    } catch {
+      setError('Αποτυχία αποθήκευσης PDF.');
+      return;
+    }
+    if (pendingPdfBlobId != null && pendingPdfBlobId !== loadedPdfBlobId) {
+      try { await deleteLocalImage(pendingPdfBlobId); } catch { /* best-effort */ }
+    }
+    setPendingPdfBlobId(draftId);
+    setPendingPdfName(file.name);
+    setPdfUrl(null); // a fresh pending PDF supersedes the existing real URL
+    input.value = '';
+  }
+
+  async function handleRemovePdf() {
+    // Same rule as images: never delete bytes seeded from a still-queued update.
+    if (pendingPdfBlobId != null && pendingPdfBlobId !== loadedPdfBlobId) {
+      try {
+        await deleteLocalImage(pendingPdfBlobId);
+      } catch {
+        // best-effort
+      }
+    }
+    setPendingPdfBlobId(null);
+    setPendingPdfName(null);
+    setPdfUrl(null);
+  }
+
   async function handleRemoveImage() {
     // Only delete bytes picked in *this* session. A pendingImageBlobId seeded from
     // resolveSongForEdit belongs to an earlier still-queued update; deleting it would make
@@ -194,6 +246,8 @@ export default function LocalEditSongPage() {
         axisValues,
         imageUrl,
         pendingImageBlobId,
+        pdfUrl,
+        pendingPdfBlobId,
       });
     } catch {
       setError('Αποτυχία αποθήκευσης. Δοκίμασε ξανά.');
@@ -271,6 +325,16 @@ export default function LocalEditSongPage() {
             <>
               <img src={localPreviewUrl ?? imageUrl ?? undefined} alt="Προεπισκόπηση παρτιτούρας" className="max-h-64 rounded-box object-contain" />
               <button type="button" onClick={handleRemoveImage} className="btn btn-sm btn-outline btn-error self-start">Αφαίρεση εικόνας</button>
+            </>
+          )}
+        </div>
+        <div className="flex flex-col gap-2">
+          <label className="label-text">Στίχοι σε PDF (προαιρετικό)</label>
+          <input type="file" accept={ALLOWED_PDF_TYPE} onChange={handlePdfChange} className="file-input file-input-bordered" />
+          {(pendingPdfName || pdfUrl) && (
+            <>
+              <span className="text-sm">{pendingPdfName ?? 'PDF'}</span>
+              <button type="button" onClick={handleRemovePdf} className="btn btn-sm btn-outline btn-error self-start">Αφαίρεση PDF</button>
             </>
           )}
         </div>

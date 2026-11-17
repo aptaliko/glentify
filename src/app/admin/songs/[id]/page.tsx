@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { upload } from '@vercel/blob/client';
 import PageNav from '@/components/PageNav';
+import { validatePdfFile, ALLOWED_PDF_TYPE } from '@/lib/pdfValidation';
 import SongAxisEditor, { type AxisValueEntry } from '@/components/SongAxisEditor';
 
 export default function EditSongPage() {
@@ -18,6 +19,8 @@ export default function EditSongPage() {
   const [axisValues, setAxisValues] = useState<AxisValueEntry[]>([]);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [uploadingPdf, setUploadingPdf] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -39,6 +42,32 @@ export default function EditSongPage() {
     setImageUrl(null);
   }
 
+  async function handlePdfChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const input = e.target;
+    const file = input.files?.[0];
+    if (!file) return;
+    setError(null);
+    const validation = validatePdfFile(file);
+    if (!validation.ok) {
+      setError(validation.reason);
+      input.value = '';
+      return;
+    }
+    setUploadingPdf(true);
+    try {
+      const blob = await upload(file.name, file, { access: 'public', handleUploadUrl: '/api/songs/pdf-upload' });
+      setPdfUrl(blob.url);
+    } catch {
+      setError('Αποτυχία μεταφόρτωσης PDF');
+    } finally {
+      setUploadingPdf(false);
+    }
+  }
+
+  function handleRemovePdf() {
+    setPdfUrl(null);
+  }
+
   useEffect(() => {
     fetch(`/api/songs/${params.id}`).then((r) => r.json()).then((song) => {
       setTitle(song.title);
@@ -47,6 +76,7 @@ export default function EditSongPage() {
       setMaleKey(song.maleKey ?? '');
       setFemaleKey(song.femaleKey ?? '');
       setImageUrl(song.imageUrl ?? null);
+      setPdfUrl(song.pdfUrl ?? null);
       setAxisValues(
         song.axisValues.map((v: { axisType: string; refId: number | null; yearValue: number | null }) => ({
           axisType: v.axisType,
@@ -71,6 +101,7 @@ export default function EditSongPage() {
         femaleKey: femaleKey || null,
         axisValues,
         imageUrl,
+        pdfUrl,
       }),
     });
     if (!res.ok) {
@@ -116,6 +147,17 @@ export default function EditSongPage() {
             <>
               <img src={imageUrl} alt="Προεπισκόπηση παρτιτούρας" className="max-h-64 rounded-box object-contain" />
               <button type="button" onClick={handleRemoveImage} className="btn btn-sm btn-outline btn-error self-start">Αφαίρεση εικόνας</button>
+            </>
+          )}
+        </div>
+        <div className="flex flex-col gap-2">
+          <label className="label-text">Στίχοι σε PDF (προαιρετικό)</label>
+          <input type="file" accept={ALLOWED_PDF_TYPE} onChange={handlePdfChange} className="file-input file-input-bordered" />
+          {uploadingPdf && <span className="loading loading-spinner loading-sm" />}
+          {pdfUrl && (
+            <>
+              <a href={pdfUrl} target="_blank" rel="noopener noreferrer" className="link text-sm">Άνοιγμα PDF</a>
+              <button type="button" onClick={handleRemovePdf} className="btn btn-sm btn-outline btn-error self-start">Αφαίρεση PDF</button>
             </>
           )}
         </div>

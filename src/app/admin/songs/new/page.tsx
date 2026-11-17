@@ -12,6 +12,7 @@ import { isNativeApp } from '@/lib/platform';
 import { enqueue } from '@/lib/syncQueue';
 import { useSyncQueue } from '@/components/SyncQueueProvider';
 import { validateImageFile, IMAGE_ACCEPT_ATTR } from '@/lib/imageValidation';
+import { validatePdfFile, ALLOWED_PDF_TYPE } from '@/lib/pdfValidation';
 import { putLocalImage, deleteLocalImage } from '@/lib/localImageStore';
 import { mintDraftId } from '@/lib/draftIds';
 
@@ -28,6 +29,10 @@ export default function NewSongPage() {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [pendingImageBlobId, setPendingImageBlobId] = useState<number | null>(null);
   const [localPreviewUrl, setLocalPreviewUrl] = useState<string | null>(null);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [pendingPdfBlobId, setPendingPdfBlobId] = useState<number | null>(null);
+  const [pendingPdfName, setPendingPdfName] = useState<string | null>(null);
+  const [uploadingPdf, setUploadingPdf] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -83,6 +88,65 @@ export default function NewSongPage() {
     } finally {
       setUploading(false);
     }
+  }
+
+  async function handlePdfChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const input = e.target;
+    const file = input.files?.[0];
+    if (!file) return;
+    setError(null);
+    const validation = validatePdfFile(file);
+    if (!validation.ok) {
+      setError(validation.reason);
+      input.value = '';
+      return;
+    }
+    if (native) {
+      const draftId = mintDraftId();
+      try {
+        await putLocalImage(draftId, { blob: file, contentType: ALLOWED_PDF_TYPE, filename: file.name });
+      } catch {
+        setError('Αποτυχία αποθήκευσης PDF.');
+        return;
+      }
+      if (pendingPdfBlobId != null) {
+        try { await deleteLocalImage(pendingPdfBlobId); } catch { /* best-effort */ }
+      }
+      setPendingPdfBlobId(draftId);
+      setPendingPdfName(file.name);
+      setPdfUrl(null); // a fresh pending PDF supersedes any prior real URL
+      input.value = '';
+      return;
+    }
+    // Web: eager direct upload, mirroring the image path.
+    setUploadingPdf(true);
+    try {
+      const token = await getAuthToken();
+      const blob = await upload(file.name, file, {
+        access: 'public',
+        handleUploadUrl: apiUrl('/api/songs/pdf-upload'),
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      });
+      setPdfUrl(blob.url);
+      setPendingPdfName(file.name);
+    } catch {
+      setError('Αποτυχία μεταφόρτωσης PDF');
+    } finally {
+      setUploadingPdf(false);
+    }
+  }
+
+  async function handleRemovePdf() {
+    if (native && pendingPdfBlobId != null) {
+      try {
+        await deleteLocalImage(pendingPdfBlobId);
+      } catch {
+        // best-effort cleanup; clearing the form state below is what matters
+      }
+    }
+    setPendingPdfBlobId(null);
+    setPendingPdfName(null);
+    setPdfUrl(null);
   }
 
   async function handleRemoveImage() {
@@ -150,6 +214,8 @@ export default function NewSongPage() {
       axisValues,
       imageUrl,
       pendingImageBlobId: native ? pendingImageBlobId : null,
+      pdfUrl,
+      pendingPdfBlobId: native ? pendingPdfBlobId : null,
     };
     if (native) {
       try {
@@ -212,6 +278,17 @@ export default function NewSongPage() {
             <>
               <img src={localPreviewUrl ?? imageUrl ?? undefined} alt="Προεπισκόπηση παρτιτούρας" className="max-h-64 rounded-box object-contain" />
               <button type="button" onClick={handleRemoveImage} className="btn btn-sm btn-outline btn-error self-start">Αφαίρεση εικόνας</button>
+            </>
+          )}
+        </div>
+        <div className="flex flex-col gap-2">
+          <label className="label-text">Στίχοι σε PDF (προαιρετικό)</label>
+          <input type="file" accept={ALLOWED_PDF_TYPE} onChange={handlePdfChange} className="file-input file-input-bordered" />
+          {uploadingPdf && <span className="loading loading-spinner loading-sm" />}
+          {(pendingPdfName || pdfUrl) && (
+            <>
+              <span className="text-sm">{pendingPdfName ?? 'PDF'}</span>
+              <button type="button" onClick={handleRemovePdf} className="btn btn-sm btn-outline btn-error self-start">Αφαίρεση PDF</button>
             </>
           )}
         </div>
