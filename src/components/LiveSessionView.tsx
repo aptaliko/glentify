@@ -49,6 +49,12 @@ function KeyBadges({ maleKey, femaleKey }: { maleKey: string | null; femaleKey: 
   );
 }
 
+const VIEW_OPTIONS: Record<StackBlock, { icon: string; label: string }> = {
+  image: { icon: '🎼', label: 'Παρτιτούρα' },
+  pdf: { icon: '📄', label: 'PDF' },
+  lyrics: { icon: '📝', label: 'Στίχοι' },
+};
+
 function LyricsCard({
   lyrics,
   imageUrl,
@@ -70,6 +76,7 @@ function LyricsCard({
 }) {
   // null until the persisted scale resolves — avoids a first-paint size jump on stage
   const [scale, setScale] = useState<number | null>(null);
+  const [chosenView, setChosenView] = useState<StackBlock | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -97,18 +104,16 @@ function LyricsCard({
   }
 
   const blocks = selectStackBlocks({ imageUrl, pdfUrl, lyrics });
-  // Two or three pieces stack one after another in one scrolling column; one piece fills the view.
-  const stacked = blocks.length > 1;
+  // One view at a time. The chosen view carries over to the next song when that song has it;
+  // otherwise the first available view (image, PDF, lyrics) shows.
+  const selected: StackBlock | null = blocks.length === 0 ? null : chosenView && blocks.includes(chosenView) ? chosenView : blocks[0];
 
   function renderBlock(block: StackBlock) {
     if (block === 'image') {
-      if (stacked) {
-        return <img key="image" src={imageUrl ?? undefined} alt="Παρτιτούρα" className="h-auto w-full object-contain" />;
-      }
       // Pinch/wheel to zoom, drag to pan; double-tap resets. `touch-none` keeps
       // the WebView from hijacking the pinch/pan gesture for page scroll.
       return (
-        <TransformWrapper key="image" doubleClick={{ mode: 'reset' }} minScale={1} centerOnInit>
+        <TransformWrapper doubleClick={{ mode: 'reset' }} minScale={1} centerOnInit>
           <TransformComponent wrapperClass="!w-full !max-h-[70vh] touch-none" contentClass="!w-full !justify-center">
             <img src={imageUrl ?? undefined} alt="Παρτιτούρα" className="max-h-[70vh] w-auto object-contain" />
           </TransformComponent>
@@ -116,17 +121,16 @@ function LyricsCard({
       );
     }
     if (block === 'pdf') {
-      if (stacked) return <PdfPages key="pdf" url={pdfUrl ?? ''} />;
       return (
-        <div key="pdf" className="max-h-[70vh] overflow-y-auto">
+        <div className="max-h-[70vh] overflow-y-auto">
           <PdfPages url={pdfUrl ?? ''} />
         </div>
       );
     }
     // lyrics
     return (
-      <Fragment key="lyrics">
-        <div className={stacked ? 'flex justify-end gap-1' : 'absolute right-2 top-2 z-10 flex gap-1'}>
+      <>
+        <div className="absolute right-2 top-2 z-10 flex gap-1">
           <button
             type="button"
             aria-label={stageMode ? 'Έξοδος από τη λειτουργία σκηνής' : 'Λειτουργία σκηνής'}
@@ -155,8 +159,8 @@ function LyricsCard({
             A+
           </button>
         </div>
-        {stacked ? (
-          scale === null ? (
+        <div ref={scrollRef} className={stageMode ? 'max-h-[86vh] overflow-y-auto' : 'max-h-[70vh] overflow-y-auto'}>
+          {scale === null ? (
             <div className="min-h-[8rem]" aria-hidden />
           ) : (
             <pre
@@ -167,38 +171,21 @@ function LyricsCard({
             >
               {lyrics}
             </pre>
-          )
-        ) : (
-          <>
-            <div ref={scrollRef} className={stageMode ? 'max-h-[86vh] overflow-y-auto' : 'max-h-[70vh] overflow-y-auto'}>
-              {scale === null ? (
-                <div className="min-h-[8rem]" aria-hidden />
-              ) : (
-                <pre
-                  className={`mx-auto max-w-[50ch] whitespace-pre-wrap text-left font-sans leading-relaxed text-base-content ${
-                    stageMode ? 'font-semibold' : ''
-                  }`}
-                  style={{ fontSize: `${scale * 1.5}rem` }}
-                >
-                  {lyrics}
-                </pre>
-              )}
-            </div>
-            <button
-              type="button"
-              aria-label="Προηγούμενη σελίδα στίχων"
-              onClick={() => page(-1)}
-              className="absolute inset-x-0 top-0 h-[20%] cursor-pointer bg-transparent"
-            />
-            <button
-              type="button"
-              aria-label="Επόμενη σελίδα στίχων"
-              onClick={() => page(1)}
-              className="absolute inset-x-0 bottom-0 h-[20%] cursor-pointer bg-transparent"
-            />
-          </>
-        )}
-      </Fragment>
+          )}
+        </div>
+        <button
+          type="button"
+          aria-label="Προηγούμενη σελίδα στίχων"
+          onClick={() => page(-1)}
+          className="absolute inset-x-0 top-0 h-[20%] cursor-pointer bg-transparent"
+        />
+        <button
+          type="button"
+          aria-label="Επόμενη σελίδα στίχων"
+          onClick={() => page(1)}
+          className="absolute inset-x-0 bottom-0 h-[20%] cursor-pointer bg-transparent"
+        />
+      </>
     );
   }
 
@@ -209,10 +196,25 @@ function LyricsCard({
       }`}
     >
       {!stageMode && <KeyBadges maleKey={maleKey} femaleKey={femaleKey} />}
-      {!stacked && blocks.map((block) => renderBlock(block))}
-      {stacked && (
-        <div className="flex max-h-[75vh] flex-col gap-4 overflow-y-auto">{blocks.map((block) => renderBlock(block))}</div>
+      {/* Icon row only when more than one view exists; a single view needs no switcher. */}
+      {blocks.length > 1 && (
+        <div role="group" aria-label="Προβολή" className="relative z-10 flex justify-center gap-2">
+          {blocks.map((block) => (
+            <button
+              key={block}
+              type="button"
+              aria-label={VIEW_OPTIONS[block].label}
+              title={VIEW_OPTIONS[block].label}
+              aria-pressed={selected === block}
+              onClick={() => setChosenView(block)}
+              className={`btn btn-circle btn-sm text-base ${selected === block ? 'btn-primary' : 'btn-outline'}`}
+            >
+              <span aria-hidden="true">{VIEW_OPTIONS[block].icon}</span>
+            </button>
+          ))}
+        </div>
       )}
+      {selected && renderBlock(selected)}
       {blocks.length === 0 && (
         <p className="text-lg italic text-base-content/50">Δεν έχουν προστεθεί ακόμη στίχοι ή παρτιτούρα για αυτό το τραγούδι.</p>
       )}
