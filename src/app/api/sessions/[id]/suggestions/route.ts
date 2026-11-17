@@ -10,6 +10,7 @@ import { listAxisTypes, getAxisValuesForOwner } from '@/db/queries/axisValues';
 import { listGenres } from '@/db/queries/genres';
 import { buildSuggestionsResponse, type AxisValue, type SongWithAxes } from '@/lib/suggestions';
 import { getUserId } from '@/lib/requestUser';
+import { parseFiltersParam } from '@/lib/filterState';
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const ownerId = getUserId(request);
@@ -19,10 +20,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   if (!session) return NextResponse.json({ error: 'Δεν βρέθηκε session' }, { status: 404 });
 
   const showPlayed = request.nextUrl.searchParams.get('showPlayed') === 'true';
-  const hasActiveParam = request.nextUrl.searchParams.has('activeAxisTypes');
-  const requestedActive = hasActiveParam
-    ? new Set((request.nextUrl.searchParams.get('activeAxisTypes') ?? '').split(',').filter(Boolean))
-    : null;
+  const filters = parseFiltersParam(request.nextUrl.searchParams.get('filters'));
 
   if (session.currentSongId === null) {
     return NextResponse.json(
@@ -31,7 +29,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         allSongs: [],
         playedSongIds: new Set(),
         showPlayed,
-        requestedActive,
+        filters: null,
         lookups: { regions: [], rhythms: [], dromoi: [], dances: [], composers: [], axisTypes: [], genres: [] },
       })
     );
@@ -85,7 +83,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       allSongs: songsWithAxes,
       playedSongIds: new Set(playedSongIdList),
       showPlayed,
-      requestedActive,
+      filters,
       lookups: { regions, rhythms, dromoi, dances, composers, axisTypes, genres },
     })
   );
