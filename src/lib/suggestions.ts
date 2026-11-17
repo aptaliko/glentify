@@ -1,4 +1,4 @@
-import type { SongRow, RegionRow, RhythmRow, DromosRow, ComposerRow, AxisTypeRow, GenreRow } from '@/db/schema';
+import type { SongRow, RegionRow, RhythmRow, DromosRow, DanceRow, ComposerRow, AxisTypeRow, GenreRow } from '@/db/schema';
 
 export interface AxisValue {
   axisType: string;
@@ -159,6 +159,7 @@ export interface ReferenceLookups {
   regions: RegionRow[];
   rhythms: RhythmRow[];
   dromoi: DromosRow[];
+  dances: DanceRow[];
   composers: ComposerRow[];
   axisTypes: AxisTypeRow[];
   genres: GenreRow[];
@@ -223,6 +224,7 @@ export function buildSuggestionsResponse(input: BuildSuggestionsInput): Suggesti
     genre: new Map(lookups.genres.map((g) => [g.id, g.name])),
     rhythm: new Map(lookups.rhythms.map((r) => [r.id, r.name])),
     dromos: new Map(lookups.dromoi.map((d) => [d.id, d.name])),
+    dance: new Map(lookups.dances.map((d) => [d.id, d.name])),
     composer: new Map(lookups.composers.map((c) => [c.id, c.name])),
   };
   const axisLabelByKey = new Map(lookups.axisTypes.map((t) => [t.key, t.label]));

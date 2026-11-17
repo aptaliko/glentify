@@ -4,6 +4,7 @@ import { getAxisValuesForOwner, listAxisTypes } from '@/db/queries/axisValues';
 import { listRegions } from '@/db/queries/regions';
 import { listRhythms } from '@/db/queries/rhythms';
 import { listDromoi } from '@/db/queries/dromoi';
+import { listDances } from '@/db/queries/dances';
 import { listComposers } from '@/db/queries/composers';
 import { listGenres } from '@/db/queries/genres';
 import { listProgramsWithSequencesAndSongs } from '@/db/queries/programs';
@@ -14,7 +15,7 @@ import { getUserId } from '@/lib/requestUser';
 
 export async function GET(request: NextRequest) {
   const userId = getUserId(request);
-  const [ownSongs, axisValues, axisTypes, regions, rhythms, dromoi, composers, genres, programs, currentUser] =
+  const [ownSongs, axisValues, axisTypes, regions, rhythms, dromoi, dances, composers, genres, programs, currentUser] =
     await Promise.all([
       listSongs(userId),
       getAxisValuesForOwner(userId),
@@ -22,6 +23,7 @@ export async function GET(request: NextRequest) {
       listRegions(userId),
       listRhythms(userId),
       listDromoi(userId),
+      listDances(userId),
       listComposers(userId),
       listGenres(userId),
       listProgramsWithSequencesAndSongs(userId),
@@ -47,6 +49,7 @@ export async function GET(request: NextRequest) {
     regions,
     rhythms,
     dromoi,
+    dances,
     composers,
     genres,
     programs,

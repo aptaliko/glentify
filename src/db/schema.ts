@@ -36,6 +36,12 @@ export const dromoi = pgTable('dromoi', {
   ownerId: integer('owner_id').references(() => users.id),
 });
 
+export const dances = pgTable('dances', {
+  id: serial('id').primaryKey(),
+  name: text('name').notNull(),
+  ownerId: integer('owner_id').references(() => users.id),
+});
+
 export const genres = pgTable('genres', {
   id: serial('id').primaryKey(),
   name: text('name').notNull(),
@@ -142,6 +148,7 @@ export type PasswordResetTokenRow = typeof passwordResetTokens.$inferSelect;
 export type RegionRow = typeof regions.$inferSelect;
 export type RhythmRow = typeof rhythms.$inferSelect;
 export type DromosRow = typeof dromoi.$inferSelect;
+export type DanceRow = typeof dances.$inferSelect;
 export type GenreRow = typeof genres.$inferSelect;
 export type ComposerRow = typeof composers.$inferSelect;
 export type SongRow = typeof songs.$inferSelect;

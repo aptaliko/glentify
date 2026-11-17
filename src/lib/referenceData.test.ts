@@ -28,6 +28,7 @@ function referenceData(): ReferenceData {
     regions: [],
     rhythms: [],
     dromoi: [],
+    dances: [],
     composers: [],
     axisTypes: [],
     genres: [],
@@ -66,6 +67,7 @@ describe('normalizeReferenceData', () => {
       regions: [],
       rhythms: [],
       dromoi: [],
+      dances: [],
       composers: [],
       axisTypes: [],
       genres: [],
@@ -82,6 +84,7 @@ describe('normalizeReferenceData', () => {
       regions: [],
       rhythms: [],
       dromoi: [],
+      dances: [],
       composers: [],
       axisTypes: [],
       genres: [],
@@ -105,6 +108,7 @@ describe('normalizeReferenceData', () => {
       regions: [],
       rhythms: [],
       dromoi: [],
+      dances: [],
       composers: [],
       genres: [],
       programs: [],
@@ -122,10 +126,15 @@ describe('normalizeReferenceData', () => {
     expect(normalizeReferenceData(legacy).songs[0].pdfUrl).toBeNull();
   });
 
+  it('defaults dances to an empty array when missing (pre-Χορός cached blob)', () => {
+    const legacy = { songs: [], sharedSongs: [], axisValues: [], regions: [], rhythms: [], dromoi: [], composers: [], genres: [], programs: [], axisTypes: [] } as unknown as ReferenceData;
+    expect(normalizeReferenceData(legacy).dances).toEqual([]);
+  });
+
   it('backfills currentUser to null when missing (pre-feature cached blob)', () => {
     const legacy = {
       songs: [], sharedSongs: [], axisValues: [], regions: [], rhythms: [],
-      dromoi: [], composers: [], axisTypes: [], genres: [], programs: [],
+      dromoi: [], dances: [], composers: [], axisTypes: [], genres: [], programs: [],
     } as unknown as ReferenceData;
     expect(normalizeReferenceData(legacy).currentUser).toBeNull();
   });
@@ -133,7 +142,7 @@ describe('normalizeReferenceData', () => {
   it('backfills new program fields and sequence.entries for an old-shape program', () => {
     const legacy = {
       songs: [], sharedSongs: [], axisValues: [], regions: [], rhythms: [],
-      dromoi: [], composers: [], axisTypes: [], genres: [],
+      dromoi: [], dances: [], composers: [], axisTypes: [], genres: [],
       programs: [{ id: 1, title: 'A', sequences: [{ id: 10, title: 'S1', songIds: [1, 2] }] }],
     } as unknown as ReferenceData;
     const p = normalizeReferenceData(legacy).programs[0];

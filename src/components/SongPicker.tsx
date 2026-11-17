@@ -26,12 +26,14 @@ export default function SongPicker({
   const [genres, setGenres] = useState<Option[]>([]);
   const [rhythms, setRhythms] = useState<Option[]>([]);
   const [dromoi, setDromoi] = useState<Option[]>([]);
+  const [dances, setDances] = useState<Option[]>([]);
   const [composers, setComposers] = useState<Option[]>([]);
 
   const [regionId, setRegionId] = useState('');
   const [genreId, setGenreId] = useState('');
   const [rhythmId, setRhythmId] = useState('');
   const [dromosId, setDromosId] = useState('');
+  const [danceId, setDanceId] = useState('');
   const [composerId, setComposerId] = useState('');
   const [year, setYear] = useState('');
   const [search, setSearch] = useState('');
@@ -47,20 +49,22 @@ export default function SongPicker({
       dataSource.listGenres(),
       dataSource.listRhythms(),
       dataSource.listDromoi(),
+      dataSource.listDances(),
       dataSource.listComposers(),
       dataSource.listAllSongs(),
-    ]).then(([r, g, rh, d, c, s]) => {
+    ]).then(([r, g, rh, d, dn, c, s]) => {
       setRegions(r);
       setGenres(g);
       setRhythms(rh);
       setDromoi(d);
+      setDances(dn);
       setComposers(c);
       setAllSongs(s);
       setLoaded(true);
     });
   }, [dataSource]);
 
-  const hasFilters = !!regionId || !!genreId || !!rhythmId || !!dromosId || !!composerId || !!year || !!search;
+  const hasFilters = !!regionId || !!genreId || !!rhythmId || !!dromosId || !!danceId || !!composerId || !!year || !!search;
 
   useEffect(() => {
     if (!loaded || !hasFilters) return;
@@ -70,6 +74,7 @@ export default function SongPicker({
       genreId: genreId ? Number(genreId) : undefined,
       rhythmId: rhythmId ? Number(rhythmId) : undefined,
       dromosId: dromosId ? Number(dromosId) : undefined,
+      danceId: danceId ? Number(danceId) : undefined,
       composerId: composerId ? Number(composerId) : undefined,
       year: year ? Number(year) : undefined,
       search: search || undefined,
@@ -80,7 +85,7 @@ export default function SongPicker({
     return () => {
       cancelled = true;
     };
-  }, [dataSource, loaded, hasFilters, regionId, genreId, rhythmId, dromosId, composerId, year, search]);
+  }, [dataSource, loaded, hasFilters, regionId, genreId, rhythmId, dromosId, danceId, composerId, year, search]);
 
   function handleRegionChange(e: React.ChangeEvent<HTMLSelectElement>) {
     setRegionId(e.target.value);
@@ -99,6 +104,11 @@ export default function SongPicker({
 
   function handleDromosChange(e: React.ChangeEvent<HTMLSelectElement>) {
     setDromosId(e.target.value);
+    setPage(0);
+  }
+
+  function handleDanceChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    setDanceId(e.target.value);
     setPage(0);
   }
 
@@ -158,6 +168,12 @@ export default function SongPicker({
           <select value={dromosId} onChange={handleDromosChange} className="select select-bordered select-sm">
             <option value="">Όλοι οι δρόμοι</option>
             {dromoi.map((d) => (
+              <option key={d.id} value={d.id}>{d.name}</option>
+            ))}
+          </select>
+          <select value={danceId} onChange={handleDanceChange} className="select select-bordered select-sm">
+            <option value="">Όλοι οι χοροί</option>
+            {dances.map((d) => (
               <option key={d.id} value={d.id}>{d.name}</option>
             ))}
           </select>

@@ -1,6 +1,6 @@
 
 export type DraftEntity =
-  | 'regions' | 'genres' | 'rhythms' | 'dromoi' | 'composers'
+  | 'regions' | 'genres' | 'rhythms' | 'dromoi' | 'dances' | 'composers'
   | 'song' | 'sequence' | 'sequence-song';
 
 export type DraftMap = Record<string, number>;

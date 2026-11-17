@@ -12,6 +12,7 @@ import {
   regions,
   rhythms,
   dromoi,
+  dances,
   genres,
   composers,
   passwordResetTokens,
@@ -58,6 +59,7 @@ export async function deleteUserCascade(userId: number): Promise<void> {
   await db.delete(regions).where(eq(regions.ownerId, userId));
   await db.delete(rhythms).where(eq(rhythms.ownerId, userId));
   await db.delete(dromoi).where(eq(dromoi.ownerId, userId));
+  await db.delete(dances).where(eq(dances.ownerId, userId));
   await db.delete(genres).where(eq(genres.ownerId, userId));
   await db.delete(composers).where(eq(composers.ownerId, userId));
 

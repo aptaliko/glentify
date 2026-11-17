@@ -1,4 +1,4 @@
-// Create/delete for the taxonomy admin pages (rhythms, regions, genres, dromoi, composers).
+// Create/delete for the taxonomy admin pages (rhythms, regions, genres, dromoi, dances, composers).
 //
 // Native: enqueued in the offline sync queue (the queue is drained by SyncQueueProvider).
 // Web: the queue is never drained in a browser (processQueue runs only in the native app),
@@ -11,7 +11,7 @@ import { nativeApiFetch } from './nativeApiFetch';
 import { isNativeApp } from './platform';
 import { makeTaxonomyCreateHandler, makeTaxonomyDeleteHandler } from './syncHandlers';
 
-export type TaxonomyEntity = Extract<DraftEntity, 'regions' | 'genres' | 'rhythms' | 'dromoi' | 'composers'>;
+export type TaxonomyEntity = Extract<DraftEntity, 'regions' | 'genres' | 'rhythms' | 'dromoi' | 'dances' | 'composers'>;
 
 const GENERIC_FAILURE = 'Αποτυχία αποθήκευσης. Δοκίμασε ξανά.';
 
@@ -55,7 +55,7 @@ export async function removeTaxonomyValue(entity: TaxonomyEntity, id: number): P
 // taxonomy handlers so queued song/program/session items are left alone.
 export async function drainWebTaxonomyQueue(): Promise<void> {
   if (isNativeApp()) return;
-  const entities: TaxonomyEntity[] = ['regions', 'genres', 'rhythms', 'dromoi', 'composers'];
+  const entities: TaxonomyEntity[] = ['regions', 'genres', 'rhythms', 'dromoi', 'dances', 'composers'];
   const handlers = new Map<string, SyncHandler>();
   for (const entity of entities) {
     handlers.set(`${entity}-create`, makeTaxonomyCreateHandler(entity));

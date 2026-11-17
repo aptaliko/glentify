@@ -11,6 +11,7 @@ export interface SongFilters {
   regionId?: number;
   rhythmId?: number;
   dromosId?: number;
+  danceId?: number;
   composerId?: number;
   year?: number;
 }
@@ -56,6 +57,19 @@ export async function listSongs(ownerId: number, filters: SongFilters = {}): Pro
       .where(and(eq(songAxisValues.axisType, 'dromos'), inArray(songAxisValues.songId, songIds)));
     const matchingSongIds = new Set(
       dromosAxisRows.filter((r) => r.refId === filters.dromosId).map((r) => r.songId)
+    );
+    results = results.filter((s) => matchingSongIds.has(s.id));
+  }
+
+  if (filters.danceId) {
+    const songIds = results.map((s) => s.id);
+    if (songIds.length === 0) return [];
+    const danceAxisRows = await db
+      .select()
+      .from(songAxisValues)
+      .where(and(eq(songAxisValues.axisType, 'dance'), inArray(songAxisValues.songId, songIds)));
+    const matchingSongIds = new Set(
+      danceAxisRows.filter((r) => r.refId === filters.danceId).map((r) => r.songId)
     );
     results = results.filter((s) => matchingSongIds.has(s.id));
   }

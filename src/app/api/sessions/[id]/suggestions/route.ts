@@ -4,6 +4,7 @@ import { listSongs, getSongWithAxisValues } from '@/db/queries/songs';
 import { listRegions } from '@/db/queries/regions';
 import { listRhythms } from '@/db/queries/rhythms';
 import { listDromoi } from '@/db/queries/dromoi';
+import { listDances } from '@/db/queries/dances';
 import { listComposers } from '@/db/queries/composers';
 import { listAxisTypes, getAxisValuesForOwner } from '@/db/queries/axisValues';
 import { listGenres } from '@/db/queries/genres';
@@ -31,17 +32,18 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         playedSongIds: new Set(),
         showPlayed,
         requestedActive,
-        lookups: { regions: [], rhythms: [], dromoi: [], composers: [], axisTypes: [], genres: [] },
+        lookups: { regions: [], rhythms: [], dromoi: [], dances: [], composers: [], axisTypes: [], genres: [] },
       })
     );
   }
 
-  const [allSongs, regions, rhythms, dromoi, composers, axisTypes, genres, playedSongIdList, currentSongWithAxes, allAxisValues] =
+  const [allSongs, regions, rhythms, dromoi, dances, composers, axisTypes, genres, playedSongIdList, currentSongWithAxes, allAxisValues] =
     await Promise.all([
       listSongs(ownerId),
       listRegions(ownerId),
       listRhythms(ownerId),
       listDromoi(ownerId),
+      listDances(ownerId),
       listComposers(ownerId),
       listAxisTypes(),
       listGenres(ownerId),
@@ -84,7 +86,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       playedSongIds: new Set(playedSongIdList),
       showPlayed,
       requestedActive,
-      lookups: { regions, rhythms, dromoi, composers, axisTypes, genres },
+      lookups: { regions, rhythms, dromoi, dances, composers, axisTypes, genres },
     })
   );
 }

@@ -9,6 +9,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <Link href="/admin/regions" className="btn btn-ghost btn-sm">Περιοχές</Link>
         <Link href="/admin/rhythms" className="btn btn-ghost btn-sm">Ρυθμοί</Link>
         <Link href="/admin/dromoi" className="btn btn-ghost btn-sm">Δρόμοι</Link>
+        <Link href="/admin/dances" className="btn btn-ghost btn-sm">Χοροί</Link>
         <Link href="/admin/composers" className="btn btn-ghost btn-sm">Συνθέτες</Link>
         <Link href="/admin/genres" className="btn btn-ghost btn-sm">Είδη</Link>
         <Link href="/" className="btn btn-ghost btn-sm ml-auto">Αρχική</Link>

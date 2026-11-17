@@ -104,6 +104,7 @@ function toReferenceLookups(referenceData: ReferenceData): ReferenceLookups {
     regions: referenceData.regions,
     rhythms: referenceData.rhythms,
     dromoi: referenceData.dromoi,
+    dances: referenceData.dances,
     composers: referenceData.composers,
     axisTypes: referenceData.axisTypes,
     genres: referenceData.genres,
