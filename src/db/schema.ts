@@ -53,6 +53,7 @@ export const songs = pgTable('songs', {
   title: text('title').notNull(),
   lyrics: text('lyrics'),
   imageUrl: text('image_url'),
+  pdfUrl: text('pdf_url'),
   notes: text('notes'),
   maleKey: text('male_key'),
   femaleKey: text('female_key'),
