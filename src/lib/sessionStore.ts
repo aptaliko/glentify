@@ -6,13 +6,15 @@ import {
   type SuggestionsResponsePayload,
   type CurrentSongPayload,
   type ReferenceLookups,
+  type FilterValue,
 } from './suggestions';
+import { serializeFilters } from './filterState';
 import { groupBySequenceIndex } from './sessionGrouping';
 import type { ReferenceData } from './referenceData';
 import type { KeyValueStore } from './preferencesStore';
 
 export interface SessionStore {
-  load(showPlayed: boolean, activeAxisTypes: string[] | null): Promise<SuggestionsResponsePayload>;
+  load(showPlayed: boolean, filters: FilterValue[] | null): Promise<SuggestionsResponsePayload>;
   pickSong(songId: number): Promise<void>;
   endSequence(): Promise<void>;
   endSession(): Promise<void>;
@@ -21,9 +23,9 @@ export interface SessionStore {
 export class RemoteSessionStore implements SessionStore {
   constructor(private sessionId: string) {}
 
-  async load(showPlayed: boolean, activeAxisTypes: string[] | null): Promise<SuggestionsResponsePayload> {
+  async load(showPlayed: boolean, filters: FilterValue[] | null): Promise<SuggestionsResponsePayload> {
     const searchParams = new URLSearchParams({ showPlayed: String(showPlayed) });
-    if (activeAxisTypes !== null) searchParams.set('activeAxisTypes', activeAxisTypes.join(','));
+    if (filters !== null) searchParams.set('filters', serializeFilters(filters));
     const res = await fetch(`/api/sessions/${this.sessionId}/suggestions?${searchParams.toString()}`);
     return res.json();
   }
@@ -125,7 +127,7 @@ export function getSequenceSuggestions(
   referenceData: ReferenceData,
   currentSongId: number,
   excludeSongIds: Set<number>,
-  activeAxisTypes: string[] | null
+  filters: FilterValue[] | null
 ): SuggestionsResponsePayload {
   const allSongs = songsWithAxes(referenceData);
   const currentEntry = allSongs.find((s) => s.song.id === currentSongId);
@@ -135,7 +137,7 @@ export function getSequenceSuggestions(
     allSongs,
     playedSongIds: excludeSongIds,
     showPlayed: false,
-    requestedActive: activeAxisTypes !== null ? new Set(activeAxisTypes) : null,
+    filters,
     lookups: toReferenceLookups(referenceData),
   });
 }
@@ -160,7 +162,7 @@ export class ExplorationSessionStore implements SessionStore {
     if (this.currentSongId !== null) this.playedSongIds.add(this.currentSongId);
   }
 
-  async load(showPlayed: boolean, activeAxisTypes: string[] | null): Promise<SuggestionsResponsePayload> {
+  async load(showPlayed: boolean, filters: FilterValue[] | null): Promise<SuggestionsResponsePayload> {
     const allSongs = songsWithAxes(this.referenceData);
     const currentEntry = this.currentSongId !== null ? allSongs.find((s) => s.song.id === this.currentSongId) : undefined;
 
@@ -169,7 +171,7 @@ export class ExplorationSessionStore implements SessionStore {
       allSongs,
       playedSongIds: this.playedSongIds,
       showPlayed,
-      requestedActive: activeAxisTypes !== null ? new Set(activeAxisTypes) : null,
+      filters,
       lookups: toReferenceLookups(this.referenceData),
     });
   }
@@ -216,7 +218,7 @@ export class LocalSessionStore implements SessionStore {
     return state.playedEntries;
   }
 
-  async load(showPlayed: boolean, activeAxisTypes: string[] | null): Promise<SuggestionsResponsePayload> {
+  async load(showPlayed: boolean, filters: FilterValue[] | null): Promise<SuggestionsResponsePayload> {
     const state = await this.getState();
     const allSongs = songsWithAxes(this.referenceData);
     const currentEntry = state.currentSongId !== null ? allSongs.find((s) => s.song.id === state.currentSongId) : undefined;
@@ -226,7 +228,7 @@ export class LocalSessionStore implements SessionStore {
       allSongs,
       playedSongIds: new Set(state.playedEntries.map((e) => e.songId)),
       showPlayed,
-      requestedActive: activeAxisTypes !== null ? new Set(activeAxisTypes) : null,
+      filters,
       lookups: toReferenceLookups(this.referenceData),
     });
   }

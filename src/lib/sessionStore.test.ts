@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   LocalSessionStore,
   hasLocalSession,
@@ -6,10 +6,11 @@ import {
   clearLastEndedSession,
   getSequenceSuggestions,
   ExplorationSessionStore,
+  RemoteSessionStore,
 } from './sessionStore';
 import type { KeyValueStore } from './preferencesStore';
 import type { ReferenceData } from './referenceData';
-import type { SongRow, RegionRow, GenreRow } from '@/db/schema';
+import type { SongRow, RegionRow, GenreRow, AxisTypeRow } from '@/db/schema';
 import type { SongAxisValueRow } from '@/db/schema';
 
 function makeSong(id: number, title: string): SongRow {
@@ -74,7 +75,7 @@ describe('LocalSessionStore', () => {
     const data = await store.load(false, null);
     expect(data.currentSong?.id).toBe(1);
     expect(data.mode).toBe('ungrouped');
-    expect(data.songs.map((s) => s.id)).toEqual([2]);
+    expect(data.candidates.map((s) => s.id)).toEqual([2]);
   });
 
   it('marks the current song played and advances on pickSong', async () => {
@@ -83,7 +84,7 @@ describe('LocalSessionStore', () => {
     await store.pickSong(2);
     const data = await store.load(true, null);
     expect(data.currentSong?.id).toBe(2);
-    const song1 = data.songs.find((s) => s.id === 1);
+    const song1 = data.candidates.find((s) => s.id === 1);
     expect(song1?.played).toBe(true);
   });
 
@@ -98,8 +99,8 @@ describe('LocalSessionStore', () => {
     const data = await store.load(true, null);
     expect(data.currentSong?.id).toBe(1);
     // Song 2 and 3 should show as played (proving endSequence preserved playedSongIds)
-    const song2 = data.songs.find((s) => s.id === 2);
-    const song3 = data.songs.find((s) => s.id === 3);
+    const song2 = data.candidates.find((s) => s.id === 2);
+    const song3 = data.candidates.find((s) => s.id === 3);
     expect(song2?.played).toBe(true);
     expect(song3?.played).toBe(true);
   });
@@ -115,8 +116,8 @@ describe('LocalSessionStore', () => {
 
     // Verify played history exists before endSession
     let data = await store.load(true, null);
-    const song1Before = data.songs.find((s) => s.id === 1);
-    const song2Before = data.songs.find((s) => s.id === 2);
+    const song1Before = data.candidates.find((s) => s.id === 1);
+    const song2Before = data.candidates.find((s) => s.id === 2);
     expect(song1Before?.played).toBe(true);
     expect(song2Before?.played).toBe(true);
 
@@ -130,8 +131,8 @@ describe('LocalSessionStore', () => {
 
     // Song 2 and 3 should NOT be marked as played if endSession correctly cleared playedSongIds
     // If endSession was buggy (e.g. just called endSequence), they would still be marked as played
-    const song2After = data.songs.find((s) => s.id === 2);
-    const song3After = data.songs.find((s) => s.id === 3);
+    const song2After = data.candidates.find((s) => s.id === 2);
+    const song3After = data.candidates.find((s) => s.id === 3);
     expect(song2After?.played).toBe(false);
     expect(song3After?.played).toBe(false);
   });
@@ -260,7 +261,7 @@ function referenceDataWithGenreAxes(): ReferenceData {
     dromoi: [],
     dances: [],
     composers: [],
-    axisTypes: [],
+    axisTypes: [{ id: 1, key: 'genre', label: 'Είδος', lookupTable: 'genres', hierarchical: false } as AxisTypeRow],
     genres: [{ id: 1, name: 'Παραδοσιακό', ownerId: null } as GenreRow, { id: 2, name: 'Λαϊκό', ownerId: null } as GenreRow],
     programs: [],
     currentUser: null,
@@ -288,17 +289,39 @@ describe('getSequenceSuggestions', () => {
     expect(result.currentSong).toBeNull();
     expect(result.mode).toBe('ungrouped');
     expect(result.candidates).toEqual([]);
-    expect(result.songs).toEqual([]);
+    expect(result.appliedFilters).toEqual([]);
   });
 
-  it('respects an explicit activeAxisTypes override, same as the underlying engine', () => {
+  it('an explicit empty filters list (every chip removed) is ungrouped, same as the underlying engine', () => {
     const data = referenceDataWithGenreAxes();
-    // An empty activeAxisTypes set means "no active filter" to the underlying engine (same as
-    // Live) — falls back to its ungrouped mode, listing every song except the excluded sequence
-    // song (4), regardless of genre.
+    // An empty filters list means "no filter" to the engine (same as Live) — falls back to its
+    // ungrouped mode, listing every song except the excluded sequence song (4), regardless of genre.
     const result = getSequenceSuggestions(data, 1, new Set([4]), []);
     expect(result.mode).toBe('ungrouped');
-    expect(result.songs.map((s) => s.id).sort()).toEqual([2, 3]);
+    expect(result.candidates.map((c) => c.id).sort()).toEqual([2, 3]);
+  });
+});
+
+describe('RemoteSessionStore.load', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('omits the filters param when filters is null (use defaults)', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ json: async () => ({}) });
+    vi.stubGlobal('fetch', fetchMock);
+    await new RemoteSessionStore('7').load(false, null);
+    const url = String(fetchMock.mock.calls[0][0]);
+    expect(url).toContain('/api/sessions/7/suggestions?');
+    expect(url).not.toContain('filters');
+  });
+
+  it('sends the filters param in URL form when filters are given', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ json: async () => ({}) });
+    vi.stubGlobal('fetch', fetchMock);
+    await new RemoteSessionStore('7').load(false, [{ axisType: 'rhythm', refId: 10, yearValue: null }]);
+    const url = String(fetchMock.mock.calls[0][0]);
+    expect(url).toContain('filters=rhythm%3A10');
   });
 });
 
@@ -307,7 +330,7 @@ describe('ExplorationSessionStore', () => {
     const store = new ExplorationSessionStore(referenceDataWithThreeSongs(), 1);
     const data = await store.load(false, null);
     expect(data.currentSong?.id).toBe(1);
-    expect(data.songs.map((s) => s.id).sort()).toEqual([2, 3]);
+    expect(data.candidates.map((s) => s.id).sort()).toEqual([2, 3]);
   });
 
   it('marks the current song played and advances on pickSong, entirely in memory', async () => {
@@ -315,7 +338,7 @@ describe('ExplorationSessionStore', () => {
     await store.pickSong(2);
     const data = await store.load(true, null);
     expect(data.currentSong?.id).toBe(2);
-    expect(data.songs.find((s) => s.id === 1)?.played).toBe(true);
+    expect(data.candidates.find((s) => s.id === 1)?.played).toBe(true);
   });
 
   it('clears the current song on endSequence, keeping played history', async () => {
@@ -332,6 +355,6 @@ describe('ExplorationSessionStore', () => {
     await store.endSession();
     const data = await store.load(true, null);
     expect(data.currentSong?.id).toBe(2);
-    expect(data.songs.find((s) => s.id === 1)?.played).toBe(true);
+    expect(data.candidates.find((s) => s.id === 1)?.played).toBe(true);
   });
 });
