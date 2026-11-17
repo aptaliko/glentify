@@ -169,6 +169,7 @@ export interface CurrentSongPayload {
   title: string;
   lyrics: string | null;
   imageUrl: string | null;
+  pdfUrl?: string | null;
   maleKey: string | null;
   femaleKey: string | null;
 }

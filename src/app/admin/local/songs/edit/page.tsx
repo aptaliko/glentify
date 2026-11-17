@@ -34,6 +34,7 @@ async function fetchLiveSong(
       title: data.title,
       lyrics: data.lyrics,
       imageUrl: data.imageUrl,
+      pdfUrl: data.pdfUrl ?? null,
       notes: data.notes,
       maleKey: data.maleKey,
       femaleKey: data.femaleKey,

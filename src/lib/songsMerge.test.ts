@@ -20,8 +20,8 @@ const emptySongFields = { imageUrl: null, notes: null, maleKey: null, femaleKey:
 
 describe('mergeSongsWithPending', () => {
   const base: CachedSong[] = [
-    { id: 1, title: 'Τραγούδι Α', lyrics: 'Στίχοι Α', imageUrl: null, notes: null, maleKey: null, femaleKey: null },
-    { id: 2, title: 'Τραγούδι Β', lyrics: null, imageUrl: null, notes: null, maleKey: null, femaleKey: null },
+    { id: 1, title: 'Τραγούδι Α', lyrics: 'Στίχοι Α', imageUrl: null, pdfUrl: null, notes: null, maleKey: null, femaleKey: null },
+    { id: 2, title: 'Τραγούδι Β', lyrics: null, imageUrl: null, pdfUrl: null, notes: null, maleKey: null, femaleKey: null },
   ];
 
   it('returns the base list unchanged when there are no queued actions', () => {
@@ -139,6 +139,7 @@ describe('resolveSongForEdit', () => {
     title: 'Τραγούδι Α',
     lyrics: 'Στίχοι Α',
     imageUrl: 'https://example.com/a.png',
+    pdfUrl: null,
     notes: 'Σημείωση',
     maleKey: 'Ρε',
     femaleKey: 'Λα',

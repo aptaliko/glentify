@@ -10,7 +10,7 @@ function song(id: number, title: string): SongRow {
     id,
     title,
     lyrics: null,
-    imageUrl: null,
+    imageUrl: null, pdfUrl: null,
     notes: null,
     maleKey: null,
     femaleKey: null,
@@ -112,6 +112,14 @@ describe('normalizeReferenceData', () => {
 
     const result = normalizeReferenceData(legacyData);
     expect(result.axisTypes).toEqual([]);
+  });
+
+  it('backfills pdfUrl to null on songs from a pre-PDF cached blob', () => {
+    const legacy = {
+      songs: [{ id: 1, title: 'Α', lyrics: null, imageUrl: null, pdfUrl: null, notes: null, maleKey: null, femaleKey: null }],
+      sharedSongs: [], axisValues: [], regions: [], rhythms: [], dromoi: [], composers: [], genres: [], programs: [], axisTypes: [],
+    } as unknown as ReferenceData;
+    expect(normalizeReferenceData(legacy).songs[0].pdfUrl).toBeNull();
   });
 
   it('backfills currentUser to null when missing (pre-feature cached blob)', () => {

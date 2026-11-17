@@ -5,7 +5,7 @@ import type { SongRow } from '@/db/schema';
 
 const FIXED = new Date('2026-01-01T00:00:00.000Z');
 function song(id: number, title: string): SongRow {
-  return { id, title, lyrics: null, imageUrl: null, notes: null, maleKey: null, femaleKey: null, ownerId: 1, createdAt: FIXED, updatedAt: FIXED };
+  return { id, title, lyrics: null, imageUrl: null, pdfUrl: null, notes: null, maleKey: null, femaleKey: null, ownerId: 1, createdAt: FIXED, updatedAt: FIXED };
 }
 
 const program: OfflineProgram = {

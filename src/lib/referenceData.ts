@@ -57,6 +57,7 @@ export interface CachedSong {
   title: string;
   lyrics: string | null;
   imageUrl: string | null;
+  pdfUrl: string | null;
   notes: string | null;
   maleKey: string | null;
   femaleKey: string | null;
@@ -121,7 +122,8 @@ export function normalizeReferenceData(data: ReferenceData): ReferenceData {
       version: (p as OfflineProgram).version ?? 0,
       sequences: (p.sequences ?? []).map((s) => ({ ...s, entries: s.entries ?? [], version: (s as OfflineSequence).version ?? 0 })),
     })),
-    sharedSongs: data.sharedSongs ?? [],
+    songs: (data.songs ?? []).map((s) => ({ ...s, pdfUrl: s.pdfUrl ?? null })),
+    sharedSongs: (data.sharedSongs ?? []).map((s) => ({ ...s, pdfUrl: s.pdfUrl ?? null })),
     axisTypes: data.axisTypes ?? [],
     currentUser: data.currentUser ?? null,
   };

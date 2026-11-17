@@ -92,6 +92,7 @@ function toCurrentSongPayload(entry: SongWithAxes): CurrentSongPayload & { axisV
     title: entry.song.title,
     lyrics: entry.song.lyrics,
     imageUrl: entry.song.imageUrl,
+    pdfUrl: entry.song.pdfUrl,
     maleKey: entry.song.maleKey,
     femaleKey: entry.song.femaleKey,
     axisValues: entry.axisValues,
