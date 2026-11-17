@@ -11,15 +11,6 @@ export interface SongWithAxes {
   axisValues: AxisValue[];
 }
 
-function axisValueMap(axisValues: AxisValue[]): Map<string, AxisValue> {
-  return new Map(axisValues.map((v) => [v.axisType, v]));
-}
-
-function axisValuesMatch(a: AxisValue, b: AxisValue): boolean {
-  if (a.axisType === 'year') return a.yearValue === b.yearValue;
-  return a.refId === b.refId;
-}
-
 export function getRegionAncestorIds(regionId: number, regions: RegionRow[]): number[] {
   const byId = new Map(regions.map((r) => [r.id, r]));
   const ancestors: number[] = [];
@@ -48,13 +39,6 @@ export function getRegionDescendantIds(regionId: number, regions: RegionRow[]): 
     stack.push(...(childrenByParent.get(id) ?? []));
   }
   return result;
-}
-
-export function regionMatchesFilter(candidateRegionId: number, currentRegionId: number, regions: RegionRow[]): boolean {
-  if (candidateRegionId === currentRegionId) return true;
-  if (getRegionAncestorIds(currentRegionId, regions).includes(candidateRegionId)) return true;
-  if (getRegionDescendantIds(currentRegionId, regions).includes(candidateRegionId)) return true;
-  return false;
 }
 
 export interface FilterValue {
@@ -121,105 +105,6 @@ export function firstMatchIndex(candidate: AxisValue[], orderedFilters: FilterVa
   return i === -1 ? Number.MAX_SAFE_INTEGER : i;
 }
 
-export interface FilteredCandidatesParams {
-  currentSongId: number;
-  currentAxisValues: AxisValue[];
-  activeAxisTypes: Set<string>;
-  allSongs: SongWithAxes[];
-  regions: RegionRow[];
-  playedSongIds: Set<number>;
-  showPlayed: boolean;
-}
-
-export function getFilteredCandidates(params: FilteredCandidatesParams): SongWithAxes[] {
-  const { currentSongId, currentAxisValues, activeAxisTypes, allSongs, regions, playedSongIds, showPlayed } = params;
-  const currentMap = axisValueMap(currentAxisValues);
-
-  return allSongs
-    .filter(({ song }) => song.id !== currentSongId)
-    .filter(({ song }) => showPlayed || !playedSongIds.has(song.id))
-    .filter(({ axisValues }) => {
-      const candidateMap = axisValueMap(axisValues);
-      for (const axisType of activeAxisTypes) {
-        const currentValue = currentMap.get(axisType);
-        if (!currentValue) continue;
-        const candidateValue = candidateMap.get(axisType);
-        if (!candidateValue) return false;
-        if (axisType === 'region' && currentValue.refId !== null && candidateValue.refId !== null) {
-          if (!regionMatchesFilter(candidateValue.refId, currentValue.refId, regions)) return false;
-        } else if (!axisValuesMatch(currentValue, candidateValue)) {
-          return false;
-        }
-      }
-      return true;
-    });
-}
-
-export function rankBySharedAxes(
-  candidates: SongWithAxes[],
-  currentAxisValues: AxisValue[],
-  activeAxisTypes: Set<string>
-): SongRow[] {
-  const currentMap = axisValueMap(currentAxisValues);
-  const inactiveSharedTypes = [...currentMap.keys()].filter((t) => !activeAxisTypes.has(t));
-
-  function score(axisValues: AxisValue[]): number {
-    const candidateMap = axisValueMap(axisValues);
-    let total = 0;
-    for (const axisType of inactiveSharedTypes) {
-      const candidateValue = candidateMap.get(axisType);
-      if (candidateValue && axisValuesMatch(currentMap.get(axisType)!, candidateValue)) total += 1;
-    }
-    return total;
-  }
-
-  return [...candidates]
-    .sort((a, b) => {
-      const diff = score(b.axisValues) - score(a.axisValues);
-      if (diff !== 0) return diff;
-      return a.song.title.localeCompare(b.song.title, 'el');
-    })
-    .map((c) => c.song);
-}
-
-export interface SuggestionParams {
-  currentSongId: number;
-  currentAxisValues: AxisValue[];
-  activeAxisTypes: Set<string>;
-  allSongs: SongWithAxes[];
-  regions: RegionRow[];
-  playedSongIds: Set<number>;
-  showPlayed: boolean;
-}
-
-export type SuggestionResult =
-  | { mode: 'filtered'; candidates: SongRow[] }
-  | { mode: 'ungrouped'; songs: SongRow[] };
-
-export function getSuggestions(params: SuggestionParams): SuggestionResult {
-  const { currentSongId, currentAxisValues, activeAxisTypes, allSongs, regions, playedSongIds, showPlayed } = params;
-
-  if (activeAxisTypes.size === 0) {
-    const visible = allSongs
-      .filter(({ song }) => song.id !== currentSongId)
-      .filter(({ song }) => showPlayed || !playedSongIds.has(song.id))
-      .map(({ song }) => song)
-      .sort((a, b) => a.title.localeCompare(b.title, 'el'));
-    return { mode: 'ungrouped', songs: visible };
-  }
-
-  const filtered = getFilteredCandidates({
-    currentSongId,
-    currentAxisValues,
-    activeAxisTypes,
-    allSongs,
-    regions,
-    playedSongIds,
-    showPlayed,
-  });
-  return { mode: 'filtered', candidates: rankBySharedAxes(filtered, currentAxisValues, activeAxisTypes) };
-}
-
 export interface ReferenceLookups {
   regions: RegionRow[];
   rhythms: RhythmRow[];
@@ -240,26 +125,30 @@ export interface CurrentSongPayload {
   femaleKey: string | null;
 }
 
-export interface AvailableAxis {
-  key: string;
-  label: string;
-  value: string;
-}
-
 export interface SuggestedSong {
   id: number;
   title: string;
   played: boolean;
 }
 
+export interface FilterOption {
+  refId: number | null;
+  yearValue: number | null;
+  name: string;
+}
+
+export interface AxisOptions {
+  axisType: string;
+  label: string;
+  options: FilterOption[];
+}
+
 export interface SuggestionsResponsePayload {
   currentSong: CurrentSongPayload | null;
-  availableAxisTypes: AvailableAxis[];
-  activeAxisTypes: string[];
+  appliedFilters: FilterValue[];
   mode: 'filtered' | 'ungrouped';
+  axes: AxisOptions[];
   candidates: SuggestedSong[];
-  songs: SuggestedSong[];
-  listTitle: string;
 }
 
 export interface BuildSuggestionsInput {
@@ -267,56 +156,71 @@ export interface BuildSuggestionsInput {
   allSongs: SongWithAxes[];
   playedSongIds: Set<number>;
   showPlayed: boolean;
-  requestedActive: Set<string> | null;
+  // null means "not chosen by the user yet": use the song's defaults.
+  filters: FilterValue[] | null;
   lookups: ReferenceLookups;
 }
 
+// Every axis type that has at least one option, in lookups.axisTypes order. Options are sorted by name,
+// years ascending. Years come from the songs themselves, since they have no lookup table.
+function buildAxisOptions(lookups: ReferenceLookups, allSongs: SongWithAxes[]): AxisOptions[] {
+  const years = [
+    ...new Set(allSongs.flatMap((s) => s.axisValues.filter((v) => v.axisType === 'year').map((v) => v.yearValue))),
+  ]
+    .filter((y): y is number => y !== null)
+    .sort((a, b) => a - b);
+
+  const fromLookup = (rows: { id: number; name: string }[]): FilterOption[] =>
+    rows
+      .map((r) => ({ refId: r.id, yearValue: null, name: r.name }))
+      .sort((a, b) => a.name.localeCompare(b.name, 'el'));
+
+  const optionsByKey: Record<string, FilterOption[]> = {
+    region: fromLookup(lookups.regions),
+    rhythm: fromLookup(lookups.rhythms),
+    dromos: fromLookup(lookups.dromoi),
+    dance: fromLookup(lookups.dances),
+    composer: fromLookup(lookups.composers),
+    genre: fromLookup(lookups.genres),
+    year: years.map((y) => ({ refId: null, yearValue: y, name: String(y) })),
+  };
+
+  return lookups.axisTypes
+    .map((t) => ({ axisType: t.key, label: t.label, options: optionsByKey[t.key] ?? [] }))
+    .filter((a) => a.options.length > 0);
+}
+
 export function buildSuggestionsResponse(input: BuildSuggestionsInput): SuggestionsResponsePayload {
-  const { currentSongWithAxes, allSongs, playedSongIds, showPlayed, requestedActive, lookups } = input;
+  const { currentSongWithAxes, allSongs, playedSongIds, showPlayed, filters, lookups } = input;
+
+  const axes = buildAxisOptions(lookups, allSongs);
+  const axisOrder = axes.map((a) => a.axisType);
+  const knownFilterKeys = new Set(axes.flatMap((a) => a.options.map((o) => filterKey({ axisType: a.axisType, refId: o.refId, yearValue: o.yearValue }))));
 
   if (!currentSongWithAxes) {
-    return { currentSong: null, availableAxisTypes: [], activeAxisTypes: [], mode: 'ungrouped', candidates: [], songs: [], listTitle: '' };
+    return { currentSong: null, appliedFilters: [], mode: 'ungrouped', axes, candidates: [] };
   }
 
-  const currentAxisValues = currentSongWithAxes.axisValues;
-  const availableAxisTypeKeys = currentAxisValues.map((v) => v.axisType);
-  const effectiveActive = requestedActive
-    ? new Set([...requestedActive].filter((t) => availableAxisTypeKeys.includes(t)))
-    : new Set(availableAxisTypeKeys);
-
-  const lookupNameById: Record<string, Map<number, string>> = {
-    region: new Map(lookups.regions.map((r) => [r.id, r.name])),
-    genre: new Map(lookups.genres.map((g) => [g.id, g.name])),
-    rhythm: new Map(lookups.rhythms.map((r) => [r.id, r.name])),
-    dromos: new Map(lookups.dromoi.map((d) => [d.id, d.name])),
-    dance: new Map(lookups.dances.map((d) => [d.id, d.name])),
-    composer: new Map(lookups.composers.map((c) => [c.id, c.name])),
-  };
-  const axisLabelByKey = new Map(lookups.axisTypes.map((t) => [t.key, t.label]));
-
-  function labelForAxisValue(v: AxisValue): string {
-    if (v.axisType === 'year') return String(v.yearValue);
-    const name = v.refId !== null ? lookupNameById[v.axisType]?.get(v.refId) : undefined;
-    return name ?? '?';
-  }
-
-  const toSuggestion = (id: number, title: string): SuggestedSong => ({ id, title, played: playedSongIds.has(id) });
-
-  const result = getSuggestions({
-    currentSongId: currentSongWithAxes.id,
-    currentAxisValues,
-    activeAxisTypes: effectiveActive,
-    allSongs,
-    regions: lookups.regions,
-    playedSongIds,
-    showPlayed,
+  const requested = filters ?? defaultFilters(currentSongWithAxes.axisValues, lookups.regions);
+  const seen = new Set<string>();
+  const appliedFilters = requested.filter((f) => {
+    const key = filterKey(f);
+    if (!knownFilterKeys.has(key) || seen.has(key)) return false;
+    seen.add(key);
+    return true;
   });
+  const ordered = orderFilters(appliedFilters, axisOrder);
 
-  const availableAxisTypes: AvailableAxis[] = currentAxisValues.map((v) => ({
-    key: v.axisType,
-    label: axisLabelByKey.get(v.axisType) ?? v.axisType,
-    value: labelForAxisValue(v),
-  }));
+  const candidates = allSongs
+    .filter(({ song }) => song.id !== currentSongWithAxes.id)
+    .filter(({ song }) => showPlayed || !playedSongIds.has(song.id))
+    .filter(({ axisValues }) => matchesFilters(axisValues, appliedFilters))
+    .sort((a, b) => {
+      const diff = firstMatchIndex(a.axisValues, ordered) - firstMatchIndex(b.axisValues, ordered);
+      if (diff !== 0) return diff;
+      return a.song.title.localeCompare(b.song.title, 'el');
+    })
+    .map(({ song }) => ({ id: song.id, title: song.title, played: playedSongIds.has(song.id) }));
 
   const currentSong: CurrentSongPayload = {
     id: currentSongWithAxes.id,
@@ -328,26 +232,11 @@ export function buildSuggestionsResponse(input: BuildSuggestionsInput): Suggesti
     femaleKey: currentSongWithAxes.femaleKey,
   };
 
-  if (result.mode === 'ungrouped') {
-    return {
-      currentSong,
-      availableAxisTypes,
-      activeAxisTypes: [...effectiveActive],
-      mode: 'ungrouped',
-      candidates: [],
-      songs: result.songs.map((s) => toSuggestion(s.id, s.title)),
-      listTitle: '',
-    };
-  }
-
-  const activeLabels = [...effectiveActive].map((key) => axisLabelByKey.get(key) ?? key);
   return {
     currentSong,
-    availableAxisTypes,
-    activeAxisTypes: [...effectiveActive],
-    mode: 'filtered',
-    candidates: result.candidates.map((s) => toSuggestion(s.id, s.title)),
-    songs: [],
-    listTitle: `Άλλα τραγούδια με τα ίδια: ${activeLabels.join(', ')}`,
+    appliedFilters,
+    mode: appliedFilters.length > 0 ? 'filtered' : 'ungrouped',
+    axes,
+    candidates,
   };
 }

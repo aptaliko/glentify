@@ -2,14 +2,10 @@ import { describe, it, expect } from 'vitest';
 import {
   getRegionAncestorIds,
   getRegionDescendantIds,
-  regionMatchesFilter,
   defaultFilters,
   matchesFilters,
   orderFilters,
   firstMatchIndex,
-  getFilteredCandidates,
-  rankBySharedAxes,
-  getSuggestions,
   buildSuggestionsResponse,
   type AxisValue,
   type SongWithAxes,
@@ -62,230 +58,6 @@ describe('getRegionDescendantIds', () => {
   });
 });
 
-describe('regionMatchesFilter', () => {
-  it('matches the exact same region', () => {
-    expect(regionMatchesFilter(4, 4, regions)).toBe(true);
-  });
-
-  it('matches a broader ancestor region', () => {
-    expect(regionMatchesFilter(1, 5, regions)).toBe(true); // candidate tagged broadly "Νησιά", current is narrow "Απείρανθος"
-  });
-
-  it('matches a narrower descendant region', () => {
-    expect(regionMatchesFilter(5, 1, regions)).toBe(true); // candidate tagged narrowly, current is broad
-  });
-
-  it('does not match an unrelated branch', () => {
-    expect(regionMatchesFilter(6, 5, regions)).toBe(false); // Κύθηρα vs Απείρανθος share only the "Νησιά" great-ancestor via Νησιά(1), but 6's parent is 1 directly, not on the Απείρανθος branch
-  });
-
-  it('does not match a sibling region (same parent)', () => {
-    expect(regionMatchesFilter(6, 2, regions)).toBe(false); // Κύθηρα and Νησιά Αιγαίου both sit under Νησιά(1); siblings no longer match
-    expect(regionMatchesFilter(2, 6, regions)).toBe(false);
-  });
-
-  it('does not match a cousin (sibling of an ancestor)', () => {
-    expect(regionMatchesFilter(6, 3, regions)).toBe(false); // Κύθηρα(6) is a sibling of Νησιά Αιγαίου(2), not of Κυκλάδες(3)
-  });
-});
-
-describe('getFilteredCandidates', () => {
-  const current: SongWithAxes = {
-    song: makeSong(1, 'Current'),
-    axisValues: [av('rhythm', 10), av('region', 4), av('dromos', 100)],
-  };
-  const rhythmMatch: SongWithAxes = { song: makeSong(2, 'Rhythm match'), axisValues: [av('rhythm', 10), av('region', 99), av('dromos', 200)] };
-  const rhythmMismatch: SongWithAxes = { song: makeSong(3, 'Rhythm mismatch'), axisValues: [av('rhythm', 20)] };
-  const noRhythmAxis: SongWithAxes = { song: makeSong(4, 'No rhythm axis'), axisValues: [av('composer', 1)] };
-  const allSongs = [current, rhythmMatch, rhythmMismatch, noRhythmAxis];
-
-  it('excludes the current song', () => {
-    const result = getFilteredCandidates({
-      currentSongId: 1, currentAxisValues: current.axisValues, activeAxisTypes: new Set(['rhythm']),
-      allSongs, regions, playedSongIds: new Set(), showPlayed: false,
-    });
-    expect(result.some((c) => c.song.id === 1)).toBe(false);
-  });
-
-  it('AND-filters on every active axis, excluding songs missing the axis entirely', () => {
-    const result = getFilteredCandidates({
-      currentSongId: 1, currentAxisValues: current.axisValues, activeAxisTypes: new Set(['rhythm']),
-      allSongs, regions, playedSongIds: new Set(), showPlayed: false,
-    });
-    expect(result.map((c) => c.song.id).sort()).toEqual([2]);
-  });
-
-  it('region filtering is ancestor/descendant inclusive', () => {
-    const broadCandidate: SongWithAxes = { song: makeSong(5, 'Broad region'), axisValues: [av('region', 1)] };
-    const result = getFilteredCandidates({
-      currentSongId: 1, currentAxisValues: [av('region', 4)], activeAxisTypes: new Set(['region']),
-      allSongs: [current, broadCandidate], regions, playedSongIds: new Set(), showPlayed: false,
-    });
-    expect(result.map((c) => c.song.id)).toEqual([5]);
-  });
-
-  it('excludes already-played songs unless showPlayed is true', () => {
-    const hidden = getFilteredCandidates({
-      currentSongId: 1, currentAxisValues: current.axisValues, activeAxisTypes: new Set(['rhythm']),
-      allSongs, regions, playedSongIds: new Set([2]), showPlayed: false,
-    });
-    expect(hidden.some((c) => c.song.id === 2)).toBe(false);
-
-    const shown = getFilteredCandidates({
-      currentSongId: 1, currentAxisValues: current.axisValues, activeAxisTypes: new Set(['rhythm']),
-      allSongs, regions, playedSongIds: new Set([2]), showPlayed: true,
-    });
-    expect(shown.some((c) => c.song.id === 2)).toBe(true);
-  });
-});
-
-describe('rankBySharedAxes', () => {
-  const currentAxisValues: AxisValue[] = [av('rhythm', 10), av('region', 4), av('dromos', 100)];
-
-  it('ranks candidates higher when they share inactive-but-present axes', () => {
-    const bothShared: SongWithAxes = { song: makeSong(2, 'Both shared'), axisValues: [av('rhythm', 10), av('region', 4), av('dromos', 100)] };
-    const oneShared: SongWithAxes = { song: makeSong(3, 'One shared'), axisValues: [av('rhythm', 10), av('region', 999), av('dromos', 100)] };
-    const noneShared: SongWithAxes = { song: makeSong(4, 'None shared'), axisValues: [av('rhythm', 10), av('region', 999), av('dromos', 999)] };
-
-    const result = rankBySharedAxes([noneShared, oneShared, bothShared], currentAxisValues, new Set(['rhythm']));
-    expect(result.map((s) => s.id)).toEqual([2, 3, 4]);
-  });
-
-  it('breaks ties alphabetically by title', () => {
-    const b: SongWithAxes = { song: makeSong(2, 'Beta'), axisValues: [] };
-    const a: SongWithAxes = { song: makeSong(3, 'Alpha'), axisValues: [] };
-    const result = rankBySharedAxes([b, a], currentAxisValues, new Set(['rhythm']));
-    expect(result.map((s) => s.title)).toEqual(['Alpha', 'Beta']);
-  });
-});
-
-describe('getSuggestions', () => {
-  const current: SongWithAxes = { song: makeSong(1, 'Current'), axisValues: [av('rhythm', 10), av('region', 4)] };
-  const match: SongWithAxes = { song: makeSong(2, 'Match'), axisValues: [av('rhythm', 10), av('region', 4), av('genre', 3)] };
-  const otherGenre: SongWithAxes = { song: makeSong(3, 'Other genre song'), axisValues: [av('genre', 7)] };
-  const allSongs = [current, otherGenre, match];
-
-  it('returns a filtered ranked list when at least one axis is active', () => {
-    const result = getSuggestions({
-      currentSongId: 1, currentAxisValues: current.axisValues, activeAxisTypes: new Set(['rhythm']),
-      allSongs, regions, playedSongIds: new Set(), showPlayed: false,
-    });
-    expect(result.mode).toBe('filtered');
-    if (result.mode === 'filtered') expect(result.candidates.map((s) => s.id)).toEqual([2]);
-  });
-
-  it('falls back to a plain alphabetical list when no axis is active', () => {
-    const result = getSuggestions({
-      currentSongId: 1, currentAxisValues: current.axisValues, activeAxisTypes: new Set(),
-      allSongs, regions, playedSongIds: new Set(), showPlayed: false,
-    });
-    expect(result.mode).toBe('ungrouped');
-    if (result.mode === 'ungrouped') {
-      expect(result.songs.map((s) => s.id)).toEqual([2, 3]);
-    }
-  });
-});
-
-describe('buildSuggestionsResponse', () => {
-  const rhythms: RhythmRow[] = [{ id: 1, name: 'Καλαματιανός', ownerId: null }];
-  const dromoi: DromosRow[] = [{ id: 1, name: 'Ραστ', ownerId: null }];
-  const dances: DanceRow[] = [];
-  const composers: ComposerRow[] = [];
-  const axisTypes: AxisTypeRow[] = [
-    { id: 1, key: 'region', label: 'Περιοχή', lookupTable: 'regions', hierarchical: true },
-    { id: 2, key: 'rhythm', label: 'Ρυθμός', lookupTable: 'rhythms', hierarchical: false },
-  ];
-  const genres: GenreRow[] = [{ id: 1, name: 'Παραδοσιακό', ownerId: null }];
-  const lookups = { regions, rhythms, dromoi, dances, composers, axisTypes, genres };
-
-  it('returns an empty ungrouped response when there is no current song', () => {
-    const result = buildSuggestionsResponse({
-      currentSongWithAxes: null,
-      allSongs: [],
-      playedSongIds: new Set(),
-      showPlayed: false,
-      requestedActive: null,
-      lookups,
-    });
-    expect(result).toEqual({
-      currentSong: null,
-      availableAxisTypes: [],
-      activeAxisTypes: [],
-      mode: 'ungrouped',
-      candidates: [],
-      songs: [],
-      listTitle: '',
-    });
-  });
-
-  it('builds a filtered response with human-readable axis labels and a listTitle', () => {
-    const current = makeSong(1, 'Τραγούδι Α');
-    const candidate = makeSong(2, 'Τραγούδι Β');
-    const allSongs = [
-      { song: current, axisValues: [av('region', 3), av('rhythm', 1)] },
-      { song: candidate, axisValues: [av('region', 3), av('rhythm', 1)] },
-    ];
-    const result = buildSuggestionsResponse({
-      currentSongWithAxes: { id: 1, title: 'Τραγούδι Α', lyrics: null, imageUrl: null, maleKey: null, femaleKey: null, axisValues: [av('region', 3), av('rhythm', 1)] },
-      allSongs,
-      playedSongIds: new Set(),
-      showPlayed: false,
-      requestedActive: null,
-      lookups,
-    });
-    expect(result.mode).toBe('filtered');
-    expect(result.availableAxisTypes).toEqual([
-      { key: 'region', label: 'Περιοχή', value: 'Κυκλάδες' },
-      { key: 'rhythm', label: 'Ρυθμός', value: 'Καλαματιανός' },
-    ]);
-    expect(result.candidates).toEqual([{ id: 2, title: 'Τραγούδι Β', played: false }]);
-    expect(result.listTitle).toBe('Άλλα τραγούδια με τα ίδια: Περιοχή, Ρυθμός');
-  });
-
-  it('ranks and labels a dance axis value with its Greek name, not "?"', () => {
-    const danceLookups = {
-      ...lookups,
-      dances: [{ id: 1, name: 'Τσάμικος', ownerId: null }],
-      axisTypes: [...axisTypes, { id: 7, key: 'dance', label: 'Χορός', lookupTable: 'dances', hierarchical: false }],
-    };
-    const allSongs = [
-      { song: makeSong(1, 'Τραγούδι Α'), axisValues: [av('dance', 1)] },
-      { song: makeSong(2, 'Τραγούδι Β'), axisValues: [av('dance', 1)] },
-    ];
-    const result = buildSuggestionsResponse({
-      currentSongWithAxes: { id: 1, title: 'Τραγούδι Α', lyrics: null, imageUrl: null, maleKey: null, femaleKey: null, axisValues: [av('dance', 1)] },
-      allSongs,
-      playedSongIds: new Set(),
-      showPlayed: false,
-      requestedActive: null,
-      lookups: danceLookups,
-    });
-    expect(result.availableAxisTypes).toEqual([{ key: 'dance', label: 'Χορός', value: 'Τσάμικος' }]);
-    expect(result.candidates).toEqual([{ id: 2, title: 'Τραγούδι Β', played: false }]);
-  });
-
-  it('builds a populated ungrouped response when the current song has no active axis filters', () => {
-    const current = makeSong(1, 'Τραγούδι Α');
-    const other = makeSong(2, 'Τραγούδι Β');
-    const allSongs = [
-      { song: current, axisValues: [] },
-      { song: other, axisValues: [av('rhythm', 1)] },
-    ];
-    const result = buildSuggestionsResponse({
-      currentSongWithAxes: { id: 1, title: 'Τραγούδι Α', lyrics: null, imageUrl: null, maleKey: null, femaleKey: null, axisValues: [] },
-      allSongs,
-      playedSongIds: new Set(),
-      showPlayed: false,
-      requestedActive: null,
-      lookups,
-    });
-    expect(result.mode).toBe('ungrouped');
-    expect(result.songs).toEqual([{ id: 2, title: 'Τραγούδι Β', played: false }]);
-    expect(result.candidates).toEqual([]);
-    expect(result.listTitle).toBe('');
-  });
-});
-
 describe('defaultFilters', () => {
   it('puts the current region first, then its ancestors, then the other axes', () => {
     const f = defaultFilters([av('region', 5), av('rhythm', 10)], regions);
@@ -331,5 +103,119 @@ describe('firstMatchIndex and orderFilters', () => {
     const ordered = [{ axisType: 'region', refId: 5, yearValue: null }, { axisType: 'region', refId: 4, yearValue: null }];
     expect(firstMatchIndex([av('region', 4)], ordered)).toBe(1);
     expect(firstMatchIndex([av('region', 5), av('region', 4)], ordered)).toBe(0);
+  });
+});
+
+describe('buildSuggestionsResponse', () => {
+  const rhythms: RhythmRow[] = [{ id: 1, name: 'Καλαματιανός', ownerId: null }, { id: 2, name: 'Ζεϊμπέκικο', ownerId: null }];
+  const dromoi: DromosRow[] = [];
+  const dances: DanceRow[] = [{ id: 1, name: 'Τσάμικος', ownerId: null }];
+  const composers: ComposerRow[] = [];
+  const genres: GenreRow[] = [];
+  const axisTypes: AxisTypeRow[] = [
+    { id: 1, key: 'region', label: 'Περιοχή', lookupTable: 'regions', hierarchical: true },
+    { id: 2, key: 'rhythm', label: 'Ρυθμός', lookupTable: 'rhythms', hierarchical: false },
+    { id: 3, key: 'dance', label: 'Χορός', lookupTable: 'dances', hierarchical: false },
+    { id: 4, key: 'year', label: 'Έτος', lookupTable: null, hierarchical: false },
+  ];
+  const lookups = { regions, rhythms, dromoi, dances, composers, axisTypes, genres };
+
+  function current(id: number, title: string, axisValues: AxisValue[]) {
+    return { id, title, lyrics: null, imageUrl: null, maleKey: null, femaleKey: null, axisValues };
+  }
+
+  it('returns no current song, no applied filters and no candidates when there is no current song', () => {
+    const result = buildSuggestionsResponse({
+      currentSongWithAxes: null, allSongs: [], playedSongIds: new Set(), showPlayed: false, filters: null, lookups,
+    });
+    expect(result.currentSong).toBeNull();
+    expect(result.appliedFilters).toEqual([]);
+    expect(result.mode).toBe('ungrouped');
+    expect(result.candidates).toEqual([]);
+  });
+
+  it('uses the song defaults (region chain first) when filters is null', () => {
+    const cur = makeSong(1, 'Α');
+    const allSongs: SongWithAxes[] = [{ song: cur, axisValues: [av('region', 3), av('rhythm', 1)] }];
+    const result = buildSuggestionsResponse({
+      currentSongWithAxes: current(1, 'Α', [av('region', 3), av('rhythm', 1)]),
+      allSongs, playedSongIds: new Set(), showPlayed: false, filters: null, lookups,
+    });
+    expect(result.appliedFilters.map((f) => f.refId)).toEqual([3, 2, 1, 1]);
+    expect(result.mode).toBe('filtered');
+  });
+
+  it('drops applied filters whose values are not in the lookups', () => {
+    const cur = makeSong(1, 'Α');
+    const allSongs: SongWithAxes[] = [{ song: cur, axisValues: [av('region', 3)] }];
+    const result = buildSuggestionsResponse({
+      currentSongWithAxes: current(1, 'Α', [av('region', 3)]),
+      allSongs, playedSongIds: new Set(), showPlayed: false,
+      filters: [{ axisType: 'region', refId: 999, yearValue: null }, { axisType: 'region', refId: 3, yearValue: null }],
+      lookups,
+    });
+    expect(result.appliedFilters).toEqual([{ axisType: 'region', refId: 3, yearValue: null }]);
+  });
+
+  it('is ungrouped with an alphabetical list when every chip is removed (filters = [])', () => {
+    const allSongs: SongWithAxes[] = [
+      { song: makeSong(1, 'Α'), axisValues: [av('rhythm', 1)] },
+      { song: makeSong(2, 'Γ'), axisValues: [] },
+      { song: makeSong(3, 'Β'), axisValues: [av('rhythm', 2)] },
+    ];
+    const result = buildSuggestionsResponse({
+      currentSongWithAxes: current(1, 'Α', [av('rhythm', 1)]),
+      allSongs, playedSongIds: new Set(), showPlayed: false, filters: [], lookups,
+    });
+    expect(result.mode).toBe('ungrouped');
+    expect(result.appliedFilters).toEqual([]);
+    expect(result.candidates.map((c) => c.title)).toEqual(['Β', 'Γ']);
+  });
+
+  it('orders candidates by the first matched filter in on-screen order, then by title', () => {
+    const allSongs: SongWithAxes[] = [
+      { song: makeSong(1, 'Τρέχον'), axisValues: [av('region', 4)] },
+      { song: makeSong(2, 'Α'), axisValues: [av('region', 4)] },
+      { song: makeSong(3, 'Β'), axisValues: [av('region', 5)] },
+      { song: makeSong(4, 'Γ'), axisValues: [av('region', 4)] },
+    ];
+    const result = buildSuggestionsResponse({
+      currentSongWithAxes: current(1, 'Τρέχον', [av('region', 4)]),
+      allSongs, playedSongIds: new Set(), showPlayed: false,
+      filters: [{ axisType: 'region', refId: 5, yearValue: null }, { axisType: 'region', refId: 4, yearValue: null }],
+      lookups,
+    });
+    expect(result.candidates.map((c) => c.title)).toEqual(['Β', 'Α', 'Γ']);
+  });
+
+  it('marks played songs and hides them unless showPlayed is set', () => {
+    const allSongs: SongWithAxes[] = [
+      { song: makeSong(1, 'Α'), axisValues: [] },
+      { song: makeSong(2, 'Β'), axisValues: [] },
+    ];
+    const base = {
+      currentSongWithAxes: current(1, 'Α', []), allSongs, playedSongIds: new Set([2]), filters: [], lookups,
+    };
+    expect(buildSuggestionsResponse({ ...base, showPlayed: false }).candidates).toEqual([]);
+    expect(buildSuggestionsResponse({ ...base, showPlayed: true }).candidates).toEqual([{ id: 2, title: 'Β', played: true }]);
+  });
+
+  it('lists options for every axis that has values, in lookups order, with names', () => {
+    const allSongs: SongWithAxes[] = [
+      { song: makeSong(1, 'Α'), axisValues: [av('year', null, 1998)] },
+      { song: makeSong(2, 'Β'), axisValues: [av('year', null, 1970)] },
+    ];
+    const result = buildSuggestionsResponse({
+      currentSongWithAxes: current(1, 'Α', [av('year', null, 1998)]),
+      allSongs, playedSongIds: new Set(), showPlayed: false, filters: null, lookups,
+    });
+    expect(result.axes.map((a) => a.axisType)).toEqual(['region', 'rhythm', 'dance', 'year']);
+    expect(result.axes.find((a) => a.axisType === 'dance')).toEqual({
+      axisType: 'dance', label: 'Χορός', options: [{ refId: 1, yearValue: null, name: 'Τσάμικος' }],
+    });
+    expect(result.axes.find((a) => a.axisType === 'year')!.options).toEqual([
+      { refId: null, yearValue: 1970, name: '1970' },
+      { refId: null, yearValue: 1998, name: '1998' },
+    ]);
   });
 });
