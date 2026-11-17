@@ -13,6 +13,7 @@ const updateSchema = z.object({
   title: z.string().min(1),
   lyrics: z.string().nullable(),
   imageUrl: z.string().nullable(),
+  pdfUrl: z.string().nullable(),
   notes: z.string().nullable(),
   maleKey: z.string().nullable(),
   femaleKey: z.string().nullable(),

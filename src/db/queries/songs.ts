@@ -127,6 +127,7 @@ export interface SongInput {
   title: string;
   lyrics: string | null;
   imageUrl: string | null;
+  pdfUrl: string | null;
   notes: string | null;
   maleKey: string | null;
   femaleKey: string | null;
@@ -141,6 +142,7 @@ export async function createSong(ownerId: number, data: SongInput): Promise<Song
       title: data.title,
       lyrics: data.lyrics,
       imageUrl: data.imageUrl,
+      pdfUrl: data.pdfUrl,
       notes: data.notes,
       maleKey: data.maleKey,
       femaleKey: data.femaleKey,
@@ -158,6 +160,7 @@ export async function updateSong(ownerId: number, id: number, data: SongInput): 
       title: data.title,
       lyrics: data.lyrics,
       imageUrl: data.imageUrl,
+      pdfUrl: data.pdfUrl,
       notes: data.notes,
       maleKey: data.maleKey,
       femaleKey: data.femaleKey,
