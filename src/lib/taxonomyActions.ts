@@ -10,8 +10,6 @@ import { mintDraftId, type DraftEntity } from './draftIds';
 import { nativeApiFetch } from './nativeApiFetch';
 import { isNativeApp } from './platform';
 import { makeTaxonomyCreateHandler, makeTaxonomyDeleteHandler } from './syncHandlers';
-import { taxonomyInUseMessage } from './taxonomyMerge';
-import { loadReferenceData } from './offlineCache';
 
 export type TaxonomyEntity = Extract<DraftEntity, 'regions' | 'genres' | 'rhythms' | 'dromoi' | 'dances' | 'composers'>;
 
@@ -42,11 +40,6 @@ export async function addTaxonomyValue(entity: TaxonomyEntity, name: string, par
 
 export async function removeTaxonomyValue(entity: TaxonomyEntity, id: number): Promise<void> {
   if (isNativeApp()) {
-    // Refuse here, not at sync time: a queued delete is hidden from the list immediately, and a
-    // 409 found later would only resurface the value silently with a needs-attention badge.
-    const cached = await loadReferenceData();
-    const inUse = cached ? taxonomyInUseMessage(entity, id, cached.axisValues) : null;
-    if (inUse) throw new Error(inUse);
     try {
       await enqueue(`${entity}-delete`, { id });
     } catch {

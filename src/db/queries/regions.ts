@@ -23,13 +23,11 @@ export async function updateRegion(id: number, data: { name: string; parentId: n
 }
 
 export async function deleteRegion(id: number): Promise<void> {
-  const [songUsage] = await db
-    .select({ id: songAxisValues.id })
-    .from(songAxisValues)
-    .where(and(eq(songAxisValues.axisType, 'region'), eq(songAxisValues.refId, id)))
-    .limit(1);
-  if (songUsage) throw new Error('Η περιοχή χρησιμοποιείται από τραγούδι');
   const [childRegion] = await db.select({ id: regions.id }).from(regions).where(eq(regions.parentId, id)).limit(1);
   if (childRegion) throw new Error('Η περιοχή έχει θυγατρικές περιοχές');
-  await db.delete(regions).where(eq(regions.id, id));
+  // Songs that used this value lose it; the songs themselves stay. One batch = one transaction.
+  await db.batch([
+    db.delete(songAxisValues).where(and(eq(songAxisValues.axisType, 'region'), eq(songAxisValues.refId, id))),
+    db.delete(regions).where(eq(regions.id, id)),
+  ]);
 }

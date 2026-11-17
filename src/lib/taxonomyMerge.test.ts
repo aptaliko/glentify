@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mergeTaxonomyWithPending, taxonomyInUseMessage, type TaxonomyBaseValue } from './taxonomyMerge';
+import { mergeTaxonomyWithPending, type TaxonomyBaseValue } from './taxonomyMerge';
 import type { QueuedAction } from './syncQueue';
 
 function action(overrides: Partial<QueuedAction>): QueuedAction {
@@ -34,26 +34,5 @@ describe('mergeTaxonomyWithPending', () => {
   it('ignores actions for a different entity', () => {
     const out = mergeTaxonomyWithPending(base, [action({ type: 'genres-create', payload: { draftId: -9, name: 'Ρεμπέτικο', parentId: null } })], 'regions');
     expect(out).toHaveLength(2);
-  });
-});
-
-describe('taxonomyInUseMessage', () => {
-  it('returns the in-use message when a song references the value on its axis', () => {
-    expect(taxonomyInUseMessage('rhythms', 1, [{ axisType: 'rhythm', refId: 1 }])).toBe(
-      'Ο ρυθμός χρησιμοποιείται από τραγούδι'
-    );
-  });
-  it('returns null when no song uses the value', () => {
-    expect(taxonomyInUseMessage('rhythms', 2, [{ axisType: 'rhythm', refId: 1 }])).toBeNull();
-  });
-  it('matches the axis, not just the id: a region with the same id is not a rhythm use', () => {
-    expect(taxonomyInUseMessage('rhythms', 1, [{ axisType: 'region', refId: 1 }])).toBeNull();
-  });
-  it('uses the entity-specific message', () => {
-    expect(taxonomyInUseMessage('dromoi', 3, [{ axisType: 'dromos', refId: 3 }])).toBe('Ο δρόμος χρησιμοποιείται από τραγούδι');
-    expect(taxonomyInUseMessage('regions', 3, [{ axisType: 'region', refId: 3 }])).toBe('Η περιοχή χρησιμοποιείται από τραγούδι');
-  });
-  it('ignores year-only axis values (no refId)', () => {
-    expect(taxonomyInUseMessage('rhythms', 1, [{ axisType: 'year', refId: null }])).toBeNull();
   });
 });

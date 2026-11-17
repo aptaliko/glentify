@@ -23,11 +23,9 @@ export async function updateGenre(id: number, data: { name: string }): Promise<G
 }
 
 export async function deleteGenre(id: number): Promise<void> {
-  const [usage] = await db
-    .select({ id: songAxisValues.id })
-    .from(songAxisValues)
-    .where(and(eq(songAxisValues.axisType, 'genre'), eq(songAxisValues.refId, id)))
-    .limit(1);
-  if (usage) throw new Error('Το είδος χρησιμοποιείται από τραγούδι');
-  await db.delete(genres).where(eq(genres.id, id));
+  // Songs that used this value lose it; the songs themselves stay. One batch = one transaction.
+  await db.batch([
+    db.delete(songAxisValues).where(and(eq(songAxisValues.axisType, 'genre'), eq(songAxisValues.refId, id))),
+    db.delete(genres).where(eq(genres.id, id)),
+  ]);
 }

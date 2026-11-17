@@ -23,11 +23,9 @@ export async function updateComposer(id: number, data: { name: string }): Promis
 }
 
 export async function deleteComposer(id: number): Promise<void> {
-  const [usage] = await db
-    .select({ id: songAxisValues.id })
-    .from(songAxisValues)
-    .where(and(eq(songAxisValues.axisType, 'composer'), eq(songAxisValues.refId, id)))
-    .limit(1);
-  if (usage) throw new Error('Ο συνθέτης χρησιμοποιείται από τραγούδι');
-  await db.delete(composers).where(eq(composers.id, id));
+  // Songs that used this value lose it; the songs themselves stay. One batch = one transaction.
+  await db.batch([
+    db.delete(songAxisValues).where(and(eq(songAxisValues.axisType, 'composer'), eq(songAxisValues.refId, id))),
+    db.delete(composers).where(eq(composers.id, id)),
+  ]);
 }
