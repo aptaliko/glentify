@@ -4,8 +4,9 @@ import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import PageNav from '@/components/PageNav';
 import SongPicker from '@/components/SongPicker';
+import SuggestionFilters from '@/components/SuggestionFilters';
 import type { SessionStore } from '@/lib/sessionStore';
-import type { SuggestionsResponsePayload, SuggestedSong } from '@/lib/suggestions';
+import type { SuggestionsResponsePayload, SuggestedSong, FilterValue } from '@/lib/suggestions';
 import type { SongPickerDataSource } from '@/lib/songPickerData';
 import { preferencesStore } from '@/lib/preferencesStore';
 import {
@@ -244,7 +245,9 @@ export default function LiveSessionView({
 
   const [data, setData] = useState<SuggestionsResponsePayload | null>(null);
   const [showPlayed, setShowPlayed] = useState(false);
-  const [manualActiveAxisTypes, setManualActiveAxisTypes] = useState<string[] | null>(null);
+  // null until the user changes a chip; then the user's list replaces the song's defaults.
+  const [filterOverride, setFilterOverride] = useState<FilterValue[] | null>(null);
+  const [openAxes, setOpenAxes] = useState<string[]>([]);
   const [stageMode, setStageMode] = useState(false);
   const lyricsScrollRef = useRef<HTMLDivElement>(null);
 
@@ -267,29 +270,30 @@ export default function LiveSessionView({
   }
 
   const load = useCallback(async () => {
-    setData(await store.load(showPlayed, manualActiveAxisTypes));
-  }, [store, showPlayed, manualActiveAxisTypes]);
+    setData(await store.load(showPlayed, filterOverride));
+  }, [store, showPlayed, filterOverride]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
   }, [load]);
 
-  function toggleAxis(key: string) {
-    const current = manualActiveAxisTypes ?? data?.activeAxisTypes ?? [];
-    const next = current.includes(key) ? current.filter((k) => k !== key) : [...current, key];
-    setManualActiveAxisTypes(next);
+  function handleFiltersChange(filters: FilterValue[], nextOpenAxes: string[]) {
+    setFilterOverride(filters);
+    setOpenAxes(nextOpenAxes);
   }
 
   async function handlePick(songId: number) {
     await store.pickSong(songId);
-    setManualActiveAxisTypes(null);
+    setFilterOverride(null);
+    setOpenAxes([]);
     await load();
   }
 
   async function handleEndSequence() {
     await store.endSequence();
-    setManualActiveAxisTypes(null);
+    setFilterOverride(null);
+    setOpenAxes([]);
     await load();
   }
 
@@ -335,18 +339,12 @@ export default function LiveSessionView({
                 />
                 <span className="label-text">Δείξε τα ειπωμένα</span>
               </label>
-              {data.availableAxisTypes.map((axis) => {
-                const isActive = data.activeAxisTypes.includes(axis.key);
-                return (
-                  <button
-                    key={axis.key}
-                    onClick={() => toggleAxis(axis.key)}
-                    className={`btn btn-sm rounded-full ${isActive ? 'btn-primary' : 'btn-outline'}`}
-                  >
-                    {axis.label}: {axis.value}
-                  </button>
-                );
-              })}
+              <SuggestionFilters
+                axes={data.axes}
+                appliedFilters={filterOverride ?? data.appliedFilters}
+                openAxes={openAxes}
+                onChange={handleFiltersChange}
+              />
             </>
           )}
           <button onClick={handleEndSequence} className="btn btn-sm btn-outline">
@@ -378,21 +376,16 @@ export default function LiveSessionView({
           {!stageMode && (
           <div className="card overflow-hidden bg-base-100 shadow">
             <h2 className="border-b border-base-300 bg-base-200 px-4 py-2 text-sm font-semibold tracking-wide text-base-content/70 uppercase">
-              {data.mode === 'filtered' ? data.listTitle : 'Όλα τα τραγούδια'}
+              {data.mode === 'filtered' ? 'Προτάσεις' : 'Όλα τα τραγούδια'}
             </h2>
             <div className="flex max-h-[36rem] flex-col gap-1 overflow-y-auto p-2">
-              {data.mode === 'filtered' &&
-                (data.candidates.length === 0 ? (
-                  <p className="px-3 py-4 text-sm text-base-content/50">Καμία πρόταση</p>
-                ) : (
-                  data.candidates.map((s) => <SongButton key={s.id} song={s} onPick={handlePick} />)
-                ))}
-              {data.mode === 'ungrouped' &&
-                (data.songs.length === 0 ? (
-                  <p className="px-3 py-4 text-sm text-base-content/50">Κανένα τραγούδι</p>
-                ) : (
-                  data.songs.map((s) => <SongButton key={s.id} song={s} onPick={handlePick} />)
-                ))}
+              {data.candidates.length === 0 ? (
+                <p className="px-3 py-4 text-sm text-base-content/50">
+                  {data.mode === 'filtered' ? 'Καμία πρόταση' : 'Κανένα τραγούδι'}
+                </p>
+              ) : (
+                data.candidates.map((s) => <SongButton key={s.id} song={s} onPick={handlePick} />)
+              )}
             </div>
           </div>
           )}

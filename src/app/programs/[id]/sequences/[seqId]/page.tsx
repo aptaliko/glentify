@@ -8,6 +8,7 @@ import SequenceSuggestionsCard from '@/components/SequenceSuggestionsCard';
 import { getSequenceSuggestions, ExplorationSessionStore } from '@/lib/sessionStore';
 import { createLocalSongPickerDataSource } from '@/lib/songPickerData';
 import type { ReferenceData } from '@/lib/referenceData';
+import type { FilterValue } from '@/lib/suggestions';
 
 interface Song {
   id: number;
@@ -42,7 +43,9 @@ export default function SequencePlaybackPage() {
   // duplicated suggestions endpoint. Non-blocking (see above), so it doesn't delay the page's
   // main content even on a slow connection.
   const [referenceData, setReferenceData] = useState<ReferenceData | null>(null);
-  const [activeAxisTypes, setActiveAxisTypes] = useState<string[] | null>(null);
+  // null until the user changes a chip; then the user's list replaces the song's defaults.
+  const [filterOverride, setFilterOverride] = useState<FilterValue[] | null>(null);
+  const [openAxes, setOpenAxes] = useState<string[]>([]);
   const [exploringSongId, setExploringSongId] = useState<number | null>(null);
 
   useEffect(() => {
@@ -54,7 +57,8 @@ export default function SequencePlaybackPage() {
         // A different sequence is a different "current song" for suggestion purposes too —
         // reset the same way every other index change does (see goToIndex below), and drop
         // any in-progress exploration from the sequence we're navigating away from.
-        setActiveAxisTypes(null);
+        setFilterOverride(null);
+        setOpenAxes([]);
         setExploringSongId(null);
       });
   }, [params.id, params.seqId]);
@@ -112,16 +116,16 @@ export default function SequencePlaybackPage() {
   // effect watching for it.
   function goToIndex(i: number) {
     setIndex(i);
-    setActiveAxisTypes(null);
+    setFilterOverride(null);
+    setOpenAxes([]);
   }
   const suggestions = referenceData
-    ? getSequenceSuggestions(referenceData, current.song.id, excludeSongIds, activeAxisTypes)
+    ? getSequenceSuggestions(referenceData, current.song.id, excludeSongIds, filterOverride)
     : null;
 
-  function toggleSuggestionAxis(key: string) {
-    if (!suggestions) return;
-    const currentlyActive = activeAxisTypes ?? suggestions.activeAxisTypes;
-    setActiveAxisTypes(currentlyActive.includes(key) ? currentlyActive.filter((k) => k !== key) : [...currentlyActive, key]);
+  function handleSuggestionFiltersChange(filters: FilterValue[], nextOpenAxes: string[]) {
+    setFilterOverride(filters);
+    setOpenAxes(nextOpenAxes);
   }
 
   return (
@@ -186,7 +190,13 @@ export default function SequencePlaybackPage() {
         </div>
 
         {suggestions && (
-          <SequenceSuggestionsCard data={suggestions} onToggleAxis={toggleSuggestionAxis} onPick={setExploringSongId} />
+          <SequenceSuggestionsCard
+            data={suggestions}
+            appliedFilters={filterOverride ?? suggestions.appliedFilters}
+            openAxes={openAxes}
+            onFiltersChange={handleSuggestionFiltersChange}
+            onPick={setExploringSongId}
+          />
         )}
       </div>
     </main>

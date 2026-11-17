@@ -17,6 +17,7 @@ import type { QueuedAction } from '@/lib/syncQueue';
 import { buildSongTitleMap, toProgramDetail } from '@/lib/offlineProgramView';
 import { mergeSequencesWithPending } from '@/lib/sequencesMerge';
 import type { CachedReferenceData } from '@/lib/referenceData';
+import type { FilterValue } from '@/lib/suggestions';
 import type { SongRow } from '@/db/schema';
 
 export default function LocalSequencePage() {
@@ -25,7 +26,9 @@ export default function LocalSequencePage() {
   const [sequenceId, setSequenceId] = useState<number | null>(null);
   const [checked, setChecked] = useState(false);
   const [index, setIndex] = useState(0);
-  const [activeAxisTypes, setActiveAxisTypes] = useState<string[] | null>(null);
+  // null until the user changes a chip; then the user's list replaces the song's defaults.
+  const [filterOverride, setFilterOverride] = useState<FilterValue[] | null>(null);
+  const [openAxes, setOpenAxes] = useState<string[]>([]);
   const [exploringSongId, setExploringSongId] = useState<number | null>(null);
   const [pendingActions, setPendingActions] = useState<QueuedAction[]>([]);
 
@@ -80,7 +83,8 @@ export default function LocalSequencePage() {
   // effect watching for it.
   function goToIndex(i: number) {
     setIndex(i);
-    setActiveAxisTypes(null);
+    setFilterOverride(null);
+    setOpenAxes([]);
   }
 
   const swipeHandlers = useSwipeable({
@@ -157,12 +161,12 @@ export default function LocalSequencePage() {
     referenceData,
     current.id,
     new Set(displaySequence.songs.map((s) => s.songId)),
-    activeAxisTypes,
+    filterOverride,
   );
 
-  function toggleSuggestionAxis(key: string) {
-    const currentlyActive = activeAxisTypes ?? suggestions.activeAxisTypes;
-    setActiveAxisTypes(currentlyActive.includes(key) ? currentlyActive.filter((k) => k !== key) : [...currentlyActive, key]);
+  function handleSuggestionFiltersChange(filters: FilterValue[], nextOpenAxes: string[]) {
+    setFilterOverride(filters);
+    setOpenAxes(nextOpenAxes);
   }
 
   return (
@@ -226,7 +230,13 @@ export default function LocalSequencePage() {
           </div>
         </div>
 
-        <SequenceSuggestionsCard data={suggestions} onToggleAxis={toggleSuggestionAxis} onPick={setExploringSongId} />
+        <SequenceSuggestionsCard
+          data={suggestions}
+          appliedFilters={filterOverride ?? suggestions.appliedFilters}
+          openAxes={openAxes}
+          onFiltersChange={handleSuggestionFiltersChange}
+          onPick={setExploringSongId}
+        />
       </div>
     </main>
   );
