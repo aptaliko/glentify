@@ -256,6 +256,7 @@ export function buildSuggestionsResponse(input: BuildSuggestionsInput): Suggesti
     title: currentSongWithAxes.title,
     lyrics: currentSongWithAxes.lyrics,
     imageUrl: currentSongWithAxes.imageUrl,
+    pdfUrl: currentSongWithAxes.pdfUrl ?? null,
     maleKey: currentSongWithAxes.maleKey,
     femaleKey: currentSongWithAxes.femaleKey,
   };

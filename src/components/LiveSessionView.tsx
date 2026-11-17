@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
+import dynamic from 'next/dynamic';
 import PageNav from '@/components/PageNav';
 import SongPicker from '@/components/SongPicker';
 import type { SessionStore } from '@/lib/sessionStore';
@@ -18,6 +19,10 @@ import {
 } from '@/lib/lyricsReaderSettings';
 import { useKeepScreenAwake } from '@/lib/useKeepScreenAwake';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
+import { selectStackBlocks, type StackBlock } from '@/lib/stackBlocks';
+
+// pdf.js needs the browser and its worker file; load it only on the client.
+const PdfPages = dynamic(() => import('@/components/PdfPages'), { ssr: false });
 
 function SongButton({ song, onPick }: { song: SuggestedSong; onPick: (songId: number) => void }) {
   return (
@@ -46,6 +51,7 @@ function KeyBadges({ maleKey, femaleKey }: { maleKey: string | null; femaleKey: 
 function LyricsCard({
   lyrics,
   imageUrl,
+  pdfUrl,
   maleKey,
   femaleKey,
   scrollRef,
@@ -54,6 +60,7 @@ function LyricsCard({
 }: {
   lyrics: string | null;
   imageUrl: string | null;
+  pdfUrl: string | null;
   maleKey: string | null;
   femaleKey: string | null;
   scrollRef: React.RefObject<HTMLDivElement | null>;
@@ -88,6 +95,112 @@ function LyricsCard({
     el.scrollBy({ top: direction * el.clientHeight * 0.85, behavior: 'smooth' });
   }
 
+  const blocks = selectStackBlocks({ imageUrl, pdfUrl, lyrics });
+  // Two or three pieces stack one after another in one scrolling column; one piece fills the view.
+  const stacked = blocks.length > 1;
+
+  function renderBlock(block: StackBlock) {
+    if (block === 'image') {
+      if (stacked) {
+        return <img key="image" src={imageUrl ?? undefined} alt="Παρτιτούρα" className="h-auto w-full object-contain" />;
+      }
+      // Pinch/wheel to zoom, drag to pan; double-tap resets. `touch-none` keeps
+      // the WebView from hijacking the pinch/pan gesture for page scroll.
+      return (
+        <TransformWrapper key="image" doubleClick={{ mode: 'reset' }} minScale={1} centerOnInit>
+          <TransformComponent wrapperClass="!w-full !max-h-[70vh] touch-none" contentClass="!w-full !justify-center">
+            <img src={imageUrl ?? undefined} alt="Παρτιτούρα" className="max-h-[70vh] w-auto object-contain" />
+          </TransformComponent>
+        </TransformWrapper>
+      );
+    }
+    if (block === 'pdf') {
+      if (stacked) return <PdfPages key="pdf" url={pdfUrl ?? ''} />;
+      return (
+        <div key="pdf" className="max-h-[70vh] overflow-y-auto">
+          <PdfPages url={pdfUrl ?? ''} />
+        </div>
+      );
+    }
+    // lyrics
+    return (
+      <Fragment key="lyrics">
+        <div className={stacked ? 'flex justify-end gap-1' : 'absolute right-2 top-2 z-10 flex gap-1'}>
+          <button
+            type="button"
+            aria-label={stageMode ? 'Έξοδος από τη λειτουργία σκηνής' : 'Λειτουργία σκηνής'}
+            aria-pressed={stageMode}
+            onClick={onToggleStageMode}
+            className={`btn btn-circle btn-sm ${stageMode ? 'btn-primary' : 'btn-outline'}`}
+          >
+            🎤
+          </button>
+          <button
+            type="button"
+            aria-label="Μικρότερα γράμματα"
+            onClick={() => adjust(-1)}
+            disabled={scale !== null && scale <= FONT_SCALE_MIN}
+            className="btn btn-circle btn-sm btn-outline"
+          >
+            A−
+          </button>
+          <button
+            type="button"
+            aria-label="Μεγαλύτερα γράμματα"
+            onClick={() => adjust(1)}
+            disabled={scale !== null && scale >= FONT_SCALE_MAX}
+            className="btn btn-circle btn-sm btn-outline"
+          >
+            A+
+          </button>
+        </div>
+        {stacked ? (
+          scale === null ? (
+            <div className="min-h-[8rem]" aria-hidden />
+          ) : (
+            <pre
+              className={`mx-auto max-w-[50ch] whitespace-pre-wrap text-left font-sans leading-relaxed text-base-content ${
+                stageMode ? 'font-semibold' : ''
+              }`}
+              style={{ fontSize: `${scale * 1.5}rem` }}
+            >
+              {lyrics}
+            </pre>
+          )
+        ) : (
+          <>
+            <div ref={scrollRef} className={stageMode ? 'max-h-[86vh] overflow-y-auto' : 'max-h-[70vh] overflow-y-auto'}>
+              {scale === null ? (
+                <div className="min-h-[8rem]" aria-hidden />
+              ) : (
+                <pre
+                  className={`mx-auto max-w-[50ch] whitespace-pre-wrap text-left font-sans leading-relaxed text-base-content ${
+                    stageMode ? 'font-semibold' : ''
+                  }`}
+                  style={{ fontSize: `${scale * 1.5}rem` }}
+                >
+                  {lyrics}
+                </pre>
+              )}
+            </div>
+            <button
+              type="button"
+              aria-label="Προηγούμενη σελίδα στίχων"
+              onClick={() => page(-1)}
+              className="absolute inset-x-0 top-0 h-[20%] cursor-pointer bg-transparent"
+            />
+            <button
+              type="button"
+              aria-label="Επόμενη σελίδα στίχων"
+              onClick={() => page(1)}
+              className="absolute inset-x-0 bottom-0 h-[20%] cursor-pointer bg-transparent"
+            />
+          </>
+        )}
+      </Fragment>
+    );
+  }
+
   return (
     <div
       className={`relative flex flex-col gap-3 bg-base-100 ${
@@ -95,76 +208,11 @@ function LyricsCard({
       }`}
     >
       {!stageMode && <KeyBadges maleKey={maleKey} femaleKey={femaleKey} />}
-      {imageUrl ? (
-        // Pinch/wheel to zoom, drag to pan; double-tap resets. `touch-none` keeps
-        // the WebView from hijacking the pinch/pan gesture for page scroll.
-        <TransformWrapper doubleClick={{ mode: 'reset' }} minScale={1} centerOnInit>
-          <TransformComponent
-            wrapperClass="!w-full !max-h-[70vh] touch-none"
-            contentClass="!w-full !justify-center"
-          >
-            <img src={imageUrl} alt="Παρτιτούρα" className="max-h-[70vh] w-auto object-contain" />
-          </TransformComponent>
-        </TransformWrapper>
-      ) : lyrics ? (
-        <>
-          <div className="absolute right-2 top-2 z-10 flex gap-1">
-            <button
-              type="button"
-              aria-label={stageMode ? 'Έξοδος από τη λειτουργία σκηνής' : 'Λειτουργία σκηνής'}
-              aria-pressed={stageMode}
-              onClick={onToggleStageMode}
-              className={`btn btn-circle btn-sm ${stageMode ? 'btn-primary' : 'btn-outline'}`}
-            >
-              🎤
-            </button>
-            <button
-              type="button"
-              aria-label="Μικρότερα γράμματα"
-              onClick={() => adjust(-1)}
-              disabled={scale !== null && scale <= FONT_SCALE_MIN}
-              className="btn btn-circle btn-sm btn-outline"
-            >
-              A−
-            </button>
-            <button
-              type="button"
-              aria-label="Μεγαλύτερα γράμματα"
-              onClick={() => adjust(1)}
-              disabled={scale !== null && scale >= FONT_SCALE_MAX}
-              className="btn btn-circle btn-sm btn-outline"
-            >
-              A+
-            </button>
-          </div>
-          <div ref={scrollRef} className={stageMode ? 'max-h-[86vh] overflow-y-auto' : 'max-h-[70vh] overflow-y-auto'}>
-            {scale === null ? (
-              <div className="min-h-[8rem]" aria-hidden />
-            ) : (
-              <pre
-                className={`mx-auto max-w-[50ch] whitespace-pre-wrap text-left font-sans leading-relaxed text-base-content ${
-                  stageMode ? 'font-semibold' : ''
-                }`}
-                style={{ fontSize: `${scale * 1.5}rem` }}
-              >
-                {lyrics}
-              </pre>
-            )}
-          </div>
-          <button
-            type="button"
-            aria-label="Προηγούμενη σελίδα στίχων"
-            onClick={() => page(-1)}
-            className="absolute inset-x-0 top-0 h-[20%] cursor-pointer bg-transparent"
-          />
-          <button
-            type="button"
-            aria-label="Επόμενη σελίδα στίχων"
-            onClick={() => page(1)}
-            className="absolute inset-x-0 bottom-0 h-[20%] cursor-pointer bg-transparent"
-          />
-        </>
-      ) : (
+      {!stacked && blocks.map((block) => renderBlock(block))}
+      {stacked && (
+        <div className="flex max-h-[75vh] flex-col gap-4 overflow-y-auto">{blocks.map((block) => renderBlock(block))}</div>
+      )}
+      {blocks.length === 0 && (
         <p className="text-lg italic text-base-content/50">Δεν έχουν προστεθεί ακόμη στίχοι ή παρτιτούρα για αυτό το τραγούδι.</p>
       )}
     </div>
@@ -320,6 +368,7 @@ export default function LiveSessionView({
           <LyricsCard
             lyrics={currentSong.lyrics}
             imageUrl={currentSong.imageUrl}
+            pdfUrl={currentSong.pdfUrl ?? null}
             maleKey={currentSong.maleKey}
             femaleKey={currentSong.femaleKey}
             scrollRef={lyricsScrollRef}
