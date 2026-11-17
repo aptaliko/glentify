@@ -67,3 +67,37 @@ export function mergeTaxonomyWithPending(
   }
   return result;
 }
+
+// The axis each taxonomy entity is referenced through in song axis values, and the message the
+// server gives when a value is still used (src/db/queries/*.ts). Native checks this locally before
+// queueing a delete, since the queued delete is hidden at once and its 409 would otherwise be silent.
+const USAGE_AXIS: Partial<Record<DraftEntity, string>> = {
+  regions: 'region',
+  genres: 'genre',
+  rhythms: 'rhythm',
+  dromoi: 'dromos',
+  dances: 'dance',
+  composers: 'composer',
+};
+
+const IN_USE_MESSAGE: Partial<Record<DraftEntity, string>> = {
+  regions: 'Η περιοχή χρησιμοποιείται από τραγούδι',
+  genres: 'Το είδος χρησιμοποιείται από τραγούδι',
+  rhythms: 'Ο ρυθμός χρησιμοποιείται από τραγούδι',
+  dromoi: 'Ο δρόμος χρησιμοποιείται από τραγούδι',
+  dances: 'Ο χορός χρησιμοποιείται από τραγούδι',
+  composers: 'Ο συνθέτης χρησιμοποιείται από τραγούδι',
+};
+
+export interface UsageAxisValue {
+  axisType: string;
+  refId: number | null;
+}
+
+// Pure. Returns the in-use message when a song still references this taxonomy value, else null.
+export function taxonomyInUseMessage(entity: DraftEntity, id: number, axisValues: UsageAxisValue[]): string | null {
+  const axis = USAGE_AXIS[entity];
+  const message = IN_USE_MESSAGE[entity];
+  if (!axis || !message) return null;
+  return axisValues.some((v) => v.axisType === axis && v.refId === id) ? message : null;
+}
