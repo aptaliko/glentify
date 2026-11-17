@@ -508,3 +508,18 @@ next pass cleared it and the data synced fine. Now it only shows after 2 consecu
 - [ ] Native + offline: attach a PDF to an existing song, then Αφαίρεση PDF before reconnecting → reconnect → no needs-attention badge, no orphan upload.
 - [ ] Android device: a multi-page lyrics PDF renders page by page and scrolls in the live view (pdf.js, not a native viewer).
 - [ ] Offline (native, airplane mode) during a gig: the PDF is NOT shown (online only in v1, same as the score image).
+
+## Multi-value characteristic filters (added 2026-11-17)
+- [ ] Live view: a song in a multi-level area (e.g. Απείρανθος) starts with a Περιοχή column holding its region and every ancestor (Νάξος, Κυκλάδες, Νησιά Αιγαίου, Νησιά), current region first.
+- [ ] Live view: removing a region chip narrows or widens the "Προτάσεις" list; adding a value from the column's dropdown adds a chip and updates the list.
+- [ ] Live view: removing the last chip of a column closes that column; a column opened from "+ Χαρακτηριστικό" with no chip yet stays open with its value dropdown.
+- [ ] Live view: "+ Χαρακτηριστικό" lists only characteristics without a visible column; choosing one opens its column.
+- [ ] Live view: list order is by the first matched chip (on-screen order), then by title with Greek collation.
+- [ ] Live view: removing every chip shows "Όλα τα τραγούδια" in alphabetical order; with no candidates it shows "Κανένα τραγούδι"; with chips and no matches it shows "Καμία πρόταση".
+- [ ] Live view: picking a song (or Τέλος σειράς) resets the chips to that song's defaults and closes the extra columns.
+- [ ] Live view: "Δείξε τα ειπωμένα" still toggles played songs in and out of the list with the filters applied.
+- [ ] Sequence view (fixed program): the "Προτάσεις" card shows the same columns; a chip change re-filters the card and not the "Λίστα σειράς"; moving to another song resets the chips.
+- [ ] Sequence view (local/offline program): the same behaviour as the fixed-program sequence view, on device.
+- [ ] Native offline (airplane mode): the live session and sequence cards filter exactly as online, from the cached reference data.
+- [ ] Stale link: a URL with `filters=region:abc,,year:` (or a deleted value id) loads with those parts ignored, not an error.
+- [ ] Phone width (≈360px): the filter columns wrap, and the page has no horizontal scroll.
