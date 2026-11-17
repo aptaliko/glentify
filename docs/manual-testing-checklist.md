@@ -494,3 +494,16 @@ next pass cleared it and the data synced fine. Now it only shows after 2 consecu
 - [ ] Reorder/rename a σειρά in Διαχείριση with a live connection: it syncs (visible on another device) WITHOUT the red "σταμάτησε" notice flashing; at most the neutral "N εκκρεμεί συγχρονισμός" appears briefly
 - [ ] A genuinely stuck sync (airplane mode with a queued edit, then foreground a couple of times) STILL shows "Ο συγχρονισμός σταμάτησε προσωρινά" — the threshold delays it by one pass, it does not suppress it
 - [ ] Force-quitting and reopening while sync is still genuinely stuck re-shows the notice (the consecutive-blip counter resets on restart, so a real stall re-alarms)
+
+## Song lyrics PDF (added 2026-11-17)
+- [ ] Web new song: attach a lyrics PDF → the file name shows → Αφαίρεση PDF clears it → attach again → save → reopen the song: the PDF link is present (Άνοιγμα PDF).
+- [ ] Web edit song: replace the PDF and save → the new one is used; remove and save → the song has no PDF.
+- [ ] Reject: a PNG in the PDF input, or a PDF over 10MB → inline Greek error, nothing stored.
+- [ ] Live view, online: a song with image + PDF + typed lyrics shows the three blocks in that order, one after another, and the column scrolls.
+- [ ] Live view: a song with only a PDF fills the view; with only lyrics or only the image, it looks exactly as before.
+- [ ] Live view: a broken PDF link shows "Το PDF δεν φορτώθηκε." and the typed lyrics still render below it.
+- [ ] Live view: a PDF over 50 pages shows the first 50 and the note "Εμφανίζονται οι πρώτες 50 σελίδες."
+- [ ] Native + offline: attach a PDF to a new song, save, reconnect → the song has the PDF link (uploaded on sync).
+- [ ] Native + offline: attach a PDF to an existing song, then Αφαίρεση PDF before reconnecting → reconnect → no needs-attention badge, no orphan upload.
+- [ ] Android device: a multi-page lyrics PDF renders page by page and scrolls in the live view (pdf.js, not a native viewer).
+- [ ] Offline (native, airplane mode) during a gig: the PDF is NOT shown (online only in v1, same as the score image).
