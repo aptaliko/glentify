@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   getRegionAncestorIds,
   getRegionDescendantIds,
+  getRegionSiblingIds,
   regionMatchesFilter,
   getFilteredCandidates,
   rankBySharedAxes,
@@ -73,6 +74,27 @@ describe('regionMatchesFilter', () => {
 
   it('does not match an unrelated branch', () => {
     expect(regionMatchesFilter(6, 5, regions)).toBe(false); // Κύθηρα vs Απείρανθος share only the "Νησιά" great-ancestor via Νησιά(1), but 6's parent is 1 directly, not on the Απείρανθος branch
+  });
+
+  it('matches a sibling region (same parent)', () => {
+    expect(regionMatchesFilter(6, 2, regions)).toBe(true); // Κύθηρα and Νησιά Αιγαίου both sit directly under Νησιά(1)
+    expect(regionMatchesFilter(2, 6, regions)).toBe(true);
+  });
+
+  it('does not match a cousin (sibling of an ancestor)', () => {
+    expect(regionMatchesFilter(6, 3, regions)).toBe(false); // Κύθηρα(6) is a sibling of Νησιά Αιγαίου(2), not of Κυκλάδες(3)
+  });
+});
+
+describe('getRegionSiblingIds', () => {
+  it('returns regions sharing the same parent, excluding itself', () => {
+    expect(getRegionSiblingIds(2, regions)).toEqual([6]);
+    expect(getRegionSiblingIds(6, regions)).toEqual([2]);
+  });
+
+  it('returns an empty array for a root region or an only child', () => {
+    expect(getRegionSiblingIds(1, regions)).toEqual([]);
+    expect(getRegionSiblingIds(3, regions)).toEqual([]);
   });
 });
 

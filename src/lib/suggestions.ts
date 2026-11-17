@@ -53,7 +53,17 @@ export function getRegionDescendantIds(regionId: number, regions: RegionRow[]): 
 export function regionMatchesFilter(candidateRegionId: number, currentRegionId: number, regions: RegionRow[]): boolean {
   if (candidateRegionId === currentRegionId) return true;
   if (getRegionAncestorIds(currentRegionId, regions).includes(candidateRegionId)) return true;
-  return getRegionDescendantIds(currentRegionId, regions).includes(candidateRegionId);
+  if (getRegionDescendantIds(currentRegionId, regions).includes(candidateRegionId)) return true;
+  return getRegionSiblingIds(currentRegionId, regions).includes(candidateRegionId);
+}
+
+// Direct siblings only: other regions sharing the same parent (not cousins, not the parent's siblings).
+export function getRegionSiblingIds(regionId: number, regions: RegionRow[]): number[] {
+  const current = regions.find((r) => r.id === regionId);
+  if (!current || current.parentId === null) return [];
+  return regions
+    .filter((r) => r.parentId === current.parentId && r.id !== regionId)
+    .map((r) => r.id);
 }
 
 export interface FilteredCandidatesParams {
