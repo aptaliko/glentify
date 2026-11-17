@@ -17,7 +17,7 @@ interface TaxonomyDeletePayload { id: number }
 
 const TAXONOMY_ENTITIES: DraftEntity[] = ['regions', 'genres', 'rhythms', 'dromoi', 'composers'];
 
-function makeTaxonomyCreateHandler(entity: DraftEntity) {
+export function makeTaxonomyCreateHandler(entity: DraftEntity) {
   return async function (payload: unknown): Promise<SyncOutcome> {
     const { draftId, name, parentId } = payload as TaxonomyCreatePayload;
     // Regions can have a draft parent created earlier in the same offline session.
@@ -45,7 +45,7 @@ function makeTaxonomyCreateHandler(entity: DraftEntity) {
   };
 }
 
-function makeTaxonomyDeleteHandler(entity: DraftEntity) {
+export function makeTaxonomyDeleteHandler(entity: DraftEntity) {
   return async function (payload: unknown): Promise<SyncOutcome> {
     const { id } = payload as TaxonomyDeletePayload;
     // A draft created and deleted in the same session: the create synced first and recorded

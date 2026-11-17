@@ -3,9 +3,9 @@
 import { useEffect, useState } from 'react';
 import { nativeApiFetch } from '@/lib/nativeApiFetch';
 import { loadReferenceData } from '@/lib/offlineCache';
-import { enqueue, getQueuedActions } from '@/lib/syncQueue';
+import { getQueuedActions } from '@/lib/syncQueue';
 import { mergeTaxonomyWithPending, type DisplayTaxonomyValue } from '@/lib/taxonomyMerge';
-import { mintDraftId } from '@/lib/draftIds';
+import { addTaxonomyValue, removeTaxonomyValue, drainWebTaxonomyQueue } from '@/lib/taxonomyActions';
 import { useSyncQueue } from '@/components/SyncQueueProvider';
 
 const ENTITY = 'rhythms' as const;
@@ -18,6 +18,7 @@ export default function RhythmsAdminPage() {
   const [offline, setOffline] = useState(false);
 
   async function load() {
+    await drainWebTaxonomyQueue();
     const actions = await getQueuedActions();
     try {
       const res = await nativeApiFetch('/api/rhythms');
@@ -41,24 +42,26 @@ export default function RhythmsAdminPage() {
     e.preventDefault();
     setError(null);
     try {
-      await enqueue('rhythms-create', { draftId: mintDraftId(), name, parentId: null });
-    } catch {
-      setError('Αποτυχία αποθήκευσης. Δοκίμασε ξανά.');
+      await addTaxonomyValue(ENTITY, name);
+    } catch (err) {
+      setError((err as Error).message);
       return;
     }
     setName('');
     await notifyQueueChanged();
+    await load();
   }
 
   async function handleDelete(id: number) {
     setError(null);
     try {
-      await enqueue('rhythms-delete', { id });
-    } catch {
-      setError('Αποτυχία αποθήκευσης. Δοκίμασε ξανά.');
+      await removeTaxonomyValue(ENTITY, id);
+    } catch (err) {
+      setError((err as Error).message);
       return;
     }
     await notifyQueueChanged();
+    await load();
   }
 
   return (

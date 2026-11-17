@@ -3,9 +3,9 @@
 import { useEffect, useState } from 'react';
 import { nativeApiFetch } from '@/lib/nativeApiFetch';
 import { loadReferenceData } from '@/lib/offlineCache';
-import { enqueue, getQueuedActions } from '@/lib/syncQueue';
+import { getQueuedActions } from '@/lib/syncQueue';
 import { mergeTaxonomyWithPending, type DisplayTaxonomyValue } from '@/lib/taxonomyMerge';
-import { mintDraftId } from '@/lib/draftIds';
+import { addTaxonomyValue, removeTaxonomyValue, drainWebTaxonomyQueue } from '@/lib/taxonomyActions';
 import { useSyncQueue } from '@/components/SyncQueueProvider';
 
 const ENTITY = 'regions' as const;
@@ -19,6 +19,7 @@ export default function RegionsAdminPage() {
   const [offline, setOffline] = useState(false);
 
   async function load() {
+    await drainWebTaxonomyQueue();
     const actions = await getQueuedActions();
     try {
       const res = await nativeApiFetch('/api/regions');
@@ -42,29 +43,27 @@ export default function RegionsAdminPage() {
     e.preventDefault();
     setError(null);
     try {
-      await enqueue('regions-create', {
-        draftId: mintDraftId(),
-        name,
-        parentId: parentId ? Number(parentId) : null,
-      });
-    } catch {
-      setError('Αποτυχία αποθήκευσης. Δοκίμασε ξανά.');
+      await addTaxonomyValue(ENTITY, name, parentId ? Number(parentId) : null);
+    } catch (err) {
+      setError((err as Error).message);
       return;
     }
     setName('');
     setParentId('');
     await notifyQueueChanged();
+    await load();
   }
 
   async function handleDelete(id: number) {
     setError(null);
     try {
-      await enqueue('regions-delete', { id });
-    } catch {
-      setError('Αποτυχία αποθήκευσης. Δοκίμασε ξανά.');
+      await removeTaxonomyValue(ENTITY, id);
+    } catch (err) {
+      setError((err as Error).message);
       return;
     }
     await notifyQueueChanged();
+    await load();
   }
 
   return (

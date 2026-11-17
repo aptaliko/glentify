@@ -180,6 +180,13 @@ export async function processQueue(): Promise<ProcessResult> {
   return serialize(() => processQueueWith(indexedDbQueueStorage, handlerRegistry));
 }
 
+// Drains only the queued actions that have a handler in `handlers` (others are left
+// untouched by processQueueWith). Used by the web admin pages to flush offline writes
+// queued before web gained direct writes, without touching songs/programs/sessions items.
+export async function processQueueSubset(handlers: Map<string, SyncHandler>): Promise<ProcessResult> {
+  return serialize(() => processQueueWith(indexedDbQueueStorage, handlers));
+}
+
 // Removes needsAttention items the user dismissed (all, or just those matching
 // `predicate`). Serialized against enqueue/processQueue so it never races the queue's
 // read-modify-write cycle. Callers refresh the badge afterwards via notifyQueueChanged().
