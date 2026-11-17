@@ -16,7 +16,7 @@ function makeAction(overrides: Partial<QueuedAction>): QueuedAction {
   };
 }
 
-const emptySongFields = { imageUrl: null, notes: null, maleKey: null, femaleKey: null, axisValues: [] as AxisValueEntry[], pendingImageBlobId: null };
+const emptySongFields = { imageUrl: null, notes: null, maleKey: null, femaleKey: null, axisValues: [] as AxisValueEntry[], pendingImageBlobId: null, pdfUrl: null, pendingPdfBlobId: null };
 
 describe('mergeSongsWithPending', () => {
   const base: CachedSong[] = [
@@ -155,7 +155,7 @@ describe('resolveSongForEdit', () => {
         maleKey: 'Ρε',
         femaleKey: 'Λα',
         axisValues: baseAxisValues,
-        pendingImageBlobId: null,
+        pendingImageBlobId: null, pdfUrl: null, pendingPdfBlobId: null,
       },
       hasPendingEdit: false,
     });
@@ -166,13 +166,39 @@ describe('resolveSongForEdit', () => {
     const actions = [
       makeAction({
         type: 'song-update',
-        payload: { songId: 1, title: 'Νέος Τίτλος', lyrics: 'Νέοι στίχοι', imageUrl: null, notes: null, maleKey: null, femaleKey: null, axisValues: newAxisValues, pendingImageBlobId: null },
+        payload: { songId: 1, title: 'Νέος Τίτλος', lyrics: 'Νέοι στίχοι', imageUrl: null, notes: null, maleKey: null, femaleKey: null, axisValues: newAxisValues, pendingImageBlobId: null, pdfUrl: null, pendingPdfBlobId: null },
       }),
     ];
     expect(resolveSongForEdit(1, base, baseAxisValues, actions)).toEqual({
-      song: { title: 'Νέος Τίτλος', lyrics: 'Νέοι στίχοι', imageUrl: null, notes: null, maleKey: null, femaleKey: null, axisValues: newAxisValues, pendingImageBlobId: null },
+      song: { title: 'Νέος Τίτλος', lyrics: 'Νέοι στίχοι', imageUrl: null, notes: null, maleKey: null, femaleKey: null, axisValues: newAxisValues, pendingImageBlobId: null, pdfUrl: null, pendingPdfBlobId: null },
       hasPendingEdit: true,
     });
+  });
+
+  it('overlays a queued PDF attachment from a pending edit', () => {
+    const actions = [
+      makeAction({
+        type: 'song-update',
+        payload: { songId: 1, title: 'Τραγούδι Α', lyrics: null, imageUrl: null, pdfUrl: null, pendingPdfBlobId: -77, notes: null, maleKey: null, femaleKey: null, axisValues: baseAxisValues, pendingImageBlobId: null },
+      }),
+    ];
+    expect(resolveSongForEdit(1, base, baseAxisValues, actions).song?.pendingPdfBlobId).toBe(-77);
+  });
+
+  it('a later queued removal overrides an earlier queued PDF (last edit wins)', () => {
+    const actions = [
+      makeAction({
+        type: 'song-update',
+        payload: { songId: 1, title: 'Τραγούδι Α', lyrics: null, imageUrl: null, pdfUrl: null, pendingPdfBlobId: -77, notes: null, maleKey: null, femaleKey: null, axisValues: baseAxisValues, pendingImageBlobId: null },
+      }),
+      makeAction({
+        type: 'song-update',
+        payload: { songId: 1, title: 'Τραγούδι Α', lyrics: null, imageUrl: null, pdfUrl: null, pendingPdfBlobId: null, notes: null, maleKey: null, femaleKey: null, axisValues: baseAxisValues, pendingImageBlobId: null },
+      }),
+    ];
+    const { song } = resolveSongForEdit(1, base, baseAxisValues, actions);
+    expect(song?.pdfUrl).toBeNull();
+    expect(song?.pendingPdfBlobId).toBeNull();
   });
 
   it('falls back to the base fields when the only pending edit needs attention', () => {
@@ -192,7 +218,7 @@ describe('resolveSongForEdit', () => {
         maleKey: 'Ρε',
         femaleKey: 'Λα',
         axisValues: baseAxisValues,
-        pendingImageBlobId: null,
+        pendingImageBlobId: null, pdfUrl: null, pendingPdfBlobId: null,
       },
       hasPendingEdit: false,
     });
@@ -208,15 +234,15 @@ describe('resolveSongForEdit', () => {
     const actions = [
       makeAction({
         type: 'song-update',
-        payload: { songId: 1, title: 'Πρώτη επεξεργασία', lyrics: 'Πρώτοι στίχοι', imageUrl: null, notes: null, maleKey: null, femaleKey: null, axisValues: firstAxisValues, pendingImageBlobId: null },
+        payload: { songId: 1, title: 'Πρώτη επεξεργασία', lyrics: 'Πρώτοι στίχοι', imageUrl: null, notes: null, maleKey: null, femaleKey: null, axisValues: firstAxisValues, pendingImageBlobId: null, pdfUrl: null, pendingPdfBlobId: null },
       }),
       makeAction({
         type: 'song-update',
-        payload: { songId: 1, title: 'Δεύτερη επεξεργασία', lyrics: 'Δεύτεροι στίχοι', imageUrl: null, notes: null, maleKey: null, femaleKey: null, axisValues: secondAxisValues, pendingImageBlobId: null },
+        payload: { songId: 1, title: 'Δεύτερη επεξεργασία', lyrics: 'Δεύτεροι στίχοι', imageUrl: null, notes: null, maleKey: null, femaleKey: null, axisValues: secondAxisValues, pendingImageBlobId: null, pdfUrl: null, pendingPdfBlobId: null },
       }),
     ];
     expect(resolveSongForEdit(1, base, baseAxisValues, actions)).toEqual({
-      song: { title: 'Δεύτερη επεξεργασία', lyrics: 'Δεύτεροι στίχοι', imageUrl: null, notes: null, maleKey: null, femaleKey: null, axisValues: secondAxisValues, pendingImageBlobId: null },
+      song: { title: 'Δεύτερη επεξεργασία', lyrics: 'Δεύτεροι στίχοι', imageUrl: null, notes: null, maleKey: null, femaleKey: null, axisValues: secondAxisValues, pendingImageBlobId: null, pdfUrl: null, pendingPdfBlobId: null },
       hasPendingEdit: true,
     });
   });

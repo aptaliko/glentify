@@ -213,27 +213,37 @@ async function handleDeleteProgramSync(payload: unknown): Promise<SyncOutcome> {
 //   - returns the URL when resolved from the map (skips re-upload) or after a fresh upload()
 // A thrown/rejected upload() propagates out to processQueueWith, which maps it to
 // systemic-error (pass stops, no attempt consumed) — correct for the offline case.
-async function resolvePendingImageUrl(pendingImageBlobId: number | null | undefined): Promise<string | null | 'item-error'> {
-  if (pendingImageBlobId === null || pendingImageBlobId === undefined) return null;
-  const alreadyUploaded = await loadImageResolution(pendingImageBlobId);
+async function resolvePendingFileUrl(
+  pendingBlobId: number | null | undefined,
+  uploadPath: '/api/songs/image-upload' | '/api/songs/pdf-upload'
+): Promise<string | null | 'item-error'> {
+  if (pendingBlobId === null || pendingBlobId === undefined) return null;
+  const alreadyUploaded = await loadImageResolution(pendingBlobId);
   if (alreadyUploaded !== null) return alreadyUploaded;
-  const local = await getLocalImage(pendingImageBlobId);
+  const local = await getLocalImage(pendingBlobId);
   if (local === null) return 'item-error';
   const token = await getAuthToken();
   const blob = await upload(local.filename, local.blob, {
     access: 'public',
-    handleUploadUrl: apiUrl('/api/songs/image-upload'),
+    handleUploadUrl: apiUrl(uploadPath),
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
   });
-  await recordImageResolution(pendingImageBlobId, blob.url);
+  await recordImageResolution(pendingBlobId, blob.url);
   return blob.url;
 }
 
+// Lyrics PDFs share the device-wide draft-id namespace and the same local store as images.
+function resolvePendingPdfUrl(pendingPdfBlobId: number | null | undefined): Promise<string | null | 'item-error'> {
+  return resolvePendingFileUrl(pendingPdfBlobId, '/api/songs/pdf-upload');
+}
+
 async function handleCreateSongSync(payload: unknown): Promise<SyncOutcome> {
-  const { pendingImageBlobId, ...rest } = payload as CreateSongPayload;
-  const resolvedImage = await resolvePendingImageUrl(pendingImageBlobId);
+  const { pendingImageBlobId, pendingPdfBlobId, ...rest } = payload as CreateSongPayload;
+  const resolvedImage = await resolvePendingFileUrl(pendingImageBlobId, '/api/songs/image-upload');
   if (resolvedImage === 'item-error') return 'item-error';
-  const body = { ...rest, imageUrl: resolvedImage ?? rest.imageUrl };
+  const resolvedPdf = await resolvePendingPdfUrl(pendingPdfBlobId);
+  if (resolvedPdf === 'item-error') return 'item-error';
+  const body = { ...rest, imageUrl: resolvedImage ?? rest.imageUrl, pdfUrl: resolvedPdf ?? rest.pdfUrl };
   const res = await nativeApiFetch(
     '/api/songs',
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
@@ -242,6 +252,7 @@ async function handleCreateSongSync(payload: unknown): Promise<SyncOutcome> {
   );
   if (res.ok) {
     if (pendingImageBlobId != null) await deleteLocalImage(pendingImageBlobId);
+    if (pendingPdfBlobId != null) await deleteLocalImage(pendingPdfBlobId);
     return 'success';
   }
   if (res.status === 401 || res.status >= 500) return 'systemic-error';
@@ -249,10 +260,12 @@ async function handleCreateSongSync(payload: unknown): Promise<SyncOutcome> {
 }
 
 async function handleUpdateSongSync(payload: unknown): Promise<SyncOutcome> {
-  const { songId, pendingImageBlobId, ...rest } = payload as UpdateSongPayload;
-  const resolvedImage = await resolvePendingImageUrl(pendingImageBlobId);
+  const { songId, pendingImageBlobId, pendingPdfBlobId, ...rest } = payload as UpdateSongPayload;
+  const resolvedImage = await resolvePendingFileUrl(pendingImageBlobId, '/api/songs/image-upload');
   if (resolvedImage === 'item-error') return 'item-error';
-  const body = { ...rest, imageUrl: resolvedImage ?? rest.imageUrl };
+  const resolvedPdf = await resolvePendingPdfUrl(pendingPdfBlobId);
+  if (resolvedPdf === 'item-error') return 'item-error';
+  const body = { ...rest, imageUrl: resolvedImage ?? rest.imageUrl, pdfUrl: resolvedPdf ?? rest.pdfUrl };
   const res = await nativeApiFetch(
     `/api/songs/${encodeURIComponent(songId)}`,
     { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
@@ -264,6 +277,7 @@ async function handleUpdateSongSync(payload: unknown): Promise<SyncOutcome> {
   // handleDeleteProgramSync's 404-as-success precedent.
   if (res.ok || res.status === 404) {
     if (pendingImageBlobId != null) await deleteLocalImage(pendingImageBlobId);
+    if (pendingPdfBlobId != null) await deleteLocalImage(pendingPdfBlobId);
     return 'success';
   }
   if (res.status === 401 || res.status >= 500) return 'systemic-error';
