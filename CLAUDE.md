@@ -92,8 +92,10 @@ fixed, code-seeded list — region/rhythm/dromos/composer/year/genre) and `songA
 `yearValue` for the `year` axis, unique on `(songId, axisType)`). There is no per-song
 fixed rhythm/region/genre column — adding a new axis means a new lookup table plus a seed
 row, not a schema migration on `songs`. The suggestion engine (`src/lib/suggestions.ts`:
-`getFilteredCandidates`/`rankBySharedAxes`/`getSuggestions`) is itself axis-agnostic; it
-ranks candidates by whichever axes the current song has, toggled at the call site.
+`buildSuggestionsResponse`, on `defaultFilters`/`matchesFilters`/`firstMatchIndex`) is itself
+axis-agnostic: a song's default filters are its own value on every axis, the user adds or
+removes values per axis (chips), and candidates are ordered by the first filter they match.
+The option list per axis is built in `buildAxisOptions`.
 
 A new column on `programs`/`program_sequences` (e.g. the `version` conflict guard) must be
 threaded through **every** read path independently — the offline-blob builder

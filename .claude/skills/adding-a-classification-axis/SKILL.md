@@ -1,11 +1,11 @@
 ---
 name: adding-a-classification-axis
 description: Use when adding a new song classification axis to Glentify (a new way to tag
-  and rank songs alongside region/rhythm/dromos/composer/year/genre). The suggestion engine
-  ranks by the current song's own tags, so a new axis is a lookup table + an axis_types seed
-  row + reference/label wiring, NOT a schema migration on songs and NOT a call-site toggle. Symptoms: "new axis", "axisType", "axis_types",
-  "songAxisValues", "lookupTable", "seed-axis-types", "rankBySharedAxes", "how do I add a
-  tag dimension".
+  and filter songs alongside region/rhythm/dromos/composer/year/genre). The suggestion engine
+  builds default filters from the current song's own tags, so a new axis is a lookup table +
+  an axis_types seed row + reference/option wiring, NOT a schema migration on songs and NOT a
+  call-site toggle. Symptoms: "new axis", "axisType", "axis_types", "songAxisValues",
+  "lookupTable", "seed-axis-types", "buildAxisOptions", "how do I add a tag dimension".
 ---
 
 # Adding a Classification Axis
@@ -15,13 +15,14 @@ description: Use when adding a new song classification axis to Glentify (a new w
 Songs are classified **generically**. There is no per-song rhythm/region/genre column — a
 song's tags live in `songAxisValues` (one row per song per axis set, unique on
 `(songId, axisType)`), keyed by an `axis_types` row. The suggestion engine
-(`src/lib/suggestions.ts`: `getFilteredCandidates` / `rankBySharedAxes` / `getSuggestions`)
-is itself axis-agnostic — it ranks by whichever axes the current song has. So adding a new
-axis is **data + wiring, never a migration on `songs`**.
+(`src/lib/suggestions.ts`: `buildSuggestionsResponse`, built on `defaultFilters` /
+`matchesFilters` / `firstMatchIndex`) is itself axis-agnostic — a song's default filters are
+its own value on every axis, and candidates are ordered by the first filter they match. So
+adding a new axis is **data + wiring, never a migration on `songs`**.
 
 Two silent-failure traps: (1) forget the `axis_types` seed row and the axis effectively
-doesn't exist; (2) forget to include it in the active axis set at the suggestion call site
-and it never influences ranking — with no error anywhere.
+doesn't exist; (2) forget to register its options in `buildAxisOptions` and the axis is never
+offered in the filter columns, and its default chip is dropped — with no error anywhere.
 
 Design background: `docs/superpowers/specs/2026-07-29-dynamic-song-tags-design.md` and
 `2026-08-12-remove-genre-column-design.md`.
@@ -70,15 +71,16 @@ An axis is defined by one `axis_types` row (`src/db/schema.ts`, `axisTypes` tabl
 5. **Editor wiring — two hardcoded allowlists.** Add `'<lookupTable>'` to `LOOKUP_FIELDS` in
    `axisEditorData.ts` (else the native editor renders the axis with **zero options, no error**)
    AND `'<axis>': '/api/<lookupTable>'` to `LOOKUP_ENDPOINTS` in `SongAxisEditor.tsx`.
-6. **Suggestion *label* wiring — NOT a call-site toggle.** The engine derives its active axis
-   set from the current song's own tags (`effectiveActive = requestedActive ?? new Set(current
-   song's axis keys)` in `buildSuggestionsResponse`), so a seeded+tagged axis **ranks
-   automatically** — there is no `activeAxisTypes` array to add a key to, and
+6. **Suggestion *option* wiring — NOT a call-site toggle.** A song's default filters are built
+   from its own tags (`defaultFilters` in `buildSuggestionsResponse`), so a seeded+tagged axis
+   **filters automatically** — there is no `activeAxisTypes` array to add a key to, and
    `src/app/api/songs/suggestions/route.ts` doesn't rank at all. What you MUST wire is the
-   **label map**, which is hardcoded to the existing 5 axes; skip it and the axis ranks but
-   renders as `?`:
+   **option map** in `buildAxisOptions`, which is hardcoded to the existing axes. Skip it and the
+   axis's chip is silently dropped (`appliedFilters` only keeps values the axes list knows) and
+   the column is never offered in "+ Χαρακτηριστικό":
    - `src/lib/suggestions.ts`: add your axis to the `ReferenceLookups` interface AND to the
-     `lookupNameById` map inside `buildSuggestionsResponse`.
+     `optionsByKey` record inside `buildAxisOptions` (with `year`, the options come from the
+     songs themselves instead of a lookup table).
    - `src/app/api/sessions/[id]/suggestions/route.ts`: add the list query to its `Promise.all`
      and to **both** `lookups` objects.
    - `src/lib/sessionStore.ts` → `toReferenceLookups`: add the axis — this is the **offline**
@@ -91,7 +93,8 @@ An axis is defined by one `axis_types` row (`src/db/schema.ts`, `axisTypes` tabl
    `TAXONOMY_ENTITIES: DraftEntity[]` in `syncHandlers.ts` won't typecheck), then follow
    `adding-offline-action` (the `TAXONOMY_ENTITIES` loop auto-registers `*-create`/`*-delete`;
    `mergeTaxonomyWithPending` + a manual-checklist row).
-9. **Tests**: add the new axis to `suggestions.test.ts` (two songs sharing the axis lift rank)
+9. **Tests**: add the new axis to `suggestions.test.ts` (a song's value becomes a default chip,
+   and a second song sharing it is a candidate)
    and `referenceData.test.ts` / `axisEditorData.test.ts` (normalize backfill + option resolution).
 
 ## Common mistakes
@@ -100,11 +103,12 @@ An axis is defined by one `axis_types` row (`src/db/schema.ts`, `axisTypes` tabl
   on the wrong path — the value goes in `songAxisValues`.
 - **Skipping the seed row.** The lookup table can exist and be empty-of-meaning without the
   `axis_types` row that makes it an axis. Symptom: nothing references the new tag anywhere.
-- **Hunting for a "call-site toggle" that doesn't exist.** The engine ranks by the current
-  song's own tags — there's no static axis set to edit. The silent failure is *labels*, not
-  ranking: skip `lookupNameById` / `ReferenceLookups` / `toReferenceLookups` and the axis
-  ranks correctly but shows `?`; skip `getVisibleAxisRefIds` and its tags vanish from
-  title-search suggestions. Verify by tagging two songs and confirming the shared tag both
-  lifts rank **and** renders its label — on web *and* on device.
+- **Hunting for a "call-site toggle" that doesn't exist.** The defaults come from the current
+  song's own tags — there's no static axis set to edit. The silent failures are in the option
+  map: skip `optionsByKey` / `ReferenceLookups` / `toReferenceLookups` and the axis's chip
+  disappears and the axis is never offered; skip `getVisibleAxisRefIds` and its tags vanish
+  from title-search suggestions. Verify by tagging two songs and confirming the shared value
+  shows as a chip, the other song is listed, and the chip renders its label — on web *and* on
+  device.
 - **Non-nullable `ownerId` on the lookup table.** Breaks the shared-baseline-vs-private
   model; taxonomy tables are deliberately nullable there, unlike songs/programs/sessions.
